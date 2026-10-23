@@ -2,6 +2,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
+const vm = require("node:vm");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const { createLevilNotesApi } = require("../../electron/api.cjs");
@@ -140,6 +141,10 @@ async function createFixture() {
     "<!doctype html><title>SpaceNotes usage model</title>",
     "utf8",
   );
+  await fs.writeFile(
+    path.join(vaultRoot, "image.png"),
+    Buffer.from("usage-model-image"),
+  );
   for (let index = 0; index < 8; index += 1) {
     await fs.writeFile(
       path.join(vaultRoot, `note-${index}.md`),
@@ -190,6 +195,53 @@ async function post(baseUrl, token, method, args = []) {
   return body.result;
 }
 
+async function createBridge(baseUrl, token, postToSidecar) {
+  const source = await fs.readFile(
+    path.join(ROOT, "macos", "bridge", "levilNotesBridge.js"),
+    "utf8",
+  );
+  const window = {
+    __SPACENOTES_BRIDGE_CONFIG__: { baseUrl, token },
+    fetch,
+    webkit: {
+      messageHandlers: {
+        levilNotesHost: {
+          postMessage(message) {
+            if (message.name !== "trashNote") {
+              window.__levilNotesHostReject(
+                message.id,
+                `usage model does not support host action ${message.name}`,
+              );
+              return;
+            }
+            postToSidecar(
+              "trashNote",
+              Array.isArray(message.args) ? message.args : [],
+            ).then(
+              (result) => window.__levilNotesHostResolve(message.id, result),
+              (error) =>
+                window.__levilNotesHostReject(message.id, error.message),
+            );
+          },
+        },
+      },
+    },
+  };
+  vm.runInNewContext(source, {
+    window,
+    JSON,
+    Promise,
+    Error,
+    String,
+    TypeError,
+  });
+  return {
+    call(method, args = []) {
+      return window.levilNotes[method](...args);
+    },
+  };
+}
+
 async function main() {
   const iterations = Number(argumentValue("--iterations", "3000"));
   const seed = Number(argumentValue("--seed", "20261023"));
@@ -206,6 +258,7 @@ async function main() {
   const fixture = await createFixture();
   const settings = new SettingsStore(path.join(fixture.root, "settings.json"));
   await settings.load();
+  await settings.save({ recentVault: fixture.vaultRoot });
   const broadcaster = createEventBroadcaster();
   let trashSequence = 0;
   const vault = new VaultService(
@@ -231,10 +284,7 @@ async function main() {
     settingsStore: settings,
     hostActions: {},
   });
-  const api = {
-    ...sharedApi,
-    openVault: (rootPath) => vault.open(rootPath),
-  };
+  const api = { ...sharedApi };
   const token = crypto.randomBytes(24).toString("hex");
   const sidecar = createSidecarServer({
     api,
@@ -246,13 +296,24 @@ async function main() {
 
   const failures = [];
   const operationTypes = {};
+  let bridgeCalls = 0;
+  let assetChecks = 0;
   let lastGitHead = "";
   let eventReader;
   let events;
   try {
     const address = await sidecar.listen();
     const baseUrl = `http://127.0.0.1:${address.port}`;
-    await post(baseUrl, token, "openVault", [fixture.vaultRoot]);
+    const bridge = await createBridge(
+      baseUrl,
+      token,
+      (method, args) => post(baseUrl, token, method, args),
+    );
+    const bridgeCall = async (method, args = []) => {
+      bridgeCalls += 1;
+      return bridge.call(method, args);
+    };
+    await bridgeCall("restoreVault");
     const controller = new AbortController();
     const eventResponse = await fetch(
       `${baseUrl}/events?token=${encodeURIComponent(token)}`,
@@ -279,15 +340,15 @@ async function main() {
       let operation = "";
       let expectedEvent = "";
       try {
-        if (roll < 0.58) {
+        if (roll < 0.53) {
           operation = "readNote";
-          const result = await post(baseUrl, token, "readNote", [relative]);
+          const result = await bridgeCall("readNote", [relative]);
           if (result.content !== expected.get(relative)) {
             throw new Error("readNote 返回值与预期文件不一致。");
           }
-        } else if (roll < 0.73) {
+        } else if (roll < 0.66) {
           operation = "search";
-          const result = await post(baseUrl, token, "search", [
+          const result = await bridgeCall("search", [
             "seed",
             "all",
             "smart",
@@ -295,49 +356,66 @@ async function main() {
           if (!Array.isArray(result)) {
             throw new Error("search 未返回数组。");
           }
-        } else if (roll < 0.83) {
+        } else if (roll < 0.74) {
           operation = "getOutline";
-          const result = await post(baseUrl, token, "getOutline", [relative]);
+          const result = await bridgeCall("getOutline", [relative]);
           if (!Array.isArray(result)) {
             throw new Error("getOutline 未返回数组。");
           }
-        } else if (roll < 0.90) {
+        } else if (roll < 0.80) {
           operation = "getTags";
-          const result = await post(baseUrl, token, "getTags");
+          const result = await bridgeCall("getTags");
           if (!Array.isArray(result)) {
             throw new Error("getTags 未返回数组。");
           }
-        } else if (roll < 0.97 || expected.size > 30) {
+        } else if (roll < 0.84) {
+          operation = "readAsset";
+          const response = await fetch(
+            `${baseUrl}/assets?target=image.png&note=${encodeURIComponent(relative)}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          const content = await response.text();
+          if (!response.ok || content !== "usage-model-image") {
+            throw new Error("附件读取失败。");
+          }
+          assetChecks += 1;
+        } else if (roll < 0.92 || expected.size > 30) {
           operation = "writeNote";
           expectedEvent = "saved";
           const content = `# ${path.basename(relative, ".md")}\n\nsample ${sample} seed ${seed}\n`;
-          await post(baseUrl, token, "writeNote", [relative, content]);
+          await bridgeCall("writeNote", [relative, content]);
           expected.set(relative, content);
-        } else if (roll < 0.985) {
+        } else if (roll < 0.95) {
           operation = "createNote";
           expectedEvent = "created";
           createdSequence += 1;
-          const result = await post(baseUrl, token, "createNote", [
+          const result = await bridgeCall("createNote", [
             "",
             `model-created-${seed}-${createdSequence}`,
           ]);
           expected.set(result.path, result.content);
-        } else if (roll < 0.995) {
+        } else if (roll < 0.97) {
           operation = "renameNote";
           expectedEvent = "renamed";
           const source = paths[Math.floor(random() * paths.length)];
-          const result = await post(baseUrl, token, "renameNote", [
+          const result = await bridgeCall("renameNote", [
             source,
             `model-renamed-${seed}-${sample}`,
           ]);
           const content = expected.get(source);
           expected.delete(source);
           expected.set(result.path, content);
-        } else {
+        } else if (roll < 0.985) {
           operation = "trashNote";
           expectedEvent = "trashed";
-          await post(baseUrl, token, "trashNote", [relative]);
+          await bridgeCall("trashNote", [relative]);
           expected.delete(relative);
+        } else {
+          operation = "gitStatus";
+          const status = await bridgeCall("gitStatus");
+          if (status.repository !== true) {
+            throw new Error("Git 状态未识别当前仓库。");
+          }
         }
         operationTypes[operation] = (operationTypes[operation] || 0) + 1;
         if (expectedEvent) {
@@ -369,31 +447,27 @@ async function main() {
     }
     controller.abort();
 
-    const gitStatusBeforeCommit = await post(baseUrl, token, "gitStatus");
-    const gitBranches = await post(baseUrl, token, "gitBranches");
-    const gitLog = await post(baseUrl, token, "gitLog");
+    const gitStatusBeforeCommit = await bridgeCall("gitStatus");
+    const gitBranches = await bridgeCall("gitBranches");
+    const gitLog = await bridgeCall("gitLog");
     const finalContent = "# Certified\n\nGit flow complete.\n";
     await fs.writeFile(
       path.join(fixture.vaultRoot, "certification.md"),
       finalContent,
       "utf8",
     );
-    const gitStatusWithCertification = await post(
-      baseUrl,
-      token,
-      "gitStatus",
-    );
+    const gitStatusWithCertification = await bridgeCall("gitStatus");
     const commitPaths = gitStatusWithCertification.changes.map(
       (change) => change.path,
     );
-    await post(baseUrl, token, "gitStage", [commitPaths, false]);
-    const commit = await post(baseUrl, token, "gitCommit", [
+    await bridgeCall("gitStage", [commitPaths, false]);
+    const commit = await bridgeCall("gitCommit", [
       "test: certify macOS usage model",
       commitPaths,
     ]);
-    const push = await post(baseUrl, token, "gitPush");
-    const pull = await post(baseUrl, token, "gitPull");
-    const gitStatusAfterCommit = await post(baseUrl, token, "gitStatus");
+    const push = await bridgeCall("gitPush");
+    const pull = await bridgeCall("gitPull");
+    const gitStatusAfterCommit = await bridgeCall("gitStatus");
     const headAfter = await gitReference(fixture.vaultRoot);
 
     const report = {
@@ -406,6 +480,13 @@ async function main() {
       ),
       seed,
       operationTypes,
+      transport: {
+        bridgeCalls,
+        assetChecks,
+        bridge:
+          "levilNotesBridge.js contract over authenticated sidecar HTTP; " +
+          "executed outside WebKit",
+      },
       failures,
       eventVerified: true,
       dataIntegrity: failures.length === 0 ? "zero-corruption" : "failed",

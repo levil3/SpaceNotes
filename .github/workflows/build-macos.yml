@@ -31,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: 24.22.1
           cache: npm
 
       - name: Install application dependencies
@@ -39,6 +39,25 @@ jobs:
 
       - name: Run application tests
         run: npm test
+
+      - name: Check embedded E2E script
+        run: node scripts/macos/check-e2e-script.cjs
+
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev
+          (
+            cd macos/sidecar
+            npm audit --omit=dev
+          )
+
+      - name: Run bridge and sidecar usage model
+        run: |
+          mkdir -p docs/evidence/v0.2.0
+          node scripts/macos/usage-model.cjs \
+            --iterations 3000 \
+            --seed 20261023 \
+            --report docs/evidence/v0.2.0/usage-model.json
 
       - name: Build and verify universal artifacts
         run: |
@@ -51,6 +70,13 @@ jobs:
           codesign --verify --deep --strict "build/macos/Levil Notes.app"
           shasum -a 256 -c "build/macos/Levil Notes 0.2.0.dmg.sha256"
 
+      - name: Run real WKWebView E2E certification
+        run: |
+          bash scripts/macos/run-wkwebview-e2e.sh \
+            "build/macos/Levil Notes.app" \
+            docs/evidence/v0.2.0/e2e-wkwebview.json \
+            "build/macos/Levil Notes 0.2.0.dmg"
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -60,6 +86,8 @@ jobs:
             build/macos/Levil Notes 0.2.0.dmg.sha256
             build/macos/macho-architectures.txt
             build/macos/build.log
+            docs/evidence/v0.2.0/e2e-wkwebview.json
+            docs/evidence/v0.2.0/usage-model.json
           if-no-files-found: error
 
   intel-smoke:
@@ -102,6 +130,10 @@ jobs:
             "$RUNNER_TEMP/intel-macho-architectures.txt"
           codesign --verify --deep --strict "$mount_point/Levil Notes.app"
           "$mount_point/Levil Notes.app/Contents/MacOS/SpaceNotes" --smoke-test
+          bash scripts/macos/run-wkwebview-e2e.sh \
+            "$mount_point/Levil Notes.app" \
+            "$RUNNER_TEMP/e2e-wkwebview-intel.json" \
+            "artifact/Levil Notes 0.2.0.dmg"
 
       - name: Upload Intel evidence
         if: always()
@@ -110,4 +142,5 @@ jobs:
           name: macos-intel-evidence
           path: |
             ${{ runner.temp }}/intel-macho-architectures.txt
+            ${{ runner.temp }}/e2e-wkwebview-intel.json
           if-no-files-found: warn

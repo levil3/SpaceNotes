@@ -51,6 +51,9 @@ async function createFixture() {
     }),
     raw: vi.fn(() => 42),
   };
+  const internal = {
+    refresh: vi.fn(async () => "refreshed"),
+  };
   const vaultService = {
     resolveAsset: vi.fn(async (target, notePath) => {
       if (target === "missing.png") {
@@ -58,6 +61,10 @@ async function createFixture() {
       }
       return path.join(noteRoot, `${notePath}-${target}`);
     }),
+    readResolvedFile: vi.fn(async (absolutePath) => ({
+      content: await fs.readFile(absolutePath),
+      stat: await fs.stat(absolutePath),
+    })),
   };
   await fs.writeFile(path.join(noteRoot, "note-image.png"), "png", "utf8");
   const broadcaster = createEventBroadcaster();
@@ -68,12 +75,14 @@ async function createFixture() {
     token: "test-token",
     allowedOrigins: ["http://127.0.0.1:5173"],
     broadcaster,
+    internalHandlers: internal,
   });
   const address = await sidecar.listen();
   runningServers.push(sidecar);
 
   return {
     api,
+    internal,
     vaultService,
     broadcaster,
     sidecar,
@@ -182,6 +191,33 @@ describe("macOS sidecar HTTP contract", () => {
     expect(unknown.status).toBe(404);
     await expect(unknown.json()).resolves.toEqual({
       error: "未知 API 方法。",
+    });
+  });
+
+  it("rejects null API and internal request bodies without reporting a server error", async () => {
+    const { baseUrl } = await createFixture();
+
+    const apiResponse = await authorizedRequest(`${baseUrl}/api/raw`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "null",
+    });
+    const internalResponse = await authorizedRequest(
+      `${baseUrl}/internal/refresh`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "null",
+      },
+    );
+
+    expect(apiResponse.status).toBe(400);
+    await expect(apiResponse.json()).resolves.toEqual({
+      error: "请求体必须是对象。",
+    });
+    expect(internalResponse.status).toBe(400);
+    await expect(internalResponse.json()).resolves.toEqual({
+      error: "请求体必须是对象。",
     });
   });
 

@@ -11,9 +11,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var webView: WKWebView?
     private var messageHandler: HostMessageHandler?
     private var assetHandler: NotesAssetSchemeHandler?
-    private var token = ""
     private var retryPolicy = SidecarRetryPolicy()
     private var isTerminating = false
+    private var developmentOrigin: URL? {
+        guard
+            let value = ProcessInfo.processInfo.environment[
+                "SPACENOTES_DEV_ORIGIN"
+            ],
+            let url = URL(string: value),
+            ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+            url.host != nil
+        else {
+            return nil
+        }
+        return url
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureMainMenu()
@@ -42,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ sender: NSApplication,
         hasVisibleWindows flag: Bool
     ) -> Bool {
+        appendDiagnostic("window-reopened-from-dock-request")
         if window == nil, let client {
             showWindow(client: client)
         } else if let window {
@@ -65,6 +78,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Levil Notes", isDirectory: true)
             .appendingPathComponent("settings.json")
+        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        appendDiagnostic(
+            "sidecar-token-fingerprint=\(LaunchTokenPayload.fingerprint(of: token))"
+        )
         let configuration = SidecarManager.Configuration(
             executableURL: resourceURL.appendingPathComponent("node"),
             scriptURL: resourceURL
@@ -73,13 +90,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .appendingPathComponent("sidecar-entry.cjs"),
             webRootURL: resourceURL.appendingPathComponent("web", isDirectory: true),
             settingsURL: settingsURL,
-            token: token.isEmpty ? UUID().uuidString.replacingOccurrences(of: "-", with: "") : token,
+            token: token,
             parentPID: ProcessInfo.processInfo.processIdentifier,
-            allowedOrigins: ProcessInfo.processInfo.environment[
-                "SPACENOTES_DEV_ORIGIN"
-            ].map { [$0] } ?? []
+            allowedOrigins: developmentOrigin.map { [$0.absoluteString] } ?? []
         )
-        token = configuration.token
         let manager = SidecarManager(configuration: configuration)
         sidecar = manager
         manager.start(
@@ -97,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     NSApplication.shared.terminate(nil)
                     return
                 }
-                let client = SidecarClient(baseURL: baseURL, token: self.token)
+                let client = SidecarClient(baseURL: baseURL, token: token)
                 self.client = client
                 if self.webView != nil {
                     self.reload(client: client)
@@ -108,6 +122,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onExit: { [weak self] status in
                 guard let self, !self.isTerminating else { return }
                 self.appendDiagnostic("sidecar-exit-status=\(status)")
+                let diagnostics = self.sidecar?.diagnosticSummary ?? ""
+                if !diagnostics.isEmpty {
+                    self.appendDiagnostic("sidecar-exit-stderr=\(diagnostics)")
+                }
                 self.sidecar = nil
                 if self.retryPolicy.consumeRestart() {
                     self.appendDiagnostic("sidecar-restart-attempt=1")
@@ -171,9 +189,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         window.center()
 
+        let documentPolicy = makeDocumentPolicy(for: client)
         let messageHandler = HostMessageHandler(
             window: window,
-            clientProvider: { [weak self] in self?.client }
+            clientProvider: { [weak self] in self?.client },
+            documentPolicy: documentPolicy
         )
         controller.add(messageHandler, name: "levilNotesHost")
         self.messageHandler = messageHandler
@@ -185,7 +205,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         self.webView = webView
-        configureNavigation(client: client, webView: webView)
+        configureNavigation(
+            documentPolicy: documentPolicy,
+            webView: webView
+        )
         installBridge(client: client, in: controller)
         webView.setValue(false, forKey: "drawsBackground")
         webView.translatesAutoresizingMaskIntoConstraints = false
@@ -220,13 +243,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
         controller.removeScriptMessageHandler(forName: "levilNotesHost")
+        let documentPolicy = makeDocumentPolicy(for: client)
         let messageHandler = HostMessageHandler(
             window: window,
-            clientProvider: { [weak self] in self?.client }
+            clientProvider: { [weak self] in self?.client },
+            documentPolicy: documentPolicy
         )
         controller.add(messageHandler, name: "levilNotesHost")
         self.messageHandler = messageHandler
-        configureNavigation(client: client, webView: webView)
+        configureNavigation(
+            documentPolicy: documentPolicy,
+            webView: webView
+        )
         installBridge(client: client, in: controller)
         appendDiagnostic("webview-reload-after-sidecar-restart")
         window.makeKeyAndOrderFront(nil)
@@ -234,16 +262,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureNavigation(
-        client: SidecarClient,
+        documentPolicy: TrustedWebDocumentPolicy,
         webView: WKWebView
     ) {
         navigationDelegate = NavigationDelegate(
-            allowedOrigin: client.baseURL,
+            documentPolicy: documentPolicy,
             onFinish: { [weak self, weak webView] in
                 self?.schedulePageChecks(webView: webView)
             }
         )
         webView.navigationDelegate = navigationDelegate
+        webView.uiDelegate = navigationDelegate
+    }
+
+    private func makeDocumentPolicy(
+        for client: SidecarClient
+    ) -> TrustedWebDocumentPolicy {
+        TrustedWebDocumentPolicy(
+            trustedOrigins: [client.baseURL] + [
+                developmentOrigin
+            ].compactMap { $0 }
+        )
     }
 
     private func installBridge(
@@ -272,6 +311,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func load(client: SidecarClient, webView: WKWebView) {
+        if let developmentOrigin {
+            webView.load(URLRequest(url: developmentOrigin))
+            return
+        }
         var initialComponents = URLComponents(
             url: client.baseURL,
             resolvingAgainstBaseURL: false
@@ -289,8 +332,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   title: document.title,
                   readyState: document.readyState,
                   hasAppShell: Boolean(document.querySelector(".app-shell")),
-                  hasBridge: Boolean(window.levilNotes),
-                  bodyText: (document.body.innerText || "").slice(0, 500)
+                  hasBridge: Boolean(window.levilNotes)
                 })
                 """
             ) { result, error in
@@ -310,9 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   title: document.title,
                   readyState: document.readyState,
                   hasAppShell: Boolean(document.querySelector(".app-shell")),
-                  hasBridge: Boolean(window.levilNotes),
-                  bodyText: (document.body.innerText || "").slice(0, 2000),
-                  rootHtml: (document.getElementById("root")?.innerHTML || "").slice(0, 2000)
+                  hasBridge: Boolean(window.levilNotes)
                 })
                 """
             ) { result, error in
@@ -481,6 +521,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(windowItem)
         let windowMenu = NSMenu(title: "窗口")
         windowItem.submenu = windowMenu
+        let closeItem = NSMenuItem(
+            title: "关闭窗口",
+            action: #selector(closeMainWindow),
+            keyEquivalent: "w"
+        )
+        closeItem.target = self
+        windowMenu.addItem(closeItem)
         windowMenu.addItem(
             withTitle: "最小化",
             action: #selector(NSWindow.performMiniaturize(_:)),
@@ -497,5 +544,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: NSWindowDelegate {
-    func windowWillClose(_ notification: Notification) {}
+    func windowWillClose(_ notification: Notification) {
+        appendDiagnostic("window-closed-app-persisted")
+    }
+
+    @objc private func closeMainWindow() {
+        window?.performClose(nil)
+    }
 }

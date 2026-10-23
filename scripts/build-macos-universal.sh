@@ -60,6 +60,8 @@ x64_output="$(arch -x86_64 "$BUILD_ROOT/node-universal/node" -p process.arch)"
   swift test
   swift build -c release --arch arm64 --arch x86_64
 )
+bash "$ROOT/scripts/build-macos-fs-helper.sh" \
+  "$BUILD_ROOT/space-notes-fs"
 
 rm -rf "$BUILD_ROOT/sidecar-runtime"
 mkdir -p "$BUILD_ROOT/sidecar-runtime"
@@ -93,9 +95,12 @@ cp -R "$ROOT/dist/." "$APP_PATH/Contents/Resources/web/"
 cp "$MACOS_ROOT/bridge/levilNotesBridge.js" \
   "$APP_PATH/Contents/Resources/levilNotesBridge.js"
 cp "$ROOT/electron/api.cjs" "$ROOT/electron/git.cjs" \
+  "$ROOT/electron/file-operations.cjs" \
   "$ROOT/electron/sidecar.cjs" "$ROOT/electron/sidecar-entry.cjs" \
   "$ROOT/electron/vault.cjs" \
   "$APP_PATH/Contents/Resources/sidecar/electron/"
+cp "$BUILD_ROOT/space-notes-fs" \
+  "$APP_PATH/Contents/Resources/space-notes-fs"
 cp "$BUILD_ROOT/sidecar-runtime/package.json" \
   "$APP_PATH/Contents/Resources/sidecar/"
 cp -R "$BUILD_ROOT/sidecar-runtime/node_modules" \

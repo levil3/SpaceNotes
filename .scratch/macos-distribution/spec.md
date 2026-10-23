@@ -1,6 +1,6 @@
 # SpaceNotes macOS 薄壳与通用 DMG
 
-Status: ready-for-agent
+Status: implemented-ci-pending
 Version: v0.2.0
 
 ## Problem Statement
@@ -82,7 +82,7 @@ macOS 第一版采用薄壳方案：
 ### Sidecar transport
 
 - sidecar 使用通用 Node 24.22.1，只监听 `127.0.0.1` 的临时端口。
-- Swift 每次启动生成不可预测的一次性令牌，通过环境变量交给 sidecar，并通过
+- Swift 每次启动生成不可预测的一次性令牌，通过 sidecar 的 stdin 首行交给进程，并通过
   WKUserScript 注入 WebView。
 - sidecar 拒绝无令牌、错误令牌、非预期 Host 或非允许来源的 API 请求。
 - sidecar 同时提供已构建 React 资源、业务 API、附件读取和 `vault:changed` 事件。

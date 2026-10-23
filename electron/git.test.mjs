@@ -13,6 +13,7 @@ const {
   GitService,
   decodeGitStatus,
   normalizeRelativeGitPath,
+  sanitizedGitEnvironment,
   toIgnorePattern,
 } = require("./git.cjs");
 
@@ -42,6 +43,15 @@ async function createRepository() {
 }
 
 describe("GitService commit safety", () => {
+  it("does not expose the sidecar token to Git hooks", () => {
+    const environment = sanitizedGitEnvironment({
+      PATH: "/usr/bin",
+      SPACENOTES_TOKEN: "secret-token",
+    });
+
+    expect(environment).toEqual({ PATH: "/usr/bin" });
+  });
+
   it("refuses to commit staged files that are not selected in the UI", async () => {
     const service = new GitService({
       getVaultPath: () => path.resolve("."),

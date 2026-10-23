@@ -4,6 +4,6 @@
   "private": true,
   "description": "Production runtime dependencies for the SpaceNotes macOS sidecar.",
   "dependencies": {
-    "chokidar": "3.6.0"
+    "chokidar": "4.0.3"
   }
 }

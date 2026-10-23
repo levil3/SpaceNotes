@@ -1,6 +1,9 @@
 const fs = require("node:fs/promises");
+const fsConstants = require("node:fs").constants;
 const path = require("node:path");
 const chokidar = require("chokidar");
+
+const O_NOFOLLOW = fsConstants.O_NOFOLLOW || 0;
 
 const DEFAULT_SETTINGS = {
   appearanceRevision: 4,
@@ -251,6 +254,12 @@ function createSearchSnippet(content, query) {
   return `${start > 0 ? "..." : ""}${content.slice(start, end).replace(/\s+/g, " ")}${end < content.length ? "..." : ""}`;
 }
 
+function vaultPathOutsideError() {
+  const error = new Error("文件路径超出当前笔记库。");
+  error.code = "VAULT_PATH_OUTSIDE";
+  return error;
+}
+
 /**
  * Owns the Markdown index and is the only process allowed to touch vault files.
  * Renderer requests never receive unrestricted filesystem access.
@@ -260,6 +269,7 @@ class VaultService {
     this.settingsStore = settingsStore;
     this.onVaultChanged = onVaultChanged;
     this.trashItem = platformActions.trashItem || null;
+    this.fileOperations = platformActions.fileOperations || null;
     this.vaultPath = "";
     this.documents = new Map();
     this.directories = new Set();
@@ -274,9 +284,10 @@ class VaultService {
     if (!stat.isDirectory()) {
       throw new Error("选择的路径不是文件夹。");
     }
+    const canonicalRoot = await fs.realpath(resolved);
 
     await this.closeWatcher();
-    this.vaultPath = resolved;
+    this.vaultPath = canonicalRoot;
     await this.rebuildIndex();
     await this.startWatcher();
     await this.settingsStore.save({ recentVault: resolved });
@@ -317,6 +328,236 @@ class VaultService {
     return resolved;
   }
 
+  async assertRealPathInsideVault(absolutePath, allowRoot = false) {
+    const vaultRealPath = await fs.realpath(this.vaultPath);
+    const relative = path.relative(vaultRealPath, absolutePath);
+    const outside =
+      relative === ".." ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative) ||
+      (!allowRoot && !relative);
+    if (outside) {
+      const error = new Error("文件路径超出当前笔记库。");
+      error.code = "VAULT_PATH_OUTSIDE";
+      throw error;
+    }
+  }
+
+  async resolveExistingPathInsideVault(relativePath) {
+    const absolutePath = this.resolveInsideVault(relativePath);
+    const realPath = await fs.realpath(absolutePath);
+    await this.assertRealPathInsideVault(realPath);
+    return realPath;
+  }
+
+  async resolveExistingEntryInsideVault(relativePath) {
+    const absolutePath = this.resolveInsideVault(relativePath);
+    const realPath = await fs.realpath(absolutePath);
+    await this.assertRealPathInsideVault(realPath);
+    return absolutePath;
+  }
+
+  async resolveMutationDestinationInsideVault(relativePath) {
+    const absolutePath = this.resolveInsideVault(relativePath);
+    const parentRealPath = await fs.realpath(path.dirname(absolutePath));
+    await this.assertRealPathInsideVault(parentRealPath, true);
+    return absolutePath;
+  }
+
+  async resolveWritablePathInsideVault(relativePath) {
+    const absolutePath = this.resolveInsideVault(relativePath);
+    try {
+      return await this.resolveExistingPathInsideVault(relativePath);
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+
+    let pathEntryExists = false;
+    try {
+      await fs.lstat(absolutePath);
+      pathEntryExists = true;
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+    if (pathEntryExists) {
+      // realpath() returns ENOENT for a dangling symlink. Writing through it
+      // would create the target outside the vault, so reject the entry itself.
+      const error = new Error("文件路径超出当前笔记库。");
+      error.code = "VAULT_PATH_OUTSIDE";
+      throw error;
+    }
+
+    let ancestor = path.dirname(absolutePath);
+    while (true) {
+      try {
+        await fs.lstat(ancestor);
+        break;
+      } catch (error) {
+        if (error.code !== "ENOENT") {
+          throw error;
+        }
+        const parent = path.dirname(ancestor);
+        if (parent === ancestor) {
+          throw new Error("文件路径超出当前笔记库。");
+        }
+        ancestor = parent;
+      }
+    }
+
+    let ancestorRealPath;
+    try {
+      ancestorRealPath = await fs.realpath(ancestor);
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        const pathError = new Error("文件路径超出当前笔记库。");
+        pathError.code = "VAULT_PATH_OUTSIDE";
+        throw pathError;
+      }
+      throw error;
+    }
+    await this.assertRealPathInsideVault(ancestorRealPath, true);
+    const canonicalPath = path.resolve(
+      ancestorRealPath,
+      path.relative(ancestor, absolutePath),
+    );
+    await this.assertRealPathInsideVault(canonicalPath);
+    return canonicalPath;
+  }
+
+  mapNoFollowOpenError(error) {
+    if (error?.code === "ELOOP" || error?.code === "EMLINK") {
+      return vaultPathOutsideError();
+    }
+    return error;
+  }
+
+  async openNoFollow(absolutePath, flags, mode) {
+    try {
+      return await fs.open(absolutePath, flags | O_NOFOLLOW, mode);
+    } catch (error) {
+      throw this.mapNoFollowOpenError(error);
+    }
+  }
+
+  relativePathForFileOperations(absolutePath) {
+    const relative = path.relative(this.vaultPath, absolutePath);
+    if (
+      !relative ||
+      relative === ".." ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw vaultPathOutsideError();
+    }
+    return toPosixPath(relative);
+  }
+
+  async assertOpenedFileInsideVault(absolutePath, handle) {
+    const [openedStat, entryStat, realPath] = await Promise.all([
+      handle.stat(),
+      fs.lstat(absolutePath),
+      fs.realpath(absolutePath),
+    ]);
+    if (entryStat.isSymbolicLink() || !openedStat.isFile()) {
+      throw vaultPathOutsideError();
+    }
+    await this.assertRealPathInsideVault(realPath);
+    if (
+      Number.isFinite(openedStat.dev) &&
+      Number.isFinite(openedStat.ino) &&
+      Number.isFinite(entryStat.dev) &&
+      Number.isFinite(entryStat.ino) &&
+      (openedStat.dev !== entryStat.dev || openedStat.ino !== entryStat.ino)
+    ) {
+      throw vaultPathOutsideError();
+    }
+    return { openedStat, realPath };
+  }
+
+  async readFileNoFollow(absolutePath) {
+    if (this.fileOperations) {
+      const relativePath =
+        this.relativePathForFileOperations(absolutePath);
+      const [content, stat] = await Promise.all([
+        this.fileOperations.read(this.vaultPath, relativePath),
+        this.fileOperations.stat(this.vaultPath, relativePath),
+      ]);
+      return {
+        content,
+        stat,
+        path: absolutePath,
+      };
+    }
+    const handle = await this.openNoFollow(
+      absolutePath,
+      fsConstants.O_RDONLY,
+    );
+    try {
+      const { openedStat, realPath } =
+        await this.assertOpenedFileInsideVault(absolutePath, handle);
+      return {
+        content: await handle.readFile(),
+        stat: openedStat,
+        path: realPath,
+      };
+    } finally {
+      await handle.close();
+    }
+  }
+
+  async writeFileNoFollow(
+    absolutePath,
+    content,
+    { exclusive = false } = {},
+  ) {
+    if (this.fileOperations) {
+      const relativePath =
+        this.relativePathForFileOperations(absolutePath);
+      return this.fileOperations.write(
+        this.vaultPath,
+        relativePath,
+        content,
+        exclusive ? "exclusive" : "existing",
+      );
+    }
+    let handle;
+    try {
+      handle = await this.openNoFollow(
+        absolutePath,
+        fsConstants.O_WRONLY |
+          (exclusive
+            ? fsConstants.O_CREAT | fsConstants.O_EXCL
+            : 0),
+        0o666,
+      );
+    } catch (error) {
+      if (exclusive || error.code !== "ENOENT") {
+        throw error;
+      }
+      handle = await this.openNoFollow(
+        absolutePath,
+        fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL,
+        0o666,
+      );
+    }
+    try {
+      await this.assertOpenedFileInsideVault(absolutePath, handle);
+      await handle.truncate(0);
+      await handle.writeFile(content, "utf8");
+      return await handle.stat();
+    } finally {
+      await handle.close();
+    }
+  }
+
+  async readResolvedFile(absolutePath) {
+    return this.readFileNoFollow(absolutePath);
+  }
+
   async rebuildIndex() {
     const nextDocuments = new Map();
     const nextAssets = new Map();
@@ -345,7 +586,15 @@ class VaultService {
     assetTarget,
     directoryTarget,
   ) {
-    const entries = await fs.readdir(currentDirectory, { withFileTypes: true });
+    let entries;
+    try {
+      entries = await fs.readdir(currentDirectory, { withFileTypes: true });
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return;
+      }
+      throw error;
+    }
     const showHiddenFiles = Boolean(
       this.settingsStore.get().showHiddenFiles,
     );
@@ -397,9 +646,11 @@ class VaultService {
       }
 
       try {
-        const stat = await fs.stat(absolutePath);
-        const content = await fs.readFile(absolutePath, "utf8");
-        target.set(relativePath, this.createIndexRecord(relativePath, content, stat));
+        const { content, stat } = await this.readFileNoFollow(absolutePath);
+        target.set(
+          relativePath,
+          this.createIndexRecord(relativePath, content.toString("utf8"), stat),
+        );
       } catch {
         // An editor may be writing a file while indexing; it will be retried on the next event.
       }
@@ -428,9 +679,12 @@ class VaultService {
         const absolutePath = this.resolveInsideVault(candidate);
         const stat = await fs.stat(absolutePath);
         if (stat.isFile()) {
-          return absolutePath;
+          return await this.resolveRealPathInsideVault(absolutePath);
         }
-      } catch {
+      } catch (error) {
+        if (error.code === "ASSET_PATH_OUTSIDE") {
+          throw error;
+        }
         // Try the next common Markdown path convention.
       }
     }
@@ -442,14 +696,29 @@ class VaultService {
       const absolutePath = this.resolveInsideVault(relativePath);
       try {
         if ((await fs.stat(absolutePath)).isFile()) {
-          return absolutePath;
+          return await this.resolveRealPathInsideVault(absolutePath);
         }
-      } catch {
+      } catch (error) {
+        if (error.code === "ASSET_PATH_OUTSIDE") {
+          throw error;
+        }
         // Ignore stale index entries; the watcher will refresh the asset list.
       }
     }
 
     throw new Error("图片不存在。");
+  }
+
+  async resolveRealPathInsideVault(absolutePath) {
+    const assetRealPath = await fs.realpath(absolutePath);
+    try {
+      await this.assertRealPathInsideVault(assetRealPath);
+    } catch {
+      const error = new Error("图片路径超出当前笔记库。");
+      error.code = "ASSET_PATH_OUTSIDE";
+      throw error;
+    }
+    return assetRealPath;
   }
 
   createIndexRecord(relativePath, content, stat) {
@@ -501,13 +770,17 @@ class VaultService {
 
       if (relativePath && path.extname(relativePath).toLowerCase() === ".md") {
         const normalized = toPosixPath(relativePath);
-        const absolute = this.resolveInsideVault(normalized);
         try {
-          const stat = await fs.stat(absolute);
-          const content = await fs.readFile(absolute, "utf8");
+          const absolute =
+            await this.resolveExistingPathInsideVault(normalized);
+          const { content, stat } = await this.readFileNoFollow(absolute);
           this.documents.set(
             normalized,
-            this.createIndexRecord(normalized, content, stat),
+            this.createIndexRecord(
+              normalized,
+              content.toString("utf8"),
+              stat,
+            ),
           );
         } catch {
           this.documents.delete(normalized);
@@ -568,18 +841,17 @@ class VaultService {
   }
 
   async readNote(relativePath) {
-    const absolute = this.resolveInsideVault(relativePath);
-    const content = await fs.readFile(absolute, "utf8");
+    const absolute = await this.resolveExistingPathInsideVault(relativePath);
+    const { content } = await this.readFileNoFollow(absolute);
     return {
       path: relativePath,
-      content,
+      content: content.toString("utf8"),
     };
   }
 
   async writeNote(relativePath, content) {
-    const absolute = this.resolveInsideVault(relativePath);
-    await fs.writeFile(absolute, content, "utf8");
-    const stat = await fs.stat(absolute);
+    const absolute = await this.resolveWritablePathInsideVault(relativePath);
+    const stat = await this.writeFileNoFollow(absolute, content);
     this.documents.set(
       relativePath,
       this.createIndexRecord(relativePath, content, stat),
@@ -602,14 +874,23 @@ class VaultService {
       suffix += 1;
     }
 
-    const absolute = this.resolveInsideVault(relativePath);
-    await fs.mkdir(path.dirname(absolute), { recursive: true });
+    let absolute = await this.resolveWritablePathInsideVault(relativePath);
+    const parentDirectory = path.resolve(path.dirname(absolute));
+    if (this.fileOperations) {
+      if (parentDirectory !== path.resolve(this.vaultPath)) {
+        await this.fileOperations.mkdir(
+          this.vaultPath,
+          this.relativePathForFileOperations(parentDirectory),
+        );
+      }
+    } else {
+      await fs.mkdir(parentDirectory, { recursive: true });
+    }
+    absolute = await this.resolveWritablePathInsideVault(relativePath);
     const content = `# ${safeTitle}\n\n`;
-    await fs.writeFile(absolute, content, {
-      encoding: "utf8",
-      flag: "wx",
+    const stat = await this.writeFileNoFollow(absolute, content, {
+      exclusive: true,
     });
-    const stat = await fs.stat(absolute);
     this.documents.set(
       relativePath,
       this.createIndexRecord(relativePath, content, stat),
@@ -622,7 +903,7 @@ class VaultService {
     if (typeof this.trashItem !== "function") {
       throw new Error("当前宿主不支持将笔记移入废纸篓。");
     }
-    const absolute = this.resolveInsideVault(relativePath);
+    const absolute = await this.resolveExistingEntryInsideVault(relativePath);
     await this.trashItem(absolute);
     this.documents.delete(relativePath);
     this.onVaultChanged?.(this.snapshot("trashed"));
@@ -633,21 +914,36 @@ class VaultService {
     if (!safeTitle) {
       throw new Error("笔记名称不能为空。");
     }
-    const source = this.resolveInsideVault(relativePath);
+    const source = await this.resolveExistingEntryInsideVault(relativePath);
     const nextRelative = toPosixPath(
       path.join(path.dirname(relativePath), `${safeTitle}.md`),
     );
-    const destination = this.resolveInsideVault(nextRelative);
+    const destination =
+      await this.resolveMutationDestinationInsideVault(nextRelative);
     if (source === destination) {
       return { path: relativePath };
     }
-    await fs.rename(source, destination);
+    if (this.fileOperations) {
+      await this.fileOperations.rename(
+        this.vaultPath,
+        this.relativePathForFileOperations(source),
+        this.relativePathForFileOperations(destination),
+      );
+    } else {
+      await fs.rename(source, destination);
+    }
+    const resolvedDestination =
+      await this.resolveExistingPathInsideVault(nextRelative);
+    const { content, stat } =
+      await this.readFileNoFollow(resolvedDestination);
     this.documents.delete(relativePath);
-    const stat = await fs.stat(destination);
-    const content = await fs.readFile(destination, "utf8");
     this.documents.set(
       nextRelative,
-      this.createIndexRecord(nextRelative, content, stat),
+      this.createIndexRecord(
+        nextRelative,
+        content.toString("utf8"),
+        stat,
+      ),
     );
     this.onVaultChanged?.(this.snapshot("renamed"));
     return { path: nextRelative };

@@ -9,10 +9,10 @@ GitHub: #4
 
 **Blocked by:** #3
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] `window.levilNotes` 覆盖现有接口，不新增 React 平台分支。
-- [ ] 普通请求、错误和订阅取消行为与 Electron 契约一致。
-- [ ] 开发来源与生产来源使用允许列表，外部导航交给系统浏览器。
-- [ ] 宿主动作通过请求 ID 正确 resolve 或 reject。
-- [ ] 桥接测试覆盖成功、错误、并发请求、SSE 和取消订阅。
+- [x] `window.levilNotes` 覆盖现有接口，不新增 React 平台分支。
+- [x] 普通请求、错误和订阅取消行为与 Electron 契约一致。
+- [x] 开发来源与生产来源使用允许列表，外部导航交给系统浏览器。
+- [x] 宿主动作通过请求 ID 正确 resolve 或 reject。
+- [x] 桥接测试覆盖成功、错误、并发请求、SSE 和取消订阅。

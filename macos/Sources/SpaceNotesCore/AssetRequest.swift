@@ -14,11 +14,13 @@ public struct AssetRequest: Equatable, Sendable {
             return nil
         }
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        let query = Dictionary(
-            uniqueKeysWithValues: (components?.queryItems ?? []).compactMap {
-                item in item.value.map { (item.name, $0) }
+        let query = (components?.queryItems ?? []).reduce(
+            into: [String: String]()
+        ) { values, item in
+            if let value = item.value {
+                values[item.name] = value
             }
-        )
+        }
         let pathTarget = url.path
             .removingPercentEncoding?
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))

@@ -15,6 +15,7 @@
   "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
+    "pretest": "node scripts/macos/ensure-fs-helper.cjs",
     "dev": "concurrently -k -s first \"vite --host 127.0.0.1 --strictPort\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
     "build:web": "tsc --noEmit && vite build",
     "build": "npm run build:web && electron-builder --win nsis --publish never",
@@ -23,10 +24,13 @@
   },
   "dependencies": {
     "@milkdown/crepe": "7.22.3",
-    "chokidar": "3.6.0",
+    "chokidar": "4.0.3",
     "lucide-react": "0.468.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
+  },
+  "overrides": {
+    "katex": "0.19.0"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

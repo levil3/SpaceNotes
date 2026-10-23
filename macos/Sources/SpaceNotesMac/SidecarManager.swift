@@ -15,6 +15,7 @@ final class SidecarManager {
 
     private let configuration: Configuration
     private let process = Process()
+    private let inputPipe = Pipe()
     private let outputPipe = Pipe()
     private let errorPipe = Pipe()
     private var outputBuffer = ""
@@ -26,12 +27,24 @@ final class SidecarManager {
         self.configuration = configuration
     }
 
+    var diagnosticSummary: String {
+        var text = errorBuffer.replacingOccurrences(
+            of: configuration.token,
+            with: "[redacted]"
+        )
+        text = text.replacingOccurrences(
+            of: #"(?i)(token=)[^\s&]+"#,
+            with: "$1[redacted]",
+            options: .regularExpression
+        )
+        return String(text.suffix(2_000))
+    }
+
     func start(
         onReady: @escaping (URL) -> Void,
         onExit: @escaping (Int32) -> Void
     ) {
         var environment = ProcessInfo.processInfo.environment
-        environment["SPACENOTES_TOKEN"] = configuration.token
         environment["SPACENOTES_SETTINGS_PATH"] = configuration.settingsURL.path
         environment["SPACENOTES_WEB_ROOT"] = configuration.webRootURL.path
         environment["SPACENOTES_ALLOWED_ORIGINS"] =
@@ -54,6 +67,7 @@ final class SidecarManager {
             .deletingLastPathComponent()
         process.standardOutput = outputPipe
         process.standardError = errorPipe
+        process.standardInput = inputPipe
 
         outputPipe.fileHandleForReading.readabilityHandler = {
             [weak self] handle in
@@ -93,9 +107,24 @@ final class SidecarManager {
             }
         }
 
+        let launchData: Data
+        do {
+            launchData = try LaunchTokenPayload.data(for: configuration.token)
+        } catch {
+            onExit(-1)
+            return
+        }
+
         do {
             try process.run()
+            try inputPipe.fileHandleForWriting.write(contentsOf: launchData)
+            try inputPipe.fileHandleForWriting.close()
         } catch {
+            try? inputPipe.fileHandleForWriting.close()
+            if process.isRunning {
+                stopping = true
+                process.terminate()
+            }
             onExit(-1)
         }
     }

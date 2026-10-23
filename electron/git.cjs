@@ -5,6 +5,12 @@ const { promisify } = require("node:util");
 
 const execFileAsync = promisify(execFile);
 
+function sanitizedGitEnvironment(environment = process.env) {
+  const sanitized = { ...environment };
+  delete sanitized.SPACENOTES_TOKEN;
+  return sanitized;
+}
+
 function decodeGitStatus(code) {
   const labels = {
     M: "已修改",
@@ -159,12 +165,14 @@ class GitService {
     }
 
     try {
+      const { env, ...commandOptions } = options;
       const result = await execFileAsync("git", args, {
         cwd: this.rootPath,
         encoding: "utf8",
         windowsHide: true,
         maxBuffer: 20 * 1024 * 1024,
-        ...options,
+        ...commandOptions,
+        env: sanitizedGitEnvironment(env),
       });
       return {
         stdout: result.stdout || "",
@@ -203,6 +211,7 @@ class GitService {
       const child = spawn("git", args, {
         cwd: this.rootPath,
         windowsHide: true,
+        env: sanitizedGitEnvironment(options.env),
       });
       let stdout = "";
       let stderr = "";
@@ -819,5 +828,6 @@ module.exports = {
   GitService,
   decodeGitStatus,
   normalizeRelativeGitPath,
+  sanitizedGitEnvironment,
   toIgnorePattern,
 };

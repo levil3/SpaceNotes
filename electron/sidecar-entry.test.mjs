@@ -1,10 +1,13 @@
 import { spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
+const execFileAsync = promisify(execFile);
 const temporaryDirectories = [];
 const children = new Set();
 
@@ -83,22 +86,28 @@ describe("sidecar process contract", () => {
       "utf8",
     );
 
+    const environment = { ...process.env };
+    delete environment.SPACENOTES_TOKEN;
+    const helperPath = path.resolve("build/macos/space-notes-fs");
     const child = spawn(
       process.execPath,
       [path.resolve("electron/sidecar-entry.cjs")],
       {
         cwd: path.resolve("."),
         env: {
-          ...process.env,
-          SPACENOTES_TOKEN: "process-token",
+          ...environment,
           SPACENOTES_SETTINGS_PATH: path.join(root, "settings.json"),
           SPACENOTES_WEB_ROOT: webRoot,
           SPACENOTES_PARENT_PID: String(process.pid),
+          SPACENOTES_FS_HELPER: helperPath,
         },
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "pipe"],
       },
     );
     children.add(child);
+    child.stdin.end(
+      "SPACENOTES_TOKEN=process-token-0123456789abcdef0123456789abcdef\n",
+    );
     const ready = await waitForReady(child);
 
     expect(ready).toMatchObject({
@@ -112,7 +121,8 @@ describe("sidecar process contract", () => {
       {
         method: "POST",
         headers: {
-          Authorization: "Bearer process-token",
+          Authorization:
+            "Bearer process-token-0123456789abcdef0123456789abcdef",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ args: [] }),
@@ -121,7 +131,10 @@ describe("sidecar process contract", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ result: null });
 
-    const stream = await waitForSseResponse(ready.port, "process-token");
+    const stream = await waitForSseResponse(
+      ready.port,
+      "process-token-0123456789abcdef0123456789abcdef",
+    );
     expect(stream.response.statusCode).toBe(200);
 
     child.kill("SIGTERM");
@@ -139,4 +152,164 @@ describe("sidecar process contract", () => {
     stream.request.destroy();
     children.delete(child);
   });
+
+  it("does not expose the stdin launch token to Git hooks or ancestors", async () => {
+    const root = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-sidecar-git-hook-"),
+    );
+    temporaryDirectories.push(root);
+    const webRoot = path.join(root, "web");
+    const vaultRoot = path.join(root, "vault");
+    const leakPath = path.join(root, "ancestor-environments.txt");
+    await fs.mkdir(webRoot, { recursive: true });
+    await fs.mkdir(vaultRoot, { recursive: true });
+    await fs.writeFile(
+      path.join(webRoot, "index.html"),
+      "<!doctype html><title>SpaceNotes</title>",
+      "utf8",
+    );
+    await execFileAsync("git", ["init", "-b", "main"], { cwd: vaultRoot });
+    await execFileAsync("git", ["config", "user.name", "SpaceNotes Test"], {
+      cwd: vaultRoot,
+    });
+    await execFileAsync(
+      "git",
+      ["config", "user.email", "spacenotes@example.test"],
+      { cwd: vaultRoot },
+    );
+    await fs.writeFile(path.join(vaultRoot, "note.md"), "# Initial\n", "utf8");
+    await execFileAsync("git", ["add", "note.md"], { cwd: vaultRoot });
+    await execFileAsync("git", ["commit", "-m", "initial"], {
+      cwd: vaultRoot,
+    });
+    await fs.writeFile(path.join(vaultRoot, "note.md"), "# Changed\n", "utf8");
+
+    const hookPath = path.join(vaultRoot, ".git", "hooks", "pre-commit");
+    await fs.writeFile(
+      hookPath,
+      [
+        "#!/bin/sh",
+        "set -eu",
+        `printf '%s\\n' 'hook-ran' > '${leakPath}'`,
+        "pid=$PPID",
+        'while [ "$pid" -gt 1 ]; do',
+        `  /bin/ps eww -p "$pid" >> '${leakPath}' || true`,
+        "  next=$(/bin/ps -o ppid= -p \"$pid\" | tr -d ' ')",
+        '  [ -n "$next" ] || break',
+        '  pid="$next"',
+        "done",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fs.chmod(hookPath, 0o755);
+
+    const token = "hook-token-0123456789abcdef0123456789abcdef";
+    const environment = { ...process.env };
+    delete environment.SPACENOTES_TOKEN;
+    const helperPath = path.resolve("build/macos/space-notes-fs");
+    const child = spawn(
+      process.execPath,
+      [path.resolve("electron/sidecar-entry.cjs")],
+      {
+        cwd: path.resolve("."),
+        env: {
+          ...environment,
+          SPACENOTES_SETTINGS_PATH: path.join(root, "settings.json"),
+          SPACENOTES_WEB_ROOT: webRoot,
+          SPACENOTES_PARENT_PID: String(process.pid),
+          SPACENOTES_FS_HELPER: helperPath,
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    children.add(child);
+    child.stdin.end(`SPACENOTES_TOKEN=${token}\n`);
+    try {
+      const ready = await waitForReady(child);
+      const response = await fetch(
+        `http://127.0.0.1:${ready.port}/api/openVault`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ args: [vaultRoot] }),
+        },
+      );
+      expect(response.status).toBe(200);
+
+      const commitResponse = await fetch(
+        `http://127.0.0.1:${ready.port}/api/gitCommit`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            args: ["test: hook cannot read launch token", ["note.md"]],
+          }),
+        },
+      );
+      expect(commitResponse.status).toBe(200);
+      const environments = await fs.readFile(leakPath, "utf8");
+      expect(environments).toContain("hook-ran");
+      expect(environments).toContain("SPACENOTES_SETTINGS_PATH=");
+      expect(environments).not.toContain(token);
+      expect(environments).not.toContain("SPACENOTES_TOKEN=");
+    } finally {
+      child.kill("SIGTERM");
+      await waitForExit(child);
+      children.delete(child);
+    }
+  }, 15000);
+
+  it.runIf(process.platform === "darwin")(
+    "fails closed on macOS when the native file helper is missing",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(os.tmpdir(), "space-notes-sidecar-missing-helper-"),
+      );
+      temporaryDirectories.push(root);
+      const webRoot = path.join(root, "web");
+      await fs.mkdir(webRoot, { recursive: true });
+      await fs.writeFile(
+        path.join(webRoot, "index.html"),
+        "<!doctype html><title>SpaceNotes</title>",
+        "utf8",
+      );
+
+      const environment = { ...process.env };
+      delete environment.SPACENOTES_TOKEN;
+      const child = spawn(
+        process.execPath,
+        [path.resolve("electron/sidecar-entry.cjs")],
+        {
+          cwd: path.resolve("."),
+          env: {
+            ...environment,
+            SPACENOTES_SETTINGS_PATH: path.join(root, "settings.json"),
+            SPACENOTES_WEB_ROOT: webRoot,
+            SPACENOTES_FS_HELPER: path.join(root, "missing-helper"),
+          },
+          stdio: ["pipe", "pipe", "pipe"],
+        },
+      );
+      children.add(child);
+      let stderr = "";
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+      child.stdin.end(
+        "SPACENOTES_TOKEN=process-token-0123456789abcdef0123456789abcdef\n",
+      );
+
+      await expect(waitForExit(child)).resolves.toBe(1);
+      expect(stderr).toContain("macOS 文件安全组件缺失");
+      children.delete(child);
+    },
+  );
 });

@@ -5,19 +5,36 @@ import WebKit
 final class HostMessageHandler: NSObject, WKScriptMessageHandler {
     private weak var window: NSWindow?
     private let clientProvider: () -> SidecarClient?
+    private let documentPolicy: TrustedWebDocumentPolicy
 
     init(
         window: NSWindow,
-        clientProvider: @escaping () -> SidecarClient?
+        clientProvider: @escaping () -> SidecarClient?,
+        documentPolicy: TrustedWebDocumentPolicy
     ) {
         self.window = window
         self.clientProvider = clientProvider
+        self.documentPolicy = documentPolicy
     }
 
     func userContentController(
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
     ) {
+        guard
+            message.frameInfo.isMainFrame,
+            let currentURL = message.webView?.url,
+            let frameURL = message.frameInfo.request.url,
+            documentPolicy.isTrustedDocument(currentURL),
+            documentPolicy.isTrustedDocument(frameURL),
+            documentPolicy.isTrustedOrigin(
+                scheme: message.frameInfo.securityOrigin.protocol,
+                host: message.frameInfo.securityOrigin.host,
+                port: message.frameInfo.securityOrigin.port
+            )
+        else {
+            return
+        }
         guard let request = BridgeRequest(body: message.body) else {
             return
         }
@@ -145,13 +162,13 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
                 guard let rootPath = snapshot["path"] as? String else {
                     throw SidecarClientError.server("请先打开一个笔记库。")
                 }
-                let target = try VaultPathGuard.resolve(
-                    relativePath: relativePath,
-                    in: URL(fileURLWithPath: rootPath, isDirectory: true)
+                let root = URL(
+                    fileURLWithPath: rootPath,
+                    isDirectory: true
                 )
-                try FileManager.default.trashItem(
-                    at: target,
-                    resultingItemURL: nil
+                try VaultPathGuard.moveToTrash(
+                    relativePath: relativePath,
+                    in: root
                 )
                 let refreshed = try await client.internalCall(method: "refresh")
                 resolve(request, value: refreshed ?? NSNull())

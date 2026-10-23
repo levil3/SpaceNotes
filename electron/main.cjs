@@ -13,6 +13,9 @@ const {
   createLevilNotesApi,
   registerIpcHandlers,
 } = require("./api.cjs");
+const {
+  requireNativeFileOperations,
+} = require("./file-operations.cjs");
 const { GitService } = require("./git.cjs");
 const { SettingsStore, VaultService } = require("./vault.cjs");
 
@@ -143,8 +146,16 @@ app.whenReady().then(async () => {
     path.join(app.getPath("userData"), "settings.json"),
   );
   await settingsStore.load();
+  const fileOperations =
+    process.platform === "darwin"
+      ? requireNativeFileOperations(
+          process.env.SPACENOTES_FS_HELPER ||
+            path.join(__dirname, "..", "build", "macos", "space-notes-fs"),
+        )
+      : null;
   vaultService = new VaultService(settingsStore, sendVaultChanged, {
     trashItem: (absolutePath) => shell.trashItem(absolutePath),
+    fileOperations,
   });
   gitService = new GitService(vaultService);
 

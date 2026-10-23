@@ -1,57 +1,29 @@
 {
-  "status": "PASS",
+  "status": "INCONCLUSIVE",
+  "conclusion": "INCONCLUSIVE",
   "artifact": "Levil Notes 0.2.0.dmg",
-  "sha256": "1f69411b42b1d4d64e9353595c35578493daa5dec79fbcde58433268cdc86db6",
+  "sha256": "a14a36b3ea7fb750ddce959c1ef573465d297c7b9c72995611648b8b20f9df8a",
   "environment": {
     "macOS": "27.0.1",
-    "build": "26A434",
     "hostArchitecture": "arm64",
     "installedPath": "/Applications/Levil Notes.app"
   },
-  "universalSmoke": {
-    "arm64": {
-      "status": "PASS",
-      "port": 49935
-    },
-    "x86_64": {
-      "status": "PASS",
-      "port": 49940
-    }
-  },
-  "singleSidecarCrash": {
+  "reason": "The final local lifecycle round could not start a GUI session because the macOS console was locked (CGSSessionScreenIsLocked=Yes). The process failed before the app reached its first render, so this round provides no final lifecycle PASS evidence.",
+  "previousRound": {
     "status": "PASS",
-    "appPID": 69141,
-    "originalSidecarPID": 69143,
-    "replacementSidecarPID": 70048,
-    "replacementPort": 49982,
-    "webViewReloaded": true,
-    "delayedDOMCheck": "PASS"
-  },
-  "repeatedSidecarCrash": {
-    "status": "PASS",
-    "appRemainedAlive": true,
-    "automaticRestartStopped": true,
-    "sidecarRemainedStopped": true
-  },
-  "normalQuit": {
-    "status": "PASS",
-    "appPID": 70271,
-    "sidecarPID": 70273,
-    "appAfterQuit": "absent",
-    "sidecarAfterQuit": "absent"
-  },
-  "menuAccessibility": {
-    "status": "PASS",
-    "menus": [
-      "Apple",
-      "Levil Notes",
-      "编辑",
-      "显示",
-      "窗口"
-    ]
+    "sha256": "f4d4e54d087345e02500e4e20c9e5942a5a1fe43ca8114980a931b8a722139de",
+    "note": "Historical result only. It does not certify the final artifact and must not be used as final evidence."
   },
   "computerUseVisualCapture": {
     "status": "INCONCLUSIVE",
-    "reason": "The unified CUA entry point was unavailable in this thread, and macOS screen capture returned an all-black image because capture permission was not granted. No visual-pass claim is made."
+    "reason": "The desktop remained locked for the final source revision, preventing native-window observation and interaction."
+  },
+  "ciCoverage": {
+    "workflow": ".github/workflows/build-macos.yml",
+    "status": "PENDING",
+    "expectedRunners": [
+      "macos-15",
+      "macos-15-intel"
+    ]
   }
 }

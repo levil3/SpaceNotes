@@ -4,6 +4,7 @@ import WebKit
 
 final class NotesAssetSchemeHandler: NSObject, WKURLSchemeHandler {
     private let clientProvider: () -> SidecarClient?
+    private let lock = NSLock()
     private var tasks: [ObjectIdentifier: URLSessionDataTask] = [:]
 
     init(clientProvider: @escaping () -> SidecarClient?) {
@@ -42,21 +43,30 @@ final class NotesAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         let key = ObjectIdentifier(urlSchemeTask)
         let task = URLSession.shared.dataTask(with: sidecarRequest) {
             [weak self, weak urlSchemeTask] data, response, error in
-            guard let self, let urlSchemeTask else { return }
-            self.tasks.removeValue(forKey: key)
-            if let error {
-                urlSchemeTask.didFailWithError(error)
-                return
+            DispatchQueue.main.async {
+                guard let self, let urlSchemeTask else {
+                    return
+                }
+                self.lock.lock()
+                let wasActive = self.tasks.removeValue(forKey: key) != nil
+                self.lock.unlock()
+                guard wasActive else { return }
+                if let error {
+                    urlSchemeTask.didFailWithError(error)
+                    return
+                }
+                guard let data, let response else {
+                    self.fail(urlSchemeTask)
+                    return
+                }
+                urlSchemeTask.didReceive(response)
+                urlSchemeTask.didReceive(data)
+                urlSchemeTask.didFinish()
             }
-            guard let data, let response else {
-                self.fail(urlSchemeTask)
-                return
-            }
-            urlSchemeTask.didReceive(response)
-            urlSchemeTask.didReceive(data)
-            urlSchemeTask.didFinish()
         }
+        lock.lock()
         tasks[key] = task
+        lock.unlock()
         task.resume()
     }
 
@@ -65,7 +75,10 @@ final class NotesAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         stop urlSchemeTask: WKURLSchemeTask
     ) {
         let key = ObjectIdentifier(urlSchemeTask)
-        tasks.removeValue(forKey: key)?.cancel()
+        lock.lock()
+        let task = tasks.removeValue(forKey: key)
+        lock.unlock()
+        task?.cancel()
     }
 
     private func fail(_ task: WKURLSchemeTask) {

@@ -1,12 +1,16 @@
 import AppKit
+import SpaceNotesCore
 import WebKit
 
-final class NavigationDelegate: NSObject, WKNavigationDelegate {
-    private let allowedOrigin: URL
+final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
+    private let documentPolicy: TrustedWebDocumentPolicy
     private let onFinish: () -> Void
 
-    init(allowedOrigin: URL, onFinish: @escaping () -> Void) {
-        self.allowedOrigin = allowedOrigin
+    init(
+        documentPolicy: TrustedWebDocumentPolicy,
+        onFinish: @escaping () -> Void
+    ) {
+        self.documentPolicy = documentPolicy
         self.onFinish = onFinish
     }
 
@@ -14,6 +18,10 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate {
         _ webView: WKWebView,
         didFinish navigation: WKNavigation!
     ) {
+        guard let currentURL = webView.url,
+              documentPolicy.isTrustedDocument(currentURL) else {
+            return
+        }
         onFinish()
     }
 
@@ -26,21 +34,28 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate {
             decisionHandler(.cancel)
             return
         }
-        if url.scheme == "notes-asset" {
+        if navigationAction.targetFrame?.isMainFrame == true,
+           documentPolicy.isTrustedDocument(url) {
             decisionHandler(.allow)
             return
         }
-        if url.scheme == allowedOrigin.scheme,
-           url.host == allowedOrigin.host,
-           url.port == allowedOrigin.port
-        {
-            decisionHandler(.allow)
-            return
-        }
-        if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-            NSWorkspace.shared.open(url)
+        if navigationAction.targetFrame == nil {
+            openExternally(url)
         }
         decisionHandler(.cancel)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        if let url = navigationAction.request.url,
+           !documentPolicy.isTrustedDocument(url) {
+            openExternally(url)
+        }
+        return nil
     }
 
     func webView(
@@ -52,5 +67,11 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate {
         alert.messageText = "页面加载失败"
         alert.informativeText = error.localizedDescription
         alert.runModal()
+    }
+
+    private func openExternally(_ url: URL) {
+        if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }

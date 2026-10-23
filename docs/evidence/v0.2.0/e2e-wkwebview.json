@@ -1,216 +1,33 @@
 {
-  "environment" : {
-    "location" : "http:\/\/127.0.0.1:49941",
-    "timestamp" : "2026-10-23T10:50:55.909Z",
-    "userAgent" : "Mozilla\/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit\/605.1.15 (KHTML, like Gecko)"
+  "status": "INCONCLUSIVE",
+  "conclusion": "INCONCLUSIVE",
+  "artifact": "Levil Notes 0.2.0.dmg",
+  "sha256": "a14a36b3ea7fb750ddce959c1ef573465d297c7b9c72995611648b8b20f9df8a",
+  "environment": {
+    "macOS": "27.0.1",
+    "hostArchitecture": "arm64",
+    "node": "24.22.1"
   },
-  "failed" : 0,
-  "failures" : [
-
-  ],
-  "passed" : 50,
-  "results" : [
-    {
-      "name" : "files-open-0",
-      "status" : "PASS"
-    },
-    {
-      "name" : "search-open-1",
-      "status" : "PASS"
-    },
-    {
-      "name" : "outline-navigate-2",
-      "status" : "PASS"
-    },
-    {
-      "name" : "tags-navigate-3",
-      "status" : "PASS"
-    },
-    {
-      "name" : "bridge-write-4",
-      "status" : "PASS"
-    },
-    {
-      "name" : "git-panel-5",
-      "status" : "PASS"
-    },
-    {
-      "name" : "settings-panel-6",
-      "status" : "PASS"
-    },
-    {
-      "name" : "native-trash-7",
-      "status" : "PASS"
-    },
-    {
-      "name" : "vault-image-8",
-      "status" : "PASS"
-    },
-    {
-      "name" : "files-open-9",
-      "status" : "PASS"
-    },
-    {
-      "name" : "search-open-10",
-      "status" : "PASS"
-    },
-    {
-      "name" : "outline-navigate-11",
-      "status" : "PASS"
-    },
-    {
-      "name" : "tags-navigate-12",
-      "status" : "PASS"
-    },
-    {
-      "name" : "bridge-write-13",
-      "status" : "PASS"
-    },
-    {
-      "name" : "git-panel-14",
-      "status" : "PASS"
-    },
-    {
-      "name" : "settings-panel-15",
-      "status" : "PASS"
-    },
-    {
-      "name" : "native-trash-16",
-      "status" : "PASS"
-    },
-    {
-      "name" : "vault-image-17",
-      "status" : "PASS"
-    },
-    {
-      "name" : "files-open-18",
-      "status" : "PASS"
-    },
-    {
-      "name" : "search-open-19",
-      "status" : "PASS"
-    },
-    {
-      "name" : "outline-navigate-20",
-      "status" : "PASS"
-    },
-    {
-      "name" : "tags-navigate-21",
-      "status" : "PASS"
-    },
-    {
-      "name" : "bridge-write-22",
-      "status" : "PASS"
-    },
-    {
-      "name" : "git-panel-23",
-      "status" : "PASS"
-    },
-    {
-      "name" : "settings-panel-24",
-      "status" : "PASS"
-    },
-    {
-      "name" : "native-trash-25",
-      "status" : "PASS"
-    },
-    {
-      "name" : "vault-image-26",
-      "status" : "PASS"
-    },
-    {
-      "name" : "files-open-27",
-      "status" : "PASS"
-    },
-    {
-      "name" : "search-open-28",
-      "status" : "PASS"
-    },
-    {
-      "name" : "outline-navigate-29",
-      "status" : "PASS"
-    },
-    {
-      "name" : "tags-navigate-30",
-      "status" : "PASS"
-    },
-    {
-      "name" : "bridge-write-31",
-      "status" : "PASS"
-    },
-    {
-      "name" : "git-panel-32",
-      "status" : "PASS"
-    },
-    {
-      "name" : "settings-panel-33",
-      "status" : "PASS"
-    },
-    {
-      "name" : "native-trash-34",
-      "status" : "PASS"
-    },
-    {
-      "name" : "vault-image-35",
-      "status" : "PASS"
-    },
-    {
-      "name" : "files-open-36",
-      "status" : "PASS"
-    },
-    {
-      "name" : "search-open-37",
-      "status" : "PASS"
-    },
-    {
-      "name" : "outline-navigate-38",
-      "status" : "PASS"
-    },
-    {
-      "name" : "tags-navigate-39",
-      "status" : "PASS"
-    },
-    {
-      "name" : "bridge-write-40",
-      "status" : "PASS"
-    },
-    {
-      "name" : "git-panel-41",
-      "status" : "PASS"
-    },
-    {
-      "name" : "settings-panel-42",
-      "status" : "PASS"
-    },
-    {
-      "name" : "native-trash-43",
-      "status" : "PASS"
-    },
-    {
-      "name" : "vault-image-44",
-      "status" : "PASS"
-    },
-    {
-      "name" : "files-open-45",
-      "status" : "PASS"
-    },
-    {
-      "name" : "search-open-46",
-      "status" : "PASS"
-    },
-    {
-      "name" : "outline-navigate-47",
-      "status" : "PASS"
-    },
-    {
-      "name" : "tags-navigate-48",
-      "status" : "PASS"
-    },
-    {
-      "name" : "bridge-write-49",
-      "status" : "PASS"
-    }
-  ],
-  "status" : "PASS",
-  "total" : 50
+  "total": 0,
+  "passed": 0,
+  "failed": 0,
+  "results": [],
+  "failures": [],
+  "reason": "The final local WKWebView round could not start because the macOS console was locked (CGSSessionScreenIsLocked=Yes). No final local flow result is claimed.",
+  "previousRound": {
+    "status": "CERTIFIED",
+    "sha256": "f4d4e54d087345e02500e4e20c9e5942a5a1fe43ca8114980a931b8a722139de",
+    "passed": 58,
+    "total": 58,
+    "note": "Historical result only. It does not certify the final artifact."
+  },
+  "ciCoverage": {
+    "workflow": ".github/workflows/build-macos.yml",
+    "status": "PENDING",
+    "requiredFlows": 60,
+    "expectedRunners": [
+      "macos-15",
+      "macos-15-intel"
+    ]
+  }
 }

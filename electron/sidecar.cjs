@@ -249,7 +249,7 @@ function createSidecarServer({
             target,
             notePath,
           );
-          const content = await fsp.readFile(assetPath);
+          const { content } = await vaultService.readResolvedFile(assetPath);
           response.writeHead(200, {
             ...headers,
             "Content-Type":
@@ -297,6 +297,15 @@ function createSidecarServer({
             response,
             400,
             { error: error.message || "请求格式无效。" },
+            headers,
+          );
+          return;
+        }
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+          sendJson(
+            response,
+            400,
+            { error: "请求体必须是对象。" },
             headers,
           );
           return;
@@ -353,6 +362,15 @@ function createSidecarServer({
             response,
             400,
             { error: error.message || "请求格式无效。" },
+            headers,
+          );
+          return;
+        }
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+          sendJson(
+            response,
+            400,
+            { error: "请求体必须是对象。" },
             headers,
           );
           return;

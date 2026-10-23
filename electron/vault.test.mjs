@@ -6,10 +6,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const require = createRequire(import.meta.url);
 const { SettingsStore, VaultService } = require("./vault.cjs");
+const { createNativeFileOperations } = require("./file-operations.cjs");
 
 const temporaryDirectories = [];
+const helperPath = path.resolve("build/macos/space-notes-fs");
+const fileOperations = createNativeFileOperations(helperPath);
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) =>
       fs.rm(directory, { recursive: true, force: true }),
@@ -39,9 +43,12 @@ async function createFixture(platformActions = {}) {
 
   const settings = new SettingsStore(path.join(root, "settings.json"));
   await settings.load();
-  const vault = new VaultService(settings, () => {}, platformActions);
+  const vault = new VaultService(settings, () => {}, {
+    fileOperations,
+    ...platformActions,
+  });
   await vault.open(root);
-  return { root, vault };
+  return { root, vault, fileOperations };
 }
 
 describe("VaultService platform actions", () => {
@@ -52,7 +59,7 @@ describe("VaultService platform actions", () => {
       await vault.trashNote("notes/Java Base/example.md");
 
       expect(trashItem).toHaveBeenCalledWith(
-        path.join(root, "notes", "Java Base", "example.md"),
+        path.join(vault.getVaultPath(), "notes", "Java Base", "example.md"),
       );
       expect(vault.snapshot().files.map((file) => file.path)).not.toContain(
         "notes/Java Base/example.md",
@@ -76,6 +83,312 @@ describe("VaultService platform actions", () => {
   });
 });
 
+describe("VaultService path containment", () => {
+  it("creates nested notes through fd-relative parent creation", async () => {
+    const { vault } = await createFixture();
+    try {
+      await expect(
+        vault.createNote("notes/archive/deep", "New note"),
+      ).resolves.toEqual({
+        path: "notes/archive/deep/New note.md",
+        content: "# New note\n\n",
+      });
+      await expect(
+        vault.readNote("notes/archive/deep/New note.md"),
+      ).resolves.toEqual({
+        path: "notes/archive/deep/New note.md",
+        content: "# New note\n\n",
+      });
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("creates notes at the vault root with the native helper", async () => {
+    const { vault } = await createFixture();
+    try {
+      await expect(vault.createNote("", "Root note")).resolves.toEqual({
+        path: "Root note.md",
+        content: "# Root note\n\n",
+      });
+      await expect(
+        vault.createNote(undefined, "Another root"),
+      ).resolves.toEqual({
+        path: "Another root.md",
+        content: "# Another root\n\n",
+      });
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects reading and writing through a file symlink outside the vault", async () => {
+    const { root, vault } = await createFixture();
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    const outsideNote = path.join(outsideRoot, "outside.md");
+    await fs.writeFile(outsideNote, "# Outside\n", "utf8");
+    await fs.symlink(outsideNote, path.join(root, "linked.md"));
+
+    try {
+      await expect(vault.readNote("linked.md")).rejects.toThrow(
+        "文件路径超出当前笔记库",
+      );
+      await expect(vault.writeNote("linked.md", "# Changed\n")).rejects.toThrow(
+        "文件路径超出当前笔记库",
+      );
+      await expect(fs.readFile(outsideNote, "utf8")).resolves.toBe(
+        "# Outside\n",
+      );
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects writing through a dangling symlink without creating its target", async () => {
+    const { root, vault } = await createFixture();
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    const outsideNote = path.join(outsideRoot, "created-outside.md");
+    await fs.symlink(outsideNote, path.join(root, "dangling.md"));
+
+    try {
+      await expect(
+        vault.writeNote("dangling.md", "# Escaped\n"),
+      ).rejects.toThrow("文件路径超出当前笔记库");
+      await expect(fs.access(outsideNote)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects creating notes below a directory symlink outside the vault", async () => {
+    const { root, vault } = await createFixture();
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    await fs.symlink(outsideRoot, path.join(root, "linked-directory"), "dir");
+
+    try {
+      await expect(
+        vault.createNote("linked-directory", "escaped"),
+      ).rejects.toThrow("文件路径超出当前笔记库");
+      await expect(
+        fs.access(path.join(outsideRoot, "escaped.md")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("renames and trashes symlink entries without following their targets", async () => {
+    const trashedPaths = [];
+    const trashItem = vi.fn(async (absolutePath) => {
+      trashedPaths.push(absolutePath);
+      await fs.unlink(absolutePath);
+    });
+    const { root, vault } = await createFixture({ trashItem });
+    const targetPath = path.join(root, "target.md");
+    const linkPath = path.join(root, "link.md");
+    await fs.writeFile(targetPath, "# Target\n", "utf8");
+    await fs.symlink("target.md", linkPath);
+
+    try {
+      await expect(vault.renameNote("link.md", "link")).resolves.toEqual({
+        path: "link.md",
+      });
+      await expect(fs.readFile(targetPath, "utf8")).resolves.toBe("# Target\n");
+
+      await expect(vault.renameNote("link.md", "renamed")).resolves.toEqual({
+        path: "renamed.md",
+      });
+      await expect(fs.readFile(targetPath, "utf8")).resolves.toBe("# Target\n");
+      expect((await fs.lstat(path.join(root, "renamed.md"))).isSymbolicLink()).toBe(
+        true,
+      );
+      expect(await fs.readlink(path.join(root, "renamed.md"))).toBe("target.md");
+
+      await vault.trashNote("renamed.md");
+      expect(trashItem).toHaveBeenCalledWith(
+        path.join(vault.getVaultPath(), "renamed.md"),
+      );
+      expect(trashedPaths).toEqual([
+        path.join(vault.getVaultPath(), "renamed.md"),
+      ]);
+      await expect(fs.readFile(targetPath, "utf8")).resolves.toBe("# Target\n");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects renaming and trashing file symlinks outside the vault", async () => {
+    const trashItem = vi.fn(async () => {});
+    const { root, vault } = await createFixture({ trashItem });
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    const outsideNote = path.join(outsideRoot, "outside.md");
+    await fs.writeFile(outsideNote, "# Outside\n", "utf8");
+    await fs.symlink(outsideNote, path.join(root, "linked.md"));
+
+    try {
+      await expect(vault.renameNote("linked.md", "renamed")).rejects.toThrow(
+        "文件路径超出当前笔记库",
+      );
+      await expect(vault.trashNote("linked.md")).rejects.toThrow(
+        "文件路径超出当前笔记库",
+      );
+      expect(trashItem).not.toHaveBeenCalled();
+      await expect(fs.readFile(outsideNote, "utf8")).resolves.toBe(
+        "# Outside\n",
+      );
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects a directory symlink swapped in after read validation", async () => {
+    const { root, vault, fileOperations } = await createFixture();
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    const insideDirectory = path.join(root, "race");
+    const outsideDirectory = path.join(outsideRoot, "race");
+    const outsideNote = path.join(outsideDirectory, "note.md");
+    await fs.mkdir(insideDirectory, { recursive: true });
+    await fs.mkdir(outsideDirectory, { recursive: true });
+    await fs.writeFile(outsideNote, "OUTSIDE_SECRET\n", "utf8");
+    await fs.writeFile(path.join(insideDirectory, "note.md"), "# Inside\n");
+    const originalRead = fileOperations.read;
+    vi.spyOn(fileOperations, "read").mockImplementationOnce(async (...args) => {
+      await fs.rename(insideDirectory, `${insideDirectory}-inside`);
+      await fs.symlink(outsideDirectory, insideDirectory, "dir");
+      return originalRead(...args);
+    });
+
+    try {
+      await expect(vault.readNote("race/note.md")).rejects.toThrow();
+      await expect(fs.readFile(outsideNote, "utf8")).resolves.toBe(
+        "OUTSIDE_SECRET\n",
+      );
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects a directory symlink swapped in before write side effects", async () => {
+    const { root, vault, fileOperations } = await createFixture();
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    const insideDirectory = path.join(root, "race");
+    const outsideDirectory = path.join(outsideRoot, "race");
+    const outsideNote = path.join(outsideDirectory, "note.md");
+    await fs.mkdir(insideDirectory, { recursive: true });
+    await fs.mkdir(outsideDirectory, { recursive: true });
+    await fs.writeFile(outsideNote, "OUTSIDE_SECRET\n", "utf8");
+    await fs.writeFile(path.join(insideDirectory, "note.md"), "# Inside\n");
+    const originalWrite = fileOperations.write;
+    vi.spyOn(fileOperations, "write").mockImplementationOnce(
+      async (...args) => {
+        await fs.rename(insideDirectory, `${insideDirectory}-inside`);
+        await fs.symlink(outsideDirectory, insideDirectory, "dir");
+        return originalWrite(...args);
+      },
+    );
+
+    try {
+      await expect(
+        vault.writeNote("race/note.md", "# Escaped\n"),
+      ).rejects.toThrow();
+      await expect(fs.readFile(outsideNote, "utf8")).resolves.toBe(
+        "OUTSIDE_SECRET\n",
+      );
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects a directory symlink swapped in before rename side effects", async () => {
+    const { root, vault, fileOperations } = await createFixture();
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    const insideDirectory = path.join(root, "race");
+    const outsideDirectory = path.join(outsideRoot, "race");
+    const outsideNote = path.join(outsideDirectory, "note.md");
+    await fs.mkdir(insideDirectory, { recursive: true });
+    await fs.mkdir(outsideDirectory, { recursive: true });
+    await fs.writeFile(outsideNote, "# Outside\n", "utf8");
+    await fs.writeFile(path.join(insideDirectory, "note.md"), "# Inside\n");
+    const originalRename = fileOperations.rename;
+    vi.spyOn(fileOperations, "rename").mockImplementationOnce(
+      async (...args) => {
+        await fs.rename(insideDirectory, `${insideDirectory}-inside`);
+        await fs.symlink(outsideDirectory, insideDirectory, "dir");
+        return originalRename(...args);
+      },
+    );
+
+    try {
+      await expect(
+        vault.renameNote("race/note.md", "renamed"),
+      ).rejects.toThrow();
+      await expect(fs.readFile(outsideNote, "utf8")).resolves.toBe(
+        "# Outside\n",
+      );
+      await expect(
+        fs.access(path.join(outsideDirectory, "renamed.md")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects a directory symlink swapped in before create-note side effects", async () => {
+    const { root, vault, fileOperations } = await createFixture();
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    const insideDirectory = path.join(root, "race");
+    const outsideDirectory = path.join(outsideRoot, "race");
+    const outsideNestedDirectory = path.join(outsideDirectory, "nested");
+    await fs.mkdir(insideDirectory, { recursive: true });
+    await fs.mkdir(outsideDirectory, { recursive: true });
+    const originalMkdir = fileOperations.mkdir;
+    vi.spyOn(fileOperations, "mkdir").mockImplementationOnce(
+      async (...args) => {
+        await fs.rename(insideDirectory, `${insideDirectory}-inside`);
+        await fs.symlink(outsideDirectory, insideDirectory, "dir");
+        return originalMkdir(...args);
+      },
+    );
+
+    try {
+      await expect(
+        vault.createNote("race/nested", "created"),
+      ).rejects.toThrow();
+      await expect(fs.access(outsideNestedDirectory)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+});
+
 describe("VaultService asset resolution", () => {
   it("resolves note-relative images that do not exist at the vault root", async () => {
     const { vault } = await createFixture();
@@ -85,7 +398,15 @@ describe("VaultService asset resolution", () => {
         "notes/Java Base/example.md",
       );
       expect(resolved).toBe(
-        path.join(vault.getVaultPath(), "notes", "Java Base", "images", "local.png"),
+        await fs.realpath(
+          path.join(
+            vault.getVaultPath(),
+            "notes",
+            "Java Base",
+            "images",
+            "local.png",
+          ),
+        ),
       );
     } finally {
       await vault.closeWatcher();
@@ -99,7 +420,9 @@ describe("VaultService asset resolution", () => {
         "..\\..\\..\\images\\root.png",
         "notes/Java Base/example.md",
       );
-      expect(resolved).toBe(path.join(vault.getVaultPath(), "images", "root.png"));
+      expect(resolved).toBe(
+        await fs.realpath(path.join(vault.getVaultPath(), "images", "root.png")),
+      );
     } finally {
       await vault.closeWatcher();
     }
@@ -111,6 +434,28 @@ describe("VaultService asset resolution", () => {
       await expect(
         vault.resolveAsset("C:\\Windows\\example.png", "notes/example.md"),
       ).rejects.toThrow("图片路径无效");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects attachments that escape through a symbolic link", async () => {
+    const { root, vault } = await createFixture();
+    const outsideRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "space-notes-outside-"),
+    );
+    temporaryDirectories.push(outsideRoot);
+    const outsideAsset = path.join(outsideRoot, "secret.png");
+    await fs.writeFile(outsideAsset, "secret", "utf8");
+    await fs.symlink(
+      outsideAsset,
+      path.join(root, "images", "linked.png"),
+    );
+
+    try {
+      await expect(
+        vault.resolveAsset("images/linked.png", "notes/example.md"),
+      ).rejects.toThrow("图片路径超出当前笔记库");
     } finally {
       await vault.closeWatcher();
     }
