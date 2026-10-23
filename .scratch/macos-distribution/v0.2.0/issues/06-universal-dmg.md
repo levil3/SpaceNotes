@@ -17,4 +17,3 @@ DMG 可挂载并启动应用。
 - [ ] DMG 包含应用和 Applications 链接，可挂载、校验和退出挂载。
 - [ ] 构建不依赖 Developer ID、公证或浮动的 macOS runner。
 - [ ] 构建测试验证 Node 两架构启动、Mach-O 清单和 DMG 内容。
-

@@ -34,5 +34,3 @@ Swift 薄壳如何呈现现有 Windows 界面，并把窗口、菜单、宿主�
 - 设置保存到 `~/Library/Application Support/Levil Notes/settings.json`。
 - `trashNote` 由 Swift 使用 `FileManager.trashItem`，随后通知 sidecar 刷新索引。
 - 正常退出时终止 sidecar；异常退出最多重启一次，再次失败显示诊断信息。
-
-

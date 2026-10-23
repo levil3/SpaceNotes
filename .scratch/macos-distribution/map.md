@@ -42,4 +42,3 @@ Intel 与 Apple Silicon 的无签名 DMG。
 - SwiftUI/AppKit 重写 React 界面。
 - 第一版将文件监听、Git 和全部文件 I/O 从 Node 改为 Swift。
 - Windows 与 macOS 各维护一份 React/TypeScript 前端。
-

@@ -32,5 +32,3 @@ Swift 薄壳与 Node sidecar 之间应采用什么进程模型和传输方式，
 - sidecar 发生异常退出时最多自动重启一次；重复失败必须显示可诊断错误并停止。
 - `chooseVault`、`trashNote`、`showInFolder` 和窗口操作由 Swift 原生宿主动作
   完成；其余请求继续遵守 `window.levilNotes` 契约。
-
-

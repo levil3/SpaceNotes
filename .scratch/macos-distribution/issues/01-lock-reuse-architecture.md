@@ -19,4 +19,3 @@ macOS 第一版如何在“原生 Swift 薄壳”、单一 React/TypeScript 前�
   的前提下逐步替换。
 - 净室只针对功能验证。现有功能是行为基准，不重写、不重新设计。
 - 第一版交付无签名、无公证的 Intel + Apple Silicon 通用 DMG。
-
