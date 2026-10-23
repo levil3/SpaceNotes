@@ -34,13 +34,19 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
             decisionHandler(.cancel)
             return
         }
-        if navigationAction.targetFrame?.isMainFrame == true,
-           documentPolicy.isTrustedDocument(url) {
+        let decision = WebNavigationPolicy.decision(
+            url: url,
+            isMainFrame: navigationAction.targetFrame?.isMainFrame == true,
+            isTrustedDocument: documentPolicy.isTrustedDocument(url)
+        )
+        switch decision {
+        case .allow:
             decisionHandler(.allow)
             return
-        }
-        if navigationAction.targetFrame == nil {
+        case .openExternally:
             openExternally(url)
+        case .cancel:
+            break
         }
         decisionHandler(.cancel)
     }
@@ -52,7 +58,11 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         if let url = navigationAction.request.url,
-           !documentPolicy.isTrustedDocument(url) {
+           WebNavigationPolicy.decision(
+               url: url,
+               isMainFrame: false,
+               isTrustedDocument: documentPolicy.isTrustedDocument(url)
+           ) == .openExternally {
             openExternally(url)
         }
         return nil
@@ -70,7 +80,11 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     private func openExternally(_ url: URL) {
-        if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+        if WebNavigationPolicy.decision(
+            url: url,
+            isMainFrame: false,
+            isTrustedDocument: false
+        ) == .openExternally {
             NSWorkspace.shared.open(url)
         }
     }

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/stdio.h>
 #include <unistd.h>
 
 #ifndef O_CLOEXEC
@@ -263,25 +264,28 @@ static int command_write(
     free(content);
     return invalid_path("invalid write mode");
   }
-  int file_fd = openat(
-      parent_fd,
-      base,
-      O_WRONLY | O_NOFOLLOW | O_CLOEXEC
-  );
-  if (file_fd < 0 && errno == ENOENT && !exclusive) {
+  int file_fd;
+  if (exclusive) {
     file_fd = openat(
         parent_fd,
         base,
         O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
         0666
     );
-  } else if (file_fd < 0 && exclusive) {
+  } else {
     file_fd = openat(
         parent_fd,
         base,
-        O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
-        0666
+        O_WRONLY | O_NOFOLLOW | O_CLOEXEC
     );
+    if (file_fd < 0 && errno == ENOENT) {
+      file_fd = openat(
+          parent_fd,
+          base,
+          O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+          0666
+      );
+    }
   }
   close(parent_fd);
   if (file_fd < 0) {
@@ -353,6 +357,7 @@ static int command_rename(
   }
 
   struct stat source_status;
+  struct stat destination_status;
   if (
       fstatat(
           source_parent,
@@ -366,16 +371,54 @@ static int command_rename(
     return fail("cannot stat source entry");
   }
   if (
-      renameat(
+      fstatat(
+          destination_parent,
+          destination_base,
+          &destination_status,
+          AT_SYMLINK_NOFOLLOW
+      ) == 0
+  ) {
+    if (
+        source_status.st_dev == destination_status.st_dev &&
+        source_status.st_ino == destination_status.st_ino
+    ) {
+      if (
+          renameat(
+              source_parent,
+              source_base,
+              destination_parent,
+              destination_base
+          ) == 0
+      ) {
+        close(source_parent);
+        close(destination_parent);
+        return 0;
+      }
+      close(source_parent);
+      close(destination_parent);
+      return fail("cannot rename entry");
+    }
+    close(source_parent);
+    close(destination_parent);
+    return fail("destination already exists");
+  }
+  if (errno != ENOENT) {
+    close(source_parent);
+    close(destination_parent);
+    return fail("cannot inspect destination entry");
+  }
+  if (
+      renameatx_np(
           source_parent,
           source_base,
           destination_parent,
-          destination_base
+          destination_base,
+          RENAME_EXCL
       ) != 0
   ) {
     close(source_parent);
     close(destination_parent);
-    return fail("cannot rename entry");
+    return fail("cannot rename entry without replacing an existing path");
   }
   close(source_parent);
   close(destination_parent);

@@ -54,6 +54,25 @@ final class SpaceNotesCoreTests: XCTestCase {
         )
     }
 
+    func testExternalMainFrameNavigationOpensInTheSystemBrowser() {
+        XCTAssertEqual(
+            WebNavigationPolicy.decision(
+                url: URL(string: "https://example.com/docs")!,
+                isMainFrame: true,
+                isTrustedDocument: false
+            ),
+            .openExternally
+        )
+        XCTAssertEqual(
+            WebNavigationPolicy.decision(
+                url: URL(string: "file:///tmp/outside.html")!,
+                isMainFrame: true,
+                isTrustedDocument: false
+            ),
+            .cancel
+        )
+    }
+
     func testLaunchTokenPayloadUsesAStdInLineAndStableFingerprint() throws {
         let token = "0123456789abcdef0123456789abcdef"
         XCTAssertEqual(

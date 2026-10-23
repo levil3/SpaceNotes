@@ -12,6 +12,10 @@ const {
   requiredFlows,
   verifyE2EContract,
 } = require("./check-e2e-script.cjs");
+const {
+  buildLifecycleReport,
+  lifecycleResultIsAcceptable,
+} = require("./lifecycle-report.cjs");
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const describeMac = process.platform === "darwin" ? describe : describe.skip;
 
@@ -33,6 +37,68 @@ describe("macOS E2E contract", () => {
     expect(script).toContain("let aborted = false");
     expect(script).toContain("if (aborted)");
     expect(script).toContain("requiredFlows: 60");
+  });
+
+  it("keeps lifecycle certification inconclusive without visual evidence", () => {
+    const report = buildLifecycleReport(
+      {
+        WINDOW_LIFECYCLE_STATUS: "PASS",
+        MENU_ACCESSIBILITY_STATUS: "PASS",
+        SINGLE_CRASH_STATUS: "PASS",
+        REPEATED_CRASH_STATUS: "PASS",
+        NORMAL_QUIT_STATUS: "PASS",
+        COMPUTER_USE_VISUAL_STATUS: "INCONCLUSIVE",
+        COMPUTER_USE_VISUAL_REASON: "Computer Use unavailable.",
+        DMG_PATH: "/tmp/Levil Notes 0.2.0.dmg",
+        APP_BUNDLE: "/Applications/Levil Notes.app",
+        DIAGNOSTICS: "/tmp/diagnostics.log",
+        MENUS: "Levil Notes, File, Window",
+        WINDOW_LIFECYCLE_PID: "1",
+        WINDOW_LIFECYCLE_SIDECAR_PID: "2",
+        CRASH_APP_PID: "3",
+        ORIGINAL_SIDECAR_PID: "4",
+        REPLACEMENT_SIDECAR_PID: "5",
+        DIAGNOSTICS_BEFORE_CRASH: "10",
+        ORIGINAL_TOKEN_FINGERPRINT: "a".repeat(64),
+        REPLACEMENT_TOKEN_FINGERPRINT: "b".repeat(64),
+      },
+      { sha256: "c".repeat(64) },
+    );
+
+    expect(report.functionalStatus).toBe("PASS");
+    expect(report.status).toBe("INCONCLUSIVE");
+    expect(lifecycleResultIsAcceptable(report, "0")).toBe(false);
+    expect(lifecycleResultIsAcceptable(report, "1")).toBe(true);
+  });
+
+  it("fails closed when a functional lifecycle check is not certified", () => {
+    const report = buildLifecycleReport(
+      {
+        WINDOW_LIFECYCLE_STATUS: "PASS",
+        MENU_ACCESSIBILITY_STATUS: "PASS",
+        SINGLE_CRASH_STATUS: "NOT CERTIFIED",
+        REPEATED_CRASH_STATUS: "PASS",
+        NORMAL_QUIT_STATUS: "PASS",
+        COMPUTER_USE_VISUAL_STATUS: "PASS",
+        COMPUTER_USE_VISUAL_REASON: "Captured.",
+        DMG_PATH: "/tmp/Levil Notes 0.2.0.dmg",
+        APP_BUNDLE: "/Applications/Levil Notes.app",
+        DIAGNOSTICS: "/tmp/diagnostics.log",
+        MENUS: "Levil Notes, File, Window",
+        WINDOW_LIFECYCLE_PID: "1",
+        WINDOW_LIFECYCLE_SIDECAR_PID: "2",
+        CRASH_APP_PID: "3",
+        ORIGINAL_SIDECAR_PID: "4",
+        REPLACEMENT_SIDECAR_PID: "5",
+        DIAGNOSTICS_BEFORE_CRASH: "10",
+        ORIGINAL_TOKEN_FINGERPRINT: "a".repeat(64),
+        REPLACEMENT_TOKEN_FINGERPRINT: "b".repeat(64),
+      },
+      { sha256: "c".repeat(64) },
+    );
+
+    expect(report.status).toBe("NOT CERTIFIED");
+    expect(lifecycleResultIsAcceptable(report, "1")).toBe(false);
   });
 
 });

@@ -81,6 +81,14 @@ jobs:
             "build/macos/Levil Notes 0.2.0.dmg" \
             docs/evidence/v0.2.0/diagnostics.log
 
+      - name: Run native lifecycle regression
+        env:
+          SPACENOTES_APP_BUNDLE: ${{ github.workspace }}/build/macos/Levil Notes.app
+          SPACENOTES_ALLOW_INCONCLUSIVE_VISUAL: "1"
+        run: |
+          bash scripts/macos/run-lifecycle-e2e.sh \
+            docs/evidence/v0.2.0/lifecycle.json
+
       - name: Upload macOS artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -93,6 +101,7 @@ jobs:
             build/macos/build.log
             docs/evidence/v0.2.0/e2e-wkwebview.json
             docs/evidence/v0.2.0/diagnostics.log
+            docs/evidence/v0.2.0/lifecycle.json
             docs/evidence/v0.2.0/usage-model.json
           if-no-files-found: warn
 

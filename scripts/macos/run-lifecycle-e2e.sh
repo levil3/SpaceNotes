@@ -196,85 +196,12 @@ export REPLACEMENT_SIDECAR_PID="$replacement_sidecar_pid"
 export ORIGINAL_TOKEN_FINGERPRINT="$original_token_fingerprint"
 export REPLACEMENT_TOKEN_FINGERPRINT="$replacement_token_fingerprint"
 export DIAGNOSTICS_BEFORE_CRASH="$diagnostics_before"
+export WINDOW_LIFECYCLE_STATUS="PASS"
+export MENU_ACCESSIBILITY_STATUS="PASS"
+export SINGLE_CRASH_STATUS="PASS"
+export REPEATED_CRASH_STATUS="PASS"
+export NORMAL_QUIT_STATUS="PASS"
+export COMPUTER_USE_VISUAL_STATUS="${SPACENOTES_COMPUTER_USE_VISUAL_STATUS:-INCONCLUSIVE}"
+export COMPUTER_USE_VISUAL_REASON="${SPACENOTES_COMPUTER_USE_VISUAL_REASON:-The unified computer-use entry point was unavailable. Native menus and window state were validated through System Events; this report does not claim a visual screenshot pass.}"
 
-node <<'NODE'
-const crypto = require("node:crypto");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-
-const report = {
-  status: "PASS",
-  artifact: path.basename(process.env.DMG_PATH),
-  sha256: crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(process.env.DMG_PATH))
-    .digest("hex"),
-  environment: {
-    macOS: os.release(),
-    hostArchitecture: process.arch,
-    installedPath: process.env.APP_BUNDLE,
-  },
-  windowLifecycle: {
-    status: "PASS",
-    appPID: Number(process.env.WINDOW_LIFECYCLE_PID),
-    sidecarPID: Number(process.env.WINDOW_LIFECYCLE_SIDECAR_PID),
-    closedWindowWithoutTerminating: true,
-    reopenedFromDockRequest: true,
-    diagnosticsMarkers: [
-      "window-closed-app-persisted",
-      "window-reopened-from-dock-request",
-    ],
-  },
-  menuAccessibility: {
-    status: "PASS",
-    menus: process.env.MENUS.split(", "),
-    closeWindowCommand: "Cmd-W",
-  },
-  singleSidecarCrash: {
-    status: "PASS",
-    appPID: Number(process.env.CRASH_APP_PID),
-    originalSidecarPID: Number(process.env.ORIGINAL_SIDECAR_PID),
-    replacementSidecarPID: Number(process.env.REPLACEMENT_SIDECAR_PID),
-    tokenRotated: true,
-    tokenTransport: {
-      status: "PASS",
-      delivery: "stdin-first-line",
-      visibleInProcessEnvironment: false,
-    },
-    tokenFingerprints: {
-      algorithm: "sha256",
-      diagnosticsAfterCrashLine: Number(process.env.DIAGNOSTICS_BEFORE_CRASH),
-      original: process.env.ORIGINAL_TOKEN_FINGERPRINT,
-      replacement: process.env.REPLACEMENT_TOKEN_FINGERPRINT,
-    },
-    automaticRestart: true,
-    webViewReloaded: true,
-  },
-  repeatedSidecarCrash: {
-    status: "PASS",
-    appRemainedAlive: true,
-    automaticRestartStopped: true,
-    sidecarRemainedStopped: true,
-  },
-  normalQuit: {
-    status: "PASS",
-    appAfterQuit: "absent",
-    sidecarAfterQuit: "absent",
-  },
-  diagnosticsLog: process.env.DIAGNOSTICS,
-  computerUseVisualCapture: {
-    status: "INCONCLUSIVE",
-    reason:
-      "The unified computer-use entry point was unavailable, and screen capture returned a black frame because screen-recording permission was not granted. Native menus and window state were validated through System Events; this report does not claim a visual screenshot pass.",
-  },
-};
-
-fs.mkdirSync(path.dirname(process.env.REPORT_PATH), { recursive: true });
-fs.writeFileSync(
-  process.env.REPORT_PATH,
-  `${JSON.stringify(report, null, 2)}\n`,
-  "utf8",
-);
-process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-NODE
+node "$ROOT/scripts/macos/lifecycle-report.cjs"

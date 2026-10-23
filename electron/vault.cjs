@@ -428,6 +428,18 @@ class VaultService {
     return canonicalPath;
   }
 
+  async entryExists(absolutePath) {
+    try {
+      await fs.lstat(absolutePath);
+      return true;
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return false;
+      }
+      throw error;
+    }
+  }
+
   mapNoFollowOpenError(error) {
     if (error?.code === "ELOOP" || error?.code === "EMLINK") {
       return vaultPathOutsideError();
@@ -869,7 +881,10 @@ class VaultService {
     const prefix = parentPath ? `${parentPath.replace(/\/$/, "")}/` : "";
     let relativePath = `${prefix}${safeTitle}.md`;
     let suffix = 2;
-    while (this.documents.has(relativePath)) {
+    while (
+      this.documents.has(relativePath) ||
+      (await this.entryExists(this.resolveInsideVault(relativePath)))
+    ) {
       relativePath = `${prefix}${safeTitle} ${suffix}.md`;
       suffix += 1;
     }
@@ -922,6 +937,23 @@ class VaultService {
       await this.resolveMutationDestinationInsideVault(nextRelative);
     if (source === destination) {
       return { path: relativePath };
+    }
+    const destinationStatus = await fs
+      .lstat(destination)
+      .catch((error) => {
+        if (error.code === "ENOENT") {
+          return null;
+        }
+        throw error;
+      });
+    if (destinationStatus) {
+      const sourceStatus = await fs.lstat(source);
+      if (
+        sourceStatus.dev !== destinationStatus.dev ||
+        sourceStatus.ino !== destinationStatus.ino
+      ) {
+        throw new Error("同名笔记已存在。");
+      }
     }
     if (this.fileOperations) {
       await this.fileOperations.rename(

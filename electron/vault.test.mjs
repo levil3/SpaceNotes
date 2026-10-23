@@ -420,6 +420,98 @@ describe("VaultService path containment", () => {
   );
 });
 
+describe("VaultService overwrite protection", () => {
+  it.runIf(process.platform === "darwin")(
+    "never truncates an existing file through an exclusive helper write",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(os.tmpdir(), "space-notes-exclusive-write-"),
+      );
+      temporaryDirectories.push(root);
+      const existing = path.join(root, "existing.md");
+      await fs.writeFile(existing, "# Existing\n", "utf8");
+
+      await expect(
+        nativeFileOperations.write(
+          root,
+          "existing.md",
+          "# Replacement\n",
+          "exclusive",
+        ),
+      ).rejects.toThrow();
+      await expect(fs.readFile(existing, "utf8")).resolves.toBe("# Existing\n");
+    },
+  );
+
+  it.runIf(process.platform === "darwin")(
+    "never replaces an existing destination through the rename helper",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(os.tmpdir(), "space-notes-exclusive-rename-"),
+      );
+      temporaryDirectories.push(root);
+      await fs.writeFile(path.join(root, "source.md"), "SOURCE\n", "utf8");
+      await fs.writeFile(
+        path.join(root, "destination.md"),
+        "DESTINATION\n",
+        "utf8",
+      );
+
+      await expect(
+        nativeFileOperations.rename(
+          root,
+          "source.md",
+          "destination.md",
+        ),
+      ).rejects.toThrow();
+      await expect(
+        fs.readFile(path.join(root, "source.md"), "utf8"),
+      ).resolves.toBe("SOURCE\n");
+      await expect(
+        fs.readFile(path.join(root, "destination.md"), "utf8"),
+      ).resolves.toBe("DESTINATION\n");
+    },
+  );
+
+  it("uses a suffix when a note exists on disk but is missing from the index", async () => {
+    const { root, vault } = await createFixture();
+    await fs.writeFile(path.join(root, "Disk only.md"), "# Existing\n", "utf8");
+    try {
+      await expect(vault.createNote("", "Disk only")).resolves.toEqual({
+        path: "Disk only 2.md",
+        content: "# Disk only\n\n",
+      });
+      await expect(fs.readFile(path.join(root, "Disk only.md"), "utf8")).resolves.toBe(
+        "# Existing\n",
+      );
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects renaming a note over another indexed note", async () => {
+    const { root, vault } = await createFixture();
+    try {
+      const source = await vault.createNote("", "Source");
+      await vault.writeNote(source.path, "SOURCE\n");
+      const destination = await vault.createNote("", "Destination");
+      await vault.writeNote(destination.path, "DESTINATION\n");
+
+      await expect(
+        vault.renameNote(source.path, "Destination"),
+      ).rejects.toThrow("同名笔记已存在");
+      await expect(fs.readFile(path.join(root, source.path), "utf8")).resolves.toBe(
+        "SOURCE\n",
+      );
+      await expect(
+        fs.readFile(path.join(root, destination.path), "utf8"),
+      ).resolves.toBe("DESTINATION\n");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+});
+
 describe("VaultService asset resolution", () => {
   it("resolves note-relative images that do not exist at the vault root", async () => {
     const { vault } = await createFixture();

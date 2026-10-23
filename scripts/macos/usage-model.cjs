@@ -15,6 +15,9 @@ const {
   SettingsStore,
   VaultService,
 } = require("../../electron/vault.cjs");
+const {
+  createNativeFileOperations,
+} = require("../../electron/file-operations.cjs");
 
 const execFileAsync = promisify(execFile);
 const ROOT = path.resolve(__dirname, "../..");
@@ -261,6 +264,12 @@ async function main() {
   await settings.save({ recentVault: fixture.vaultRoot });
   const broadcaster = createEventBroadcaster();
   let trashSequence = 0;
+  const nativeFileOperations =
+    process.platform === "darwin"
+      ? createNativeFileOperations(
+          path.join(ROOT, "build", "macos", "space-notes-fs"),
+        )
+      : null;
   const vault = new VaultService(
     settings,
     (snapshot) => broadcaster.broadcast(snapshot),
@@ -275,6 +284,7 @@ async function main() {
           ),
         );
       },
+      ...(nativeFileOperations ? { fileOperations: nativeFileOperations } : {}),
     },
   );
   const git = new GitService(vault);
@@ -509,6 +519,9 @@ async function main() {
         node: process.version,
         os: os.release(),
         fixtureRoot: fixture.root,
+        fileAccess: nativeFileOperations
+          ? "native-fd-relative-helper"
+          : "node-fs-fallback",
       },
     };
     await fs.mkdir(path.dirname(reportPath), { recursive: true });

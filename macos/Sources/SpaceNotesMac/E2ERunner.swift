@@ -623,9 +623,20 @@ enum E2ERunner {
       );
     });
     await runStep("transfer-create-write-read", async () => {
+      const title = `e2e-transfer-${Date.now()}`;
       const created = await window.levilNotes.createNote(
         "",
-        `e2e-transfer-${Date.now()}`
+        title
+      );
+      const duplicate = await window.levilNotes.createNote("", title);
+      expect(
+        duplicate.path === `${created.path.replace(/\\.md$/, "")} 2.md`,
+        "duplicate note creation did not choose a non-destructive suffix"
+      );
+      const original = await window.levilNotes.readNote(created.path);
+      expect(
+        original.content.startsWith(`# ${title}`),
+        "duplicate note creation replaced the original note"
       );
       const content = "# Transfer\\n\\nSide effect marker: amber-river.\\n";
       await window.levilNotes.writeNote(created.path, content);
@@ -650,6 +661,25 @@ enum E2ERunner {
       const created = await window.levilNotes.createNote(
         "",
         `e2e-rename-source-${Date.now()}`
+      );
+      const occupied = await window.levilNotes.createNote(
+        "",
+        `e2e-rename-occupied-${Date.now()}`
+      );
+      const occupiedContent = "# Occupied\\n\\nMust remain unchanged.\\n";
+      await window.levilNotes.writeNote(occupied.path, occupiedContent);
+      await expectReject(
+        window.levilNotes.renameNote(
+          created.path,
+          occupied.path.replace(/\\.md$/, "")
+        ),
+        "rename replaced an existing note"
+      );
+      const afterRejectedRename =
+        await window.levilNotes.readNote(occupied.path);
+      expect(
+        afterRejectedRename.content === occupiedContent,
+        "rejected rename changed the existing note"
       );
       const renamed = await window.levilNotes.renameNote(
         created.path,
