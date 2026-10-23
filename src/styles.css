@@ -2101,12 +2101,28 @@ kbd {
   line-height: var(--editor-line-height);
 }
 
-.editor-mount .milkdown ol {
-  padding-left: 1.75em;
+/*
+ * Crepe renders list markers as flex siblings instead of native outside
+ * markers. Match Obsidian's indentation by reserving one compact marker slot:
+ * top-level text starts at 3ch, and every nested level adds 2.25em.
+ */
+.editor-mount .milkdown {
+  --list-marker-slot: 1.5em;
 }
 
+.editor-mount .milkdown ol,
 .editor-mount .milkdown ul {
-  padding-left: 7px;
+  padding-left: 0;
+}
+
+.editor-mount .milkdown .ProseMirror > ol,
+.editor-mount .milkdown .ProseMirror > ul {
+  padding-left: calc(3ch - var(--list-marker-slot));
+}
+
+.editor-mount .milkdown .content-dom > ol,
+.editor-mount .milkdown .content-dom > ul {
+  padding-left: calc(2.25em - var(--list-marker-slot));
 }
 
 .editor-mount .milkdown li {
@@ -2118,12 +2134,6 @@ kbd {
    with the first text line so numbers, bullets, and content share a baseline. */
 .editor-mount .milkdown .milkdown-list-item-block > .list-item {
   align-items: flex-start;
-}
-
-.editor-mount
-  .milkdown
-  .milkdown-list-item-block
-  > .list-item:has(> .label-wrapper > .label.bullet) {
   gap: 0;
 }
 
@@ -2132,6 +2142,7 @@ kbd {
   .milkdown-list-item-block
   > .list-item
   > .label-wrapper {
+  width: var(--list-marker-slot);
   height: calc(var(--editor-font-size) * var(--editor-line-height));
   min-height: 0;
   align-items: flex-start;
