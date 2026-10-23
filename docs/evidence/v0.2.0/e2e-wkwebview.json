@@ -2,7 +2,7 @@
   "status": "INCONCLUSIVE",
   "conclusion": "INCONCLUSIVE",
   "artifact": "Levil Notes 0.2.0.dmg",
-  "sha256": "5f7087e2f72d190bc50f1462f0390012eee7669f80d95a91ba95d9a4aef0a5ae",
+  "sha256": "e33aa92188c551268058e564e308a5bf49c6ce5e03751d9b3dea2f7decfa09b1",
   "environment": {
     "macOS": "27.0.1",
     "hostArchitecture": "arm64",
@@ -13,7 +13,11 @@
   "failed": 0,
   "results": [],
   "failures": [],
-  "reason": "The final local WKWebView round could not start because the macOS console was locked (CGSSessionScreenIsLocked=Yes). No final local flow result is claimed.",
+  "reason": "The final local WKWebView run was attempted against the installed artifact, but the app did not emit its first report while CGSSessionScreenIsLocked=true. The run was terminated and cleaned up; no local flow result is claimed.",
+  "computerUseVisualCapture": {
+    "status": "INCONCLUSIVE",
+    "reason": "The unified Computer Use entry point remained unavailable, and the macOS console remained locked."
+  },
   "previousRound": {
     "status": "CERTIFIED",
     "sha256": "f4d4e54d087345e02500e4e20c9e5942a5a1fe43ca8114980a931b8a722139de",

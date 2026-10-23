@@ -438,7 +438,7 @@ describe("VaultService overwrite protection", () => {
           "# Replacement\n",
           "exclusive",
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/cannot open destination file: File exists/);
       await expect(fs.readFile(existing, "utf8")).resolves.toBe("# Existing\n");
     },
   );
@@ -463,7 +463,7 @@ describe("VaultService overwrite protection", () => {
           "source.md",
           "destination.md",
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/destination already exists/);
       await expect(
         fs.readFile(path.join(root, "source.md"), "utf8"),
       ).resolves.toBe("SOURCE\n");
