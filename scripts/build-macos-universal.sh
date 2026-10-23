@@ -32,6 +32,56 @@ retry_hdiutil() {
   return 1
 }
 
+mount_point_is_active() {
+  mount | grep -F " on $mount_point " >/dev/null 2>&1
+}
+
+detach_mount_point() {
+  local attempts=3
+  local delay_seconds=1
+  local attempt
+
+  if ! mount_point_is_active; then
+    return 0
+  fi
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+    if ! mount_point_is_active; then
+      return 0
+    fi
+    if ((attempt == attempts)); then
+      echo "unable to detach mount point after $attempts attempts" >&2
+      return 1
+    fi
+    sleep "$delay_seconds"
+  done
+  return 1
+}
+
+attach_dmg() {
+  local attempts=5
+  local delay_seconds=2
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if hdiutil attach -quiet -readonly -nobrowse \
+      -mountpoint "$mount_point" "$DMG_PATH"; then
+      return 0
+    fi
+    if ! detach_mount_point; then
+      echo "cannot safely retry hdiutil attach with a dirty mount point" >&2
+      return 1
+    fi
+    if ((attempt == attempts)); then
+      echo "hdiutil attach failed after $attempts attempts" >&2
+      return 1
+    fi
+    echo "hdiutil attach attempt $attempt/$attempts failed; retrying" >&2
+    sleep "$delay_seconds"
+  done
+  return 1
+}
+
 download_node() {
   local architecture="$1"
   local archive="node-v${NODE_VERSION}-darwin-${architecture}.tar.xz"
@@ -194,11 +244,10 @@ mount_point="$BUILD_ROOT/dmg-mount"
 rm -rf "$mount_point"
 mkdir -p "$mount_point"
 cleanup() {
-  hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+  detach_mount_point || true
 }
 trap cleanup EXIT
-retry_hdiutil attach 5 2 -quiet -readonly -nobrowse \
-  -mountpoint "$mount_point" "$DMG_PATH"
+attach_dmg
 test -d "$mount_point/Levil Notes.app"
 test -L "$mount_point/Applications"
 

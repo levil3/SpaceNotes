@@ -19,6 +19,27 @@ const {
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const describeMac = process.platform === "darwin" ? describe : describe.skip;
 
+function loadShellFunction(script, name) {
+  const marker = `${name}() {`;
+  const start = script.indexOf(marker);
+  if (start === -1) {
+    throw new Error(`missing shell function ${name}`);
+  }
+  const bodyStart = script.indexOf("{", start);
+  let depth = 0;
+  for (let index = bodyStart; index < script.length; index += 1) {
+    if (script[index] === "{") {
+      depth += 1;
+    } else if (script[index] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return script.slice(start, index + 1);
+      }
+    }
+  }
+  throw new Error(`unterminated shell function ${name}`);
+}
+
 describe("macOS E2E contract", () => {
   it("keeps exactly 60 unique flows and all protected transfer flows", () => {
     const { flowNames } = loadE2EContract();
@@ -121,17 +142,169 @@ describe("macOS E2E contract", () => {
     );
   });
 
-  it("retries transient DMG operations with a bounded failure budget", () => {
+  it("executes the app shell wait before the first E2E flow", async () => {
+    const { script } = loadE2EContract();
+    const firstFlow = script.indexOf('await runStep("shell-layout"');
+    expect(firstFlow).toBeGreaterThan(0);
+    const startup = script.slice(0, firstFlow);
+    const progressMessages = [];
+    let queryCount = 0;
+    const window = {
+      webkit: {
+        messageHandlers: {
+          levilNotesHost: {
+            postMessage(message) {
+              progressMessages.push(message.args[0]);
+            },
+          },
+        },
+      },
+    };
+    const document = {
+      querySelector() {
+        queryCount += 1;
+        return queryCount >= 3 ? { className: "app-shell" } : null;
+      },
+    };
+
+    await new Function(
+      "window",
+      "document",
+      "navigator",
+      "location",
+      `return (async () => {${startup}\n})();`,
+    )(window, document, {}, {});
+
+    expect(queryCount).toBe(3);
+    expect(progressMessages[0]).toBe("waiting:app-shell");
+    expect(progressMessages.at(-1)).toBe("ready:app-shell");
+  });
+
+  it("exercises DMG retry recovery and exhaustion without real hdiutil", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
       path.join(root, "scripts/build-macos-universal.sh"),
       "utf8",
     );
+    const retryFunction = loadShellFunction(script, "retry_hdiutil");
+    const runRetry = (succeedsAt) =>
+      spawnSync(
+        "bash",
+        [
+          "-c",
+          `${retryFunction}
+count=0
+hdiutil() {
+  count=$((count + 1))
+  [[ "$count" -ge ${succeedsAt} ]]
+}
+retry_hdiutil verify 5 0 /tmp/test.dmg
+printf 'count=%s result=%s\\n' "$count" "$?"
+`,
+        ],
+        { encoding: "utf8" },
+      );
 
-    expect(script).toContain('retry_hdiutil verify 5 2 "$DMG_PATH"');
-    expect(script).toContain("retry_hdiutil attach 5 2");
-    expect(script).toContain('echo "hdiutil $operation failed after $attempts attempts"');
-    expect(script).toContain("return 1");
+    const recovered = runRetry(3);
+    expect(recovered.status).toBe(0);
+    expect(recovered.stdout).toContain("count=3 result=0");
+
+    const exhausted = runRetry(99);
+    expect(exhausted.status).toBe(0);
+    expect(exhausted.stdout).toContain("count=5 result=1");
+    expect(exhausted.stderr).toContain("failed after 5 attempts");
+  });
+
+  it("detaches a partial mount before retrying DMG attachment", () => {
+    const root = path.resolve(directory, "../..");
+    const script = fs.readFileSync(
+      path.join(root, "scripts/build-macos-universal.sh"),
+      "utf8",
+    );
+    const activeFunction = loadShellFunction(script, "mount_point_is_active");
+    const detachFunction = loadShellFunction(script, "detach_mount_point");
+    const attachFunction = loadShellFunction(script, "attach_dmg");
+    const harness = `${activeFunction}
+${detachFunction}
+${attachFunction}
+mount_point=/tmp/test-mount
+DMG_PATH=/tmp/test.dmg
+attach_count=0
+detach_count=0
+mounted=0
+events=()
+mount_point_is_active() { [[ "$mounted" == 1 ]]; }
+hdiutil() {
+  if [[ "$1" == "attach" ]]; then
+    events+=(attach)
+    attach_count=$((attach_count + 1))
+    if [[ "$attach_count" -ge 3 ]]; then
+      return 0
+    fi
+    mounted=1
+    return 1
+  fi
+  if [[ "$1" == "detach" ]]; then
+    events+=(detach)
+    detach_count=$((detach_count + 1))
+    mounted=0
+    return 0
+  fi
+  return 9
+}
+sleep() { :; }
+attach_dmg
+printf 'attach=%s detach=%s result=%s events=%s\\n' \
+  "$attach_count" "$detach_count" "$?" "$(IFS=,; echo "\${events[*]}")"
+`;
+    const result = spawnSync("bash", ["-c", harness], { encoding: "utf8" });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      "attach=3 detach=2 result=0 events=attach,detach,attach,detach,attach",
+    );
+  });
+
+  it("fails closed when a partial mount cannot be detached", () => {
+    const root = path.resolve(directory, "../..");
+    const script = fs.readFileSync(
+      path.join(root, "scripts/build-macos-universal.sh"),
+      "utf8",
+    );
+    const activeFunction = loadShellFunction(script, "mount_point_is_active");
+    const detachFunction = loadShellFunction(script, "detach_mount_point");
+    const attachFunction = loadShellFunction(script, "attach_dmg");
+    const harness = `${activeFunction}
+${detachFunction}
+${attachFunction}
+mount_point=/tmp/test-mount
+DMG_PATH=/tmp/test.dmg
+attach_count=0
+detach_count=0
+mounted=0
+mount_point_is_active() { [[ "$mounted" == 1 ]]; }
+hdiutil() {
+  if [[ "$1" == "attach" ]]; then
+    attach_count=$((attach_count + 1))
+    mounted=1
+    return 1
+  fi
+  if [[ "$1" == "detach" ]]; then
+    detach_count=$((detach_count + 1))
+    return 1
+  fi
+  return 9
+}
+sleep() { :; }
+attach_dmg
+printf 'attach=%s detach=%s result=%s\\n' \
+  "$attach_count" "$detach_count" "$?"
+`;
+    const result = spawnSync("bash", ["-c", harness], { encoding: "utf8" });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("attach=1 detach=3 result=1");
+    expect(result.stderr).toContain(
+      "cannot safely retry hdiutil attach with a dirty mount point",
+    );
   });
 
 });
