@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "artifact": "Levil Notes 0.2.0.dmg",
+  "sha256": "1f69411b42b1d4d64e9353595c35578493daa5dec79fbcde58433268cdc86db6",
+  "environment": {
+    "macOS": "27.0.1",
+    "build": "26A434",
+    "hostArchitecture": "arm64",
+    "installedPath": "/Applications/Levil Notes.app"
+  },
+  "universalSmoke": {
+    "arm64": {
+      "status": "PASS",
+      "port": 49935
+    },
+    "x86_64": {
+      "status": "PASS",
+      "port": 49940
+    }
+  },
+  "singleSidecarCrash": {
+    "status": "PASS",
+    "appPID": 69141,
+    "originalSidecarPID": 69143,
+    "replacementSidecarPID": 70048,
+    "replacementPort": 49982,
+    "webViewReloaded": true,
+    "delayedDOMCheck": "PASS"
+  },
+  "repeatedSidecarCrash": {
+    "status": "PASS",
+    "appRemainedAlive": true,
+    "automaticRestartStopped": true,
+    "sidecarRemainedStopped": true
+  },
+  "normalQuit": {
+    "status": "PASS",
+    "appPID": 70271,
+    "sidecarPID": 70273,
+    "appAfterQuit": "absent",
+    "sidecarAfterQuit": "absent"
+  },
+  "menuAccessibility": {
+    "status": "PASS",
+    "menus": [
+      "Apple",
+      "Levil Notes",
+      "编辑",
+      "显示",
+      "窗口"
+    ]
+  },
+  "computerUseVisualCapture": {
+    "status": "INCONCLUSIVE",
+    "reason": "The unified CUA entry point was unavailable in this thread, and macOS screen capture returned an all-black image because capture permission was not granted. No visual-pass claim is made."
+  }
+}

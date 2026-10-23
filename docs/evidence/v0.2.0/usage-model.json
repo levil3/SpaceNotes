@@ -1,0 +1,38 @@
+{
+  "generatedAt": "2026-10-23T10:40:15.420Z",
+  "status": "PASS",
+  "iterationsRequested": 3000,
+  "operationsExecuted": 3000,
+  "seed": 20261023,
+  "operationTypes": {
+    "readNote": 1710,
+    "writeNote": 272,
+    "getTags": 212,
+    "search": 469,
+    "createNote": 30,
+    "trashNote": 7,
+    "getOutline": 278,
+    "renameNote": 22
+  },
+  "failures": [],
+  "eventVerified": true,
+  "dataIntegrity": "zero-corruption",
+  "git": {
+    "initialHead": "b7a5ae83eb38240640342be4531349d8c49039dc",
+    "committedHead": "986fa23dcadb0400df970965b167ce9eb1004c90",
+    "commitOutput": "[main 986fa23] test: certify macOS usage model\n 38 files changed, 94 insertions(+), 22 deletions(-)\n create mode 100644 certification.md\n create mode 100644 model-created-20261023-10.md\n create mode 100644 model-created-20261023-11.md\n create mode 100644 model-created-20261023-16.md\n create mode 100644 model-created-20261023-17.md\n create mode 100644 model-created-20261023-18.md\n create mode 100644 model-created-20261023-19.md\n create mode 100644 model-created-20261023-21.md\n create mode 100644 model-created-20261023-22.md\n create mode 100644 model-created-20261023-23.md\n create mode 100644 model-created-20261023-25.md\n create mode 100644 model-created-20261023-26.md\n create mode 100644 model-created-20261023-27.md\n create mode 100644 model-created-20261023-28.md\n create mode 100644 model-created-20261023-29.md\n create mode 100644 model-created-20261023-30.md\n create mode 100644 model-created-20261023-5.md\n create mode 100644 model-created-20261023-8.md\n create mode 100644 model-renamed-20261023-1069.md\n create mode 100644 model-renamed-20261023-1116.md\n create mode 100644 model-renamed-20261023-1257.md\n create mode 100644 model-renamed-20261023-1336.md\n create mode 100644 model-renamed-20261023-1346.md\n create mode 100644 model-renamed-20261023-1383.md\n create mode 100644 model-renamed-20261023-405.md\n create mode 100644 model-renamed-20261023-471.md\n create mode 100644 model-renamed-20261023-502.md\n create mode 100644 model-renamed-20261023-542.md\n create mode 100644 model-renamed-20261023-593.md\n create mode 100644 model-renamed-20261023-811.md\n delete mode 100644 note-1.md\n delete mode 100644 note-2.md\n delete mode 100644 note-3.md\n delete mode 100644 note-5.md\n delete mode 100644 note-6.md\n delete mode 100644 note-7.md",
+    "pushOutput": "To /var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T/spacenotes-usage-model-zDfEsl/remote.git\n   b7a5ae8..986fa23  main -> main",
+    "pullOutput": "Already up to date.",
+    "branchCount": 1,
+    "logCount": 1,
+    "changedBeforeCommit": 75,
+    "statusClean": true
+  },
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v22.23.2",
+    "os": "27.0.0",
+    "fixtureRoot": "/var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T/spacenotes-usage-model-zDfEsl"
+  }
+}
