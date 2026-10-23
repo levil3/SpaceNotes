@@ -50,7 +50,11 @@ public struct SidecarClient: Sendable {
     }
 
     private func post(path: String, arguments: [Any]) async throws -> Any? {
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        guard let endpoint = Self.endpointURL(baseURL: baseURL, path: path)
+        else {
+            throw SidecarClientError.invalidResponse
+        }
+        var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 30
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -76,6 +80,25 @@ public struct SidecarClient: Sendable {
             throw SidecarClientError.invalidResponse
         }
         return dictionary["result"]
+    }
+
+    static func endpointURL(baseURL: URL, path: String) -> URL? {
+        let normalizedPath = path.trimmingCharacters(
+            in: CharacterSet(charactersIn: "/")
+        )
+        guard
+            var components = URLComponents(
+                url: baseURL,
+                resolvingAgainstBaseURL: false
+            ),
+            !normalizedPath.isEmpty
+        else {
+            return nil
+        }
+        components.path = "/\(normalizedPath)"
+        components.query = nil
+        components.fragment = nil
+        return components.url
     }
 
     static func serverError(

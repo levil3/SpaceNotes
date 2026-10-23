@@ -42,6 +42,18 @@ final class SpaceNotesCoreTests: XCTestCase {
         )
     }
 
+    func testSidecarClientBuildsOneSlashEndpointForCiFoundation() {
+        let endpoint = SidecarClient.endpointURL(
+            baseURL: URL(string: "http://127.0.0.1:43123/")!,
+            path: "/api/getVaultSnapshot"
+        )
+
+        XCTAssertEqual(
+            endpoint?.absoluteString,
+            "http://127.0.0.1:43123/api/getVaultSnapshot"
+        )
+    }
+
     func testLaunchTokenPayloadUsesAStdInLineAndStableFingerprint() throws {
         let token = "0123456789abcdef0123456789abcdef"
         XCTAssertEqual(
