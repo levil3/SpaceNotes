@@ -12,22 +12,63 @@ SIDECAR_PATTERN="$APP_BUNDLE/Contents/Resources/node $APP_BUNDLE/Contents/Resour
 app_pid=""
 sidecar_pid=""
 
+print_failure_context() {
+  local status="$1"
+  echo "lifecycle regression failed with status $status" >&2
+  echo "app_pid=${app_pid:-none} sidecar_pid=${sidecar_pid:-none}" >&2
+  if [[ -n "$app_pid" ]]; then
+    ps -o pid=,ppid=,state=,command= -p "$app_pid" >&2 || true
+  fi
+  if [[ -n "$sidecar_pid" ]]; then
+    ps -o pid=,ppid=,state=,command= -p "$sidecar_pid" >&2 || true
+  fi
+  if [[ -f "$DIAGNOSTICS" ]]; then
+    echo "last application diagnostics:" >&2
+    tail -n 120 "$DIAGNOSTICS" \
+      | "$ROOT/scripts/macos/redact-log.sh" >&2 \
+      || true
+  fi
+}
+
 cleanup() {
+  local exit_code="${1:-$?}"
+  trap - EXIT INT TERM
+  if [[ "$exit_code" -ne 0 ]]; then
+    print_failure_context "$exit_code"
+  fi
   if [[ -n "$app_pid" ]] && kill -0 "$app_pid" 2>/dev/null; then
     kill -TERM "$app_pid" 2>/dev/null || true
   fi
   if [[ -n "$sidecar_pid" ]] && kill -0 "$sidecar_pid" 2>/dev/null; then
     kill -TERM "$sidecar_pid" 2>/dev/null || true
   fi
+  exit "$exit_code"
 }
-trap cleanup EXIT
+trap 'cleanup $?' EXIT
+trap 'cleanup 130' INT
+trap 'cleanup 143' TERM
 
 wait_for_new_pid() {
   local pattern="$1"
-  local excluded="${2:-}"
   local pid=""
   for _ in {1..80}; do
     pid="$(pgrep -n -f "$pattern" 2>/dev/null || true)"
+    if [[ -n "$pid" ]]; then
+      printf '%s\n' "$pid"
+      return 0
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+wait_for_child_pid() {
+  local parent_pid="$1"
+  local pattern="$2"
+  local excluded="${3:-}"
+  local pid=""
+  for _ in {1..80}; do
+    pid="$(pgrep -P "$parent_pid" -n -f "$pattern" 2>/dev/null || true)"
     if [[ -n "$pid" && "$pid" != "$excluded" ]]; then
       printf '%s\n' "$pid"
       return 0
@@ -74,9 +115,13 @@ process_environment_exposes_token() {
 
 launch_app() {
   local start_line="$1"
+  if pgrep -f "^$APP_EXECUTABLE$" >/dev/null 2>&1; then
+    echo "the application must not already be running" >&2
+    return 1
+  fi
   open -a "$APP_BUNDLE"
   app_pid="$(wait_for_new_pid "^$APP_EXECUTABLE$")"
-  sidecar_pid="$(wait_for_new_pid "$SIDECAR_PATTERN")"
+  sidecar_pid="$(wait_for_child_pid "$app_pid" "$SIDECAR_PATTERN")"
   wait_for_log_marker "window=shown" "$start_line"
 }
 
@@ -131,7 +176,13 @@ fi
 diagnostics_before="$(wc -l < "$DIAGNOSTICS" | tr -d ' ')"
 
 kill -9 "$original_sidecar_pid"
-replacement_sidecar_pid="$(wait_for_new_pid "$SIDECAR_PATTERN" "$original_sidecar_pid")"
+replacement_sidecar_pid="$(
+  wait_for_child_pid \
+    "$crash_app_pid" \
+    "$SIDECAR_PATTERN" \
+    "$original_sidecar_pid"
+)"
+sidecar_pid="$replacement_sidecar_pid"
 for _ in {1..80}; do
   replacement_token_fingerprint="$(
     token_fingerprint_since "$diagnostics_before"
@@ -176,7 +227,7 @@ if ! grep -q "sidecar-restart-exhausted" <<<"$second_restart_log"; then
   echo "missing restart exhaustion diagnostic" >&2
   exit 1
 fi
-if pgrep -f "$SIDECAR_PATTERN" >/dev/null 2>&1; then
+if pgrep -P "$crash_app_pid" -f "$SIDECAR_PATTERN" >/dev/null 2>&1; then
   echo "sidecar remained running after the second crash" >&2
   exit 1
 fi

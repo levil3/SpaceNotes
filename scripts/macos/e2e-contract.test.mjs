@@ -180,6 +180,78 @@ describe("macOS E2E contract", () => {
     expect(progressMessages.at(-1)).toBe("ready:app-shell");
   });
 
+  it("selects a lifecycle sidecar only from the current app process", () => {
+    const root = path.resolve(directory, "../..");
+    const script = fs.readFileSync(
+      path.join(root, "scripts/macos/run-lifecycle-e2e.sh"),
+      "utf8",
+    );
+    const waitFunction = loadShellFunction(script, "wait_for_child_pid");
+    const harness = `${waitFunction}
+pgrep() {
+  if [[ "$1" == "-P" && "$2" == "4242" && "$3" == "-n" \
+    && "$4" == "-f" && "$5" == "sidecar pattern" ]]; then
+    printf '9001\\n'
+  else
+    printf '9002\\n'
+  fi
+}
+sleep() { :; }
+pid="$(wait_for_child_pid 4242 "sidecar pattern")"
+printf 'pid=%s\\n' "$pid"
+`;
+    const result = spawnSync("bash", ["-c", harness], { encoding: "utf8" });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("pid=9001");
+  });
+
+  it("keeps every lifecycle sidecar lookup scoped to its owning app", () => {
+    const root = path.resolve(directory, "../..");
+    const script = fs.readFileSync(
+      path.join(root, "scripts/macos/run-lifecycle-e2e.sh"),
+      "utf8",
+    );
+    const launchFunction = loadShellFunction(script, "launch_app");
+    const harness = `${launchFunction}
+app_pid=""
+sidecar_pid=""
+APP_BUNDLE="/tmp/Levil Notes.app"
+APP_EXECUTABLE="/tmp/Levil Notes.app/Contents/MacOS/SpaceNotes"
+SIDECAR_PATTERN="/tmp/node /tmp/sidecar-entry.cjs"
+pgrep() {
+  return 1
+}
+open() { :; }
+wait_for_new_pid() {
+  printf '4242\\n'
+}
+wait_for_child_pid() {
+  [[ "$1" == "4242" && "$2" == "$SIDECAR_PATTERN" ]] || return 71
+  printf '9001\\n'
+}
+wait_for_log_marker() { :; }
+launch_app 0
+printf 'app=%s sidecar=%s\\n' "$app_pid" "$sidecar_pid"
+`;
+    const result = spawnSync("bash", ["-c", harness], { encoding: "utf8" });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("app=4242 sidecar=9001");
+
+    const replacementStart = script.indexOf('replacement_sidecar_pid="$(');
+    expect(replacementStart).toBeGreaterThan(0);
+    const replacementEnd = script.indexOf(")\n", replacementStart);
+    const replacementBlock = script.slice(replacementStart, replacementEnd);
+    expect(replacementBlock).toContain("wait_for_child_pid \\");
+    expect(replacementBlock).toContain('"$crash_app_pid"');
+    expect(replacementBlock).toContain('"$original_sidecar_pid"');
+    expect(script).toContain(
+      'if pgrep -P "$crash_app_pid" -f "$SIDECAR_PATTERN"',
+    );
+    expect(script).not.toContain('pgrep -n -f "$SIDECAR_PATTERN"');
+  });
+
   it("exercises DMG retry recovery and exhaustion without real hdiutil", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
