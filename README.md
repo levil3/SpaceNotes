@@ -4,6 +4,8 @@ SpaceNotes 是一款面向 Windows 的本地优先 Markdown 笔记应用。它�
 Markdown 文件夹，也可以使用已有的 Obsidian 笔记库，并将编辑、搜索、大纲、反链和
 Git 工作流集中在一个桌面界面中。
 
+当前 `feat/macos-adaptation` 分支用于验证 macOS 适配流程。
+
 ![SpaceNotes 界面预览](docs/images/spacenotes-preview.png)
 
 ## 下载与安装
