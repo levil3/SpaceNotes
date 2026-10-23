@@ -178,9 +178,12 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
             reject(request, message: "后台服务不可用。")
             return
         }
+        appendDiagnostic("host-trash=start")
         Task {
             do {
+                appendDiagnostic("host-trash=snapshot:start")
                 let snapshot = try await client.snapshot()
+                appendDiagnostic("host-trash=snapshot:done")
                 guard let rootPath = snapshot["path"] as? String else {
                     throw SidecarClientError.server("请先打开一个笔记库。")
                 }
@@ -188,13 +191,18 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
                     fileURLWithPath: rootPath,
                     isDirectory: true
                 )
+                appendDiagnostic("host-trash=move:start")
                 try VaultPathGuard.moveToTrash(
                     relativePath: relativePath,
                     in: root
                 )
+                appendDiagnostic("host-trash=move:done")
+                appendDiagnostic("host-trash=refresh:start")
                 let refreshed = try await client.internalCall(method: "refresh")
+                appendDiagnostic("host-trash=refresh:done")
                 resolve(request, value: refreshed ?? NSNull())
             } catch {
+                appendDiagnostic("host-trash=failed")
                 reject(request, message: error.localizedDescription)
             }
         }
