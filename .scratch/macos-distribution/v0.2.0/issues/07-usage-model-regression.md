@@ -17,3 +17,7 @@ GitHub: #8
 - [x] 零失败与零数据损坏作为退出码门槛。
 - [x] 失败报告包含种子、操作序列、预期结果和实际结果。
 - [x] 回归工具在 CI 和本地均可运行。
+
+Final delivery: fixed seed `20261023`, 3,000/3,000 operations passed with zero
+failures and zero data corruption. CI run `39974114613` also passed 89/89
+application tests.

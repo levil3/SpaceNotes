@@ -9,11 +9,15 @@ GitHub: #5
 
 **Blocked by:** #4
 
-**Status:** implemented-ci-pending
+**Status:** completed
 
-- [ ] 应用可从构建目录启动并显示真实 React 界面（待最终 CI 认证）。
+- [x] 应用可从构建目录启动并显示真实 React 界面。
 - [x] 主窗口使用无标题栏内容布局并保留现有窗口按钮行为。
 - [x] 系统菜单提供退出、隐藏、全屏和窗口操作。
 - [x] sidecar 正常退出、单次异常重启和重复异常诊断可验证。
 - [x] 关闭窗口后应用驻留 Dock，点击 Dock 图标恢复窗口。
 - [x] Swift 单元测试覆盖 sidecar 就绪、失败、重启和进程回收。
+- [x] arm64 CI 生命周期功能项 PASS；Windows 风格界面由 60/60 E2E 覆盖。
+
+Final delivery: CI run `39974114613` at commit `3f45917` passed. Lifecycle
+functional status is PASS; visual capture remains INCONCLUSIVE.

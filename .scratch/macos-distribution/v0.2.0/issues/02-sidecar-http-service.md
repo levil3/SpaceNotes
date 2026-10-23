@@ -17,3 +17,6 @@ HTTP 请求可以打开笔记库、读取笔记、搜索并获得事件。
 - [x] SSE 能广播保存、创建、重命名、删除和外部文件变化。
 - [x] 静态资源与附件路由不会暴露笔记库外文件。
 - [x] HTTP/SSE 集成测试使用隔离笔记库并通过。
+
+Final delivery: CI run `39974114613` at commit `3f45917` passed arm64 and Intel
+WKWebView E2E, 60/60 on each runner.

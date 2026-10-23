@@ -16,3 +16,6 @@ GitHub: #4
 - [x] 开发来源与生产来源使用允许列表，外部导航交给系统浏览器。
 - [x] 宿主动作通过请求 ID 正确 resolve 或 reject。
 - [x] 桥接测试覆盖成功、错误、并发请求、SSE 和取消订阅。
+
+Final delivery: CI run `39974114613` at commit `3f45917` passed arm64 and Intel
+WKWebView E2E, 60/60 on each runner.

@@ -2,93 +2,94 @@
 
 日期：2026-10-23
 分支：`feat/macos-adaptation`
+最终提交：`3f459174e9bd207a42022f21adc6589912d9d5c1`
 
 ## 目标回顾
 
-本版本交付 macOS AppKit + WKWebView 薄壳，复用现有 React 前端与 Node 业务核心，
-生成 Intel 与 Apple Silicon 通用的无签名 DMG，并通过自动化、独立审查和真实应用
-认证控制跨平台回归风险。
+本版本交付 AppKit + WKWebView 薄壳，复用一份 React 前端和现有 Node 业务核心，
+生成 Intel 与 Apple Silicon 通用的无签名 DMG，并用固定 GitHub Actions runner
+完成双架构运行认证。
 
-流程已执行：
+流程已完整执行：
 
-1. 将需求固化为 v0.2.0 spec。
-2. 将 spec 拆成 9 个带依赖关系的 issue，并同步到 GitHub Issues。
-3. 按 issue 实现共享 API、sidecar、WebView bridge、macOS 壳层、文件动作、DMG、
+1. 需求固化为 v0.2.0 spec。
+2. 拆成 9 个带依赖关系的本地 issue，并同步到 GitHub Issues #2-#10。
+3. 逐项实现共享 API、sidecar、WebView bridge、macOS 壳层、文件动作、DMG、
    使用模型和 CI。
-4. 增加 Node、Swift、桥接、sidecar、路径边界和打包测试。
-5. 由独立 subagent 进行多轮 code review，并修复发现的问题。
-6. 运行本地回归、3000 次使用模型、DMG 校验与跨架构检查。
-7. 推送分支触发固定 arm64/Intel runner 的最终认证。
+4. 增加 Node、Swift、桥接、sidecar、路径边界和打包契约测试。
+5. 由独立 subagent 多轮 code review，并在最后两项 CI 修复后再次启动新 reviewer。
+6. 本地完成 Web 构建、89 项 Node 测试、Swift 测试、3000 次使用模型和 DMG 校验。
+7. 推送 `feat/macos-adaptation`，在 arm64 与 Intel runner 上通过 60/60 双架构 E2E。
+8. 重建并安装最终本地产物，记录独立 SHA、备份路径和锁屏限制。
 
 ## 做得好
 
-- 业务逻辑保持单一来源，Swift 只承担宿主职责，没有复制 React 或笔记核心。
-- 使用 `window.levilNotes` 作为唯一业务接口，Windows 和 macOS 共用行为契约。
-- 设计阶段先确认 sidecar 与 thin-shell 边界，避免第一版把全部 I/O 重写为 Swift。
-- 安全边界采用 fail-closed：sidecar token、Host/Origin、WebView 导航、frame 校验和
-  路径穿越均在进入业务层前拒绝。
-- 路径操作使用 fd-relative 校验，降低中间目录 symlink 的 TOCTOU 风险。
-- 跨卷废纸篓使用目标卷 `.Trashes/<uid>`，并以原子 rename 防止同名覆盖。
-- 打包检查不仅看主程序，还检查应用内全部 Mach-O，避免“主程序 universal、
-  sidecar 单架构”的假通过。
-- 固定的 3000 次使用模型覆盖真实桥接契约、事件、文件副作用和 Git 引用。
+- 业务逻辑保持单一来源；Swift 只承担窗口、菜单、系统文件动作、WebView 和
+  sidecar 生命周期。
+- `window.levilNotes` 是 Windows 与 macOS 的共同契约，React 没有平台分支。
+- sidecar 使用 stdin 传递一次性令牌，并校验回环地址、Host、Origin、导航和 frame。
+- 文件操作使用 fd-relative 原生 helper，降低中间目录 symlink 的 TOCTOU 风险。
+- 创建和重命名采用排他语义，避免在大小写不敏感 APFS 上静默覆盖。
+- 打包检查扫描应用内全部 Mach-O，而不是只检查主程序。
+- 证据同时记录源码提交、CI SHA、本地 SHA、runner 架构和平台边界。
 
-## 发现的问题
+## 关键问题与修复
 
-### 本机最终认证受锁屏阻塞
+### Intel CI 首次失败不是 x86_64 功能失败
 
-最终源码轮到达时，macOS 控制台仍处于：
+Intel job 已成功挂载 DMG、通过签名检查并输出 `SMOKE_READY arch=x86_64`。随后 E2E
+在 React 首屏尚未挂载时立即开始，前 24 条失败，后 36 条通过。新增显式等待
+`.app-shell` 最多 30 秒的启动闸门后，Intel 60/60 通过。
 
-```text
-CGSSessionScreenIsLocked = Yes
-```
+教训：端到端测试不能只用固定延迟猜页面已就绪，应等待稳定的产品状态。
 
-AppKit 无法建立 GUI 会话，`--smoke-test` 也无法进入
-`applicationDidFinishLaunching`。因此本机最终 WKWebView、窗口生命周期和 Computer
-Use 证据只能标记为 `INCONCLUSIVE`，不能沿用旧 SHA 的 PASS。
+### DMG 校验存在瞬时资源错误
 
-改进方向：GUI 认证必须安排在已解锁的交互式会话；无交互会话时，将最终认证交给
-固定 macOS CI runner，并明确区分本地与 CI 证据。
+universal CI 曾在 `hdiutil verify` 遇到
+`Resource temporarily unavailable`。构建脚本增加了有界重试：最多 5 次、每次间隔
+2 秒，并在耗尽后仍返回非零。校验和挂载都使用同一策略；后续两轮 CI 均通过。
 
-### 旧证据容易与新产物混用
+教训：对明确可能瞬时失败的系统命令可以使用有界重试，但不能无限重试或吞掉最终失败。
 
-早期 50/58 条流程和生命周期结果属于旧 DMG SHA。最终产物变化后，如果只保留
-“PASS”文件，读者无法判断证据对应哪次构建。
+### 缩小的 E2E 一度降低覆盖
 
-改进方向：每轮证据必须包含 artifact SHA-256、源码版本、环境和轮次状态；历史结果
-只能放在显式 `previousRound` 中，不得作为当前结论。
+代码审查发现早期脚本删掉了真实写入、废纸篓、搜索、索引和 Git 操作，只检查界面
+选择器。最终脚本恢复为 60 条真实 `window.levilNotes` 流程，并在两种架构上执行。
 
-### 本地与打包运行时版本需要区分
+教训：认证脚本本身必须被审查；“界面存在”不能替代真实文件与 Git 副作用验证。
 
-开发机默认 Node 与包内固定 Node 可能不同。使用模型首次结果记录的是宿主机 Node，
-不能代表应用实际 sidecar 运行时。
+### 本机 GUI 认证被锁屏阻断
 
-改进方向：认证命令直接调用包内 Node 24.22.1，并在报告中记录 `process.version`。
+最终本地安装包可以完成版本、签名和架构校验，但控制台持续锁屏，AppKit smoke 无法
+进入 GUI 就绪状态，Computer Use 入口也不可用。
 
-### 首次 CI 暴露了环境耦合
+处理：本地结果明确标记 `INCONCLUSIVE`，CI 只证明对应 runner 的功能行为，issue #10
+保持 open，等待交互式会话补做视觉验收。
 
-首次 macOS CI 在拷主程序时失败，因为脚本硬编码了本机 Swift Package Manager 的
-`.build/out/Products/Release` 路径。独立复审还发现 Windows 测试会无条件加载
-macOS helper，以及 DMG checksum 的工作目录不一致。
+### 本机废纸篓权限失败未归因
 
-修复后主程序路径由 `swift build --show-bin-path` 动态获取，非 Darwin 测试不再加载
-native helper，checksum 在产物目录内校验。这些问题说明：本地绿色不能替代干净
-runner 上的首次构建。
+本地直接启动应用的 E2E 跑到 `transfer-native-trash` 时收到
+`Operation not permitted`，最终为 54/55、`NOT CERTIFIED`。同一流程在 CI 的
+arm64 和 Intel runner 均为 PASS；当前没有足够证据把它归因于产品逻辑或代码修复。
+该失败证据原样保留，不用 CI 结果覆盖本地结论。
 
-## 关键指标
+## 最终指标
 
-- Node 单元/集成测试：10 个文件，68/68。
-- Swift 测试：12 项发现；11 项常规通过，挂载卷专项单独 1/1。
+- Node 单元/集成测试：11 个文件，89/89。
+- Swift 测试：15 项执行，14 通过，1 项按环境跳过。
 - 使用模型：3000/3000，失败 0，数据损坏 0。
-- E2E flow 定义：60 条，脚本解析通过，最终执行由 CI 认证。
+- WKWebView E2E：arm64 60/60；Intel x86_64 60/60。
+- 生命周期：功能 PASS；视觉 INCONCLUSIVE。
 - 应用内 universal Mach-O：3/3。
 - 生产依赖漏洞：根仓库 0，macOS sidecar 0。
-- 本地产物 SHA-256：
-  `5f7087e2f72d190bc50f1462f0390012eee7669f80d95a91ba95d9a4aef0a5ae`。
+- CI DMG SHA-256：
+  `c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b`。
+- 本地 DMG SHA-256：
+  `8dc85ea0163c6e7e7002f78c986ad333a8d6b2d30bc65bfd272b76d062316b61`。
 
 ## 后续行动
 
-1. 在 CI 获取最终 arm64 与 Intel WKWebView 证据，并回写本地证据文件。
-2. 只有在 CI 全部通过后才关闭认证 issue；本机 Computer Use 缺失保持显式记录。
-3. 后续升级 Electron/Vite/Vitest 工具链时单独处理 19 个开发依赖告警。
-4. 下一版本若引入 Developer ID，再增加签名、公证和 Gatekeeper 无提示安装认证。
+1. 解锁交互式 macOS 会话后，用 Computer Use 验证最终安装包并关闭 issue #10。
+2. 下一版本如要求无 Gatekeeper 拦截，再引入 Developer ID、公证和发布密钥管理。
+3. 单独升级旧 Electron/Vite/Vitest 工具链，处理 19 个开发依赖告警。
+4. 若需要可复现的逐字节 DMG，再设计固定文件时间戳和 DMG 元数据策略。

@@ -2,83 +2,87 @@
 
 测试日期：2026-10-23
 分支：`feat/macos-adaptation`
+源码提交：`3f459174e9bd207a42022f21adc6589912d9d5c1`
 
-## 环境
+## 结论
 
-- macOS 27.0.1（26A434），Apple Silicon
-- Node.js 24.22.1（应用内 sidecar）
-- 最终本地产物：`build/macos/Levil Notes 0.2.0.dmg`
-- SHA-256：`5f7087e2f72d190bc50f1462f0390012eee7669f80d95a91ba95d9a4aef0a5ae`
+源码、单元测试、共享使用模型、universal DMG 和 CI 真实 WKWebView E2E 均通过；
+开发机安装、版本、签名和架构静态检查通过。GitHub Actions run `39974114613` 在
+`macos-15` 与 `macos-15-intel` 两个 runner 上全部成功，Intel 的挂载 DMG 运行
+结果为 60/60。
+
+本机 Computer Use 仍未完成：macOS 控制台在收尾时保持
+`CGSSessionScreenIsLocked=1`，Computer Use 入口返回 `unsupported call`。因此
+GitHub issue #10 保持 open，不能把本版本声明为“视觉交互人工验收完成”。
+
+本机自动化 E2E 实际执行到 54/55，在 `transfer-native-trash` 收到
+`无法打开废纸篓目录。（Operation not permitted）`。这是本地 `NOT CERTIFIED`
+证据，根因尚未证实；同一流程在 arm64 与 Intel CI 均为 PASS，因此未据此改动产品
+代码。
+
+## 产物
+
+CI universal artifact：
+
+- SHA-256：`c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b`
+- CI run：https://github.com/levil3/SpaceNotes/actions/runs/39974114613
+- artifact：`macos-universal-v0.2.0`（ID `12510298845`）
+
+最终本地重构建：
+
+- DMG：`build/macos/Levil Notes 0.2.0.dmg`
+- SHA-256：`8dc85ea0163c6e7e7002f78c986ad333a8d6b2d30bc65bfd272b76d062316b61`
 - 已安装：`/Applications/Levil Notes.app`
+- 旧应用备份：
+  `/Users/yuzhou/Library/Application Support/Levil Notes/install-backups/20261023-230527/Levil Notes.app`
+- 系统截图：`docs/evidence/v0.2.0/macos-final.png`
+- 截图 SHA-256：
+  `d149d0f04b82548be9f102bd01867df01f4e604d4f0b78a9bd2d994bc0a9b229`
+
+本地与 CI SHA 不同来自 DMG 容器的时间戳等非确定性元数据；两者均由同一提交
+`3f45917` 构建，版本均为 `0.2.0`。
 
 ## 自动化检查
 
 | 检查 | 结果 |
 | --- | --- |
-| `npm test` | 10 个测试文件，68 项通过 |
+| `npm test` | 11 个测试文件，89/89 通过 |
 | `npm run build:web` | TypeScript 检查和 Vite 构建通过 |
-| `swift test` | 12 项发现，11 项通过，1 项因未提供挂载卷跳过 |
-| 挂载 APFS 卷专项 | `testMoveToTrashOnExplicitMountedVolume` 1/1 通过 |
-| E2E 嵌入脚本 | Swift 转义解码后 JavaScript 解析通过，共 60 条 flow |
-| sidecar/SSE 退出回归 | 通过，SIGTERM 后在超时内退出 |
-| sidecar 启动令牌 | stdin 首行传递，Git Hook 与父进程环境中不可见 |
+| `swift test` | 15 项执行，14 通过，1 项因未提供挂载卷按设计跳过 |
+| 60 条 WKWebView E2E，arm64 CI | 60/60 通过 |
+| 60 条 WKWebView E2E，x86_64 Intel CI | 60/60 通过 |
+| 3000 次 sidecar/桥接使用模型 | 3000/3000，失败 0，数据损坏 0 |
+| sidecar 启动令牌与 Git Hook 隔离 | 通过 |
 | 生产依赖审计 | 根仓库 0，macOS sidecar 0 |
-| DMG `hdiutil verify` | 通过 |
-| DMG SHA-256 清单 | 从 `build/macos` 校验通过 |
+| DMG 创建、校验、挂载 | 通过 |
 | ad-hoc `codesign --verify --deep --strict` | 通过 |
-| Mach-O 清单 | 3 个二进制，均包含 `arm64 x86_64` |
-| arm64 启动冒烟 | 最终本地复核因锁屏无法进入 `applicationDidFinishLaunching`；改由 CI 认证 |
-| x86_64（Rosetta）冒烟 | 最终本地复核因锁屏无法进入 `applicationDidFinishLaunching`；改由 Intel CI 认证 |
-| `spctl --assess` | 拒绝；无 Developer ID 与公证时的预期结果 |
+| 应用内全部 Mach-O | 3/3 同时包含 `arm64 x86_64` |
+| Intel DMG smoke | `SMOKE_READY arch=x86_64` |
+| arm64 生命周期功能项 | PASS：窗口、菜单、单次重启、重复崩溃、正常退出 |
+| 生命周期视觉项 | INCONCLUSIVE，CI gate 明确允许但未计为视觉通过 |
 
-完整开发依赖审计仍报告 19 个开发/打包工具链漏洞，主要来自旧
-Electron/Vite/Vitest/electron-builder 依赖链；生产依赖审计为零。本版本没有升级
-Windows 发布工具链，避免扩大本次 macOS 适配的变更范围。
+开发依赖审计仍报告 19 个工具链漏洞，来自旧 Electron/Vite/Vitest/electron-builder
+依赖链。生产依赖为零；本次未扩大范围升级 Windows 发布工具链。
 
-## Universal 产物
+## 证据文件
 
-以下 3 个 Mach-O 均通过 `file` 和 `lipo` 双重检查：
-
-```text
-x86_64 arm64  Contents/MacOS/SpaceNotes
-x86_64 arm64  Contents/Resources/space-notes-fs
-x86_64 arm64  Contents/Resources/node
-```
-
-包内 `vault.cjs`、`sidecar-entry.cjs` 与源码哈希一致。旧版应用已备份到：
-
-```text
-/tmp/Levil Notes 0.2.0 backup 20261023-202528.app
-/tmp/Levil Notes installed a14a36b3 20261023.app
-/tmp/Levil Notes installed 28c8fb1d 20261023.app
-```
-
-## 使用模型
-
-- 固定种子 `20261023`，执行 3,000 次操作。
-- 覆盖读取、创建、写入、搜索、重命名、废纸篓、标签、附件和 Git。
-- 失败 0，数据损坏 0，事件验证通过。
-- 详细结果见 `docs/evidence/v0.2.0/usage-model.json`。
-
-## 真实应用与 Computer Use
-
-最终本地认证轮遇到 macOS 锁屏：
-
-```text
-CGSSessionScreenIsLocked = Yes
-```
-
-因此最终源码没有获得本机 WKWebView、窗口生命周期或 Computer Use 截图通过证据。
-这两类结果明确标记为 `INCONCLUSIVE`，不沿用旧 SHA 的历史 PASS：
-
-- `docs/evidence/v0.2.0/e2e-wkwebview.json`
+- `docs/evidence/v0.2.0/ci-verification.json`
+- `docs/evidence/v0.2.0/e2e-wkwebview-intel.json`
+- `docs/evidence/v0.2.0/e2e-wkwebview-intel-diagnostics.txt`
+- `docs/evidence/v0.2.0/intel-macho-architectures.txt`
 - `docs/evidence/v0.2.0/lifecycle.json`
+- `docs/evidence/v0.2.0/usage-model.json`
+- `docs/evidence/v0.2.0/code-review.md`
+- `docs/evidence/v0.2.0/retro.md`
 
-GitHub Actions 配置会在固定 `macos-15` 和 `macos-15-intel` runner 上重新构建并执行
-真实 WKWebView 端到端认证；CI 结果将作为跨架构的最终认证证据。
+`e2e-wkwebview.json` 与 `lifecycle.json` 的顶层状态仍记录本机锁屏轮次，不把 CI
+结果伪装成本机结果；CI 结论单独记录在 `ciCoverage` 和 `ci-verification.json`。
 
 ## 已声明边界
 
-- 没有 Intel 实机；x86_64 本机仅通过 Rosetta 冒烟，Intel 全量验证依赖 CI runner。
-- 无 Apple Developer ID、无公证；Gatekeeper 首次拦截需要用户手动放行。
-- 本机最终 Computer Use 验证因锁屏未完成，不能声明截图验收通过。
+- 无 Apple Developer ID、无公证；Gatekeeper 首次拦截是预期行为。
+- 本机没有 Intel 硬件；x86_64 的完整运行证据来自固定 Intel CI runner。
+- 本机 Computer Use 交互与截图验收未完成；系统截图已保存，但不冒充 Computer Use
+  证据。issue #10 保持 open。
+- 本机 `--smoke-test` 在锁屏下 20 秒内未就绪，已安全终止，不声明本地 smoke PASS。
+- DMG 为非确定性构建；跨机器比较必须同时核对源码提交和 SHA，不能只比较文件名。

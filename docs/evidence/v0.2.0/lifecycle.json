@@ -3,13 +3,13 @@
   "conclusion": "NOT CERTIFIED",
   "functionalStatus": "NOT CERTIFIED",
   "artifact": "Levil Notes 0.2.0.dmg",
-  "sha256": "e33aa92188c551268058e564e308a5bf49c6ce5e03751d9b3dea2f7decfa09b1",
+  "sha256": "8dc85ea0163c6e7e7002f78c986ad333a8d6b2d30bc65bfd272b76d062316b61",
   "environment": {
     "macOS": "27.0.1",
     "hostArchitecture": "arm64",
     "installedPath": "/Applications/Levil Notes.app"
   },
-  "reason": "The installed artifact was verified for version, signature, and universal architectures, but the final local lifecycle round could not start a GUI session because the macOS console was locked (CGSSessionScreenIsLocked=true). Smoke initialization was terminated without claiming success, so functional lifecycle checks remain NOT CERTIFIED locally.",
+  "reason": "The final local artifact was installed and statically verified, but the local lifecycle round could not start a GUI session because the macOS console was locked (CGSSessionScreenIsLocked=1). Smoke initialization was terminated without claiming success. CI independently passed the functional lifecycle suite; this file records the separate local result.",
   "previousRound": {
     "status": "PASS",
     "sha256": "f4d4e54d087345e02500e4e20c9e5942a5a1fe43ca8114980a931b8a722139de",
@@ -21,10 +21,14 @@
   },
   "ciCoverage": {
     "workflow": ".github/workflows/build-macos.yml",
-    "status": "PENDING",
-    "expectedRunners": [
-      "macos-15",
-      "macos-15-intel"
-    ]
+    "status": "PASS",
+    "runId": 39974114613,
+    "url": "https://github.com/levil3/SpaceNotes/actions/runs/39974114613",
+    "commit": "3f459174e9bd207a42022f21adc6589912d9d5c1",
+    "sha256": "c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b",
+    "functionalStatus": "PASS",
+    "overallStatus": "INCONCLUSIVE",
+    "visualStatus": "INCONCLUSIVE",
+    "reason": "The arm64 CI runner validated window lifecycle, menus, one-time sidecar restart, repeated-crash handling and normal quit. Visual capture remained INCONCLUSIVE and was explicitly accepted by the workflow gate."
   }
 }

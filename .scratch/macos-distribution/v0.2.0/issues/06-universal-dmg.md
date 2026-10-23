@@ -17,3 +17,7 @@ DMG 可挂载并启动应用。
 - [x] DMG 包含应用和 Applications 链接，可挂载、校验和退出挂载。
 - [x] 构建不依赖 Developer ID、公证或浮动的 macOS runner。
 - [x] 构建测试验证 Node 两架构启动、Mach-O 清单和 DMG 内容。
+
+Final delivery: CI run `39974114613` uploaded universal artifact `12510298845`.
+DMG SHA-256 is `c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b`;
+all three bundled Mach-O files contain `arm64` and `x86_64`.

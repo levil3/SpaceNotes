@@ -9,11 +9,15 @@ GitHub: #6
 
 **Blocked by:** #5
 
-**Status:** implemented-ci-pending
+**Status:** completed
 
 - [x] `vault:choose` 使用原生目录选择器并建立共享笔记库索引。
 - [x] `showInFolder` 使用 Finder 定位当前笔记。
 - [x] `trashNote` 使用系统废纸篓，并刷新 sidecar 索引与事件。
 - [x] `notes-asset://` 通过 WKURLSchemeHandler 显示笔记相对和库相对附件。
 - [x] 所有宿主动作拒绝笔记库外路径。
-- [ ] 集成测试和真实应用测试覆盖文件副作用（待最终 CI 认证）。
+- [x] 集成测试和真实应用 E2E 覆盖文件副作用。
+
+Final delivery: CI run `39974114613` at commit `3f45917` passed
+`transfer-native-trash` on both arm64 and Intel. A local direct-launch E2E run
+was blocked by `Operation not permitted`; the local cause remains unproven.

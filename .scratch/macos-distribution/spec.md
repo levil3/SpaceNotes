@@ -1,7 +1,28 @@
 # SpaceNotes macOS 薄壳与通用 DMG
 
-Status: implemented-ci-pending
+Status: implemented-ci-certified-local-computer-use-blocked
 Version: v0.2.0
+
+## Delivery Record
+
+- Final source commit: `3f459174e9bd207a42022f21adc6589912d9d5c1`
+- GitHub Actions run:
+  https://github.com/levil3/SpaceNotes/actions/runs/39974114613
+- Result: arm64 build/E2E/lifecycle job PASS; Intel x86_64 job PASS.
+- WKWebView E2E: arm64 60/60; Intel 60/60.
+- Lifecycle functional checks: PASS. Visual capture: INCONCLUSIVE.
+- CI DMG SHA-256:
+  `c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b`.
+- Local final DMG SHA-256:
+  `8dc85ea0163c6e7e7002f78c986ad333a8d6b2d30bc65bfd272b76d062316b61`.
+- The local installed app, signature and three universal Mach-O files were verified.
+- Local automated E2E reached 54/55 and then failed only at `transfer-native-trash`
+  with `Operation not permitted`; this local result remains `NOT CERTIFIED`.
+- A system screenshot of the installed application was captured at
+  `docs/evidence/v0.2.0/macos-final.png`. It is not represented as Computer Use
+  evidence.
+- Local Computer Use is blocked by `CGSSessionScreenIsLocked=1`; issue #10 remains
+  open until an interactive-session visual check is completed.
 
 ## Problem Statement
 
@@ -131,6 +152,10 @@ macOS 第一版采用薄壳方案：
 - CI 使用固定的 `macos-15` 和 `macos-15-intel` runner。
 - 当前没有 Intel 实机，因此不设置 Intel 人工验证门槛；Intel 由 CI 构建和运行时
   冒烟测试覆盖。
+- CI 已经完成 Intel 挂载 DMG、smoke 和 60 条真实 E2E；本机只记录 Apple Silicon
+  安装与静态检查结果。
+- Swift 原生支持双架构不替代产物验证：Swift 主程序、Node 和原生文件 helper 都必须
+  逐项检查 Mach-O。由于 Intel CI 已覆盖真实运行，本机不重复执行同一 Intel 验证。
 
 ### Clean-room functional certification
 

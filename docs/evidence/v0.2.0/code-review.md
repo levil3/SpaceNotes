@@ -75,13 +75,42 @@
 NO BLOCKING SOURCE FINDINGS
 ```
 
-该结论只覆盖源码、测试与打包配置，不等于最终产物认证。最终产物仍需通过 CI 的
-真实 WKWebView E2E、Intel runner 和 DMG 校验。
+该结论覆盖源码、测试与打包配置。最终产物的独立认证记录见下一节。
+
+## 最后两项 CI 修复的独立复核
+
+`a72be0e` 到 `3f45917` 完成后，新启动的 subagent reviewer 对当前分支重新审查。
+首轮复核发现 3 个 P2，均已修复：
+
+1. E2E 启动等待测试只检查字符串，可能被无效等待代码绕过。现改为执行嵌入脚本的
+   启动前缀，用 DOM 替身实际等待 3 次并断言 `waiting:app-shell` 到
+   `ready:app-shell` 的顺序。
+2. DMG 重试测试只检查文本。现用 bash 和 `hdiutil` 替身实际验证第 3 次恢复成功，
+   以及连续 5 次失败后返回非零。
+3. attach 失败后的清理无法证明“先 detach 再重试”，且 detach 失败会被吞掉。现在
+   `detach_mount_point` 检查实际挂载状态并进行最多 3 次有界清理；清理失败立即停止
+   attach。测试用有状态替身断言
+   `attach,detach,attach,detach,attach`，并覆盖不可清理时 fail closed。
+
+复核后的最终验证：定向契约测试 13/13，`npm test` 89/89，`swift test` 15 项执行
+（14 通过，1 项按环境跳过），`bash -n`、E2E 脚本解析和 `git diff --check` 通过。
+
+GitHub Actions run `39974114613`（commit `3f45917`）的 arm64 与 Intel job 均
+成功，两端各输出 `WKWebView E2E certified: 60/60`。Intel 证据包为 `CERTIFIED`、
+60/60，生命周期功能项 PASS，视觉项保持 `INCONCLUSIVE`。
+
+最终 reviewer 结论：
+
+```text
+NO BLOCKING FINDINGS
+```
 
 ## 剩余风险
 
 - 本机最终 Computer Use 验证因锁屏未执行，不能替代 CI 证据。
 - 无 Intel 实机，Intel 运行结论依赖固定 `macos-15-intel` runner。
+- 本机直接启动 E2E 在废纸篓动作收到 `Operation not permitted`，根因未证实；CI
+  两个架构均通过同一动作，因此未据此修改产品代码。
 - 无 Developer ID 与 Apple 公证，Gatekeeper 首次启动拦截是预期行为。
 - 开发依赖工具链仍有 19 个已知漏洞；生产依赖审计为 0。
 - 当前没有自动更新，因此不覆盖升级与回滚路径。

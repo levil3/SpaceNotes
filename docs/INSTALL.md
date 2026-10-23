@@ -45,11 +45,17 @@ git -C D:\path\to\notes remote -v
 macOS 13.5 及以上版本可使用同一个 DMG，应用同时包含 Intel（x86_64）和
 Apple Silicon（arm64）切片。
 
-1. 打开 [SpaceNotes Releases](https://github.com/levil3/SpaceNotes/releases)。
-2. 下载 `Levil Notes x.y.z.dmg`。
-3. 双击 DMG，把 `Levil Notes` 拖入 `Applications`。
-4. 在“应用程序”中双击 `Levil Notes`。
-5. 首次启动时选择已有笔记文件夹，或新建一个空文件夹作为笔记库。
+当前 v0.2.0 验证产物在分支
+[Actions run 39974114613](https://github.com/levil3/SpaceNotes/actions/runs/39974114613)
+的 `macos-universal-v0.2.0` artifact 中。下载并解压后：
+
+1. 双击 `Levil Notes 0.2.0.dmg`，把 `Levil Notes` 拖入 `Applications`。
+2. 在“应用程序”中双击 `Levil Notes`。
+3. 首次启动时选择已有笔记文件夹，或新建一个空文件夹作为笔记库。
+
+合并到主分支并发布 GitHub Release 后，普通用户可直接从
+[SpaceNotes Releases](https://github.com/levil3/SpaceNotes/releases) 下载同版本
+DMG。
 
 当前 DMG 只使用 ad-hoc 签名，没有 Developer ID 签名，也未经过 Apple 公证。
 首次启动被 Gatekeeper 拦截时，打开“系统设置 > 隐私与安全性”，在安全提示下点击

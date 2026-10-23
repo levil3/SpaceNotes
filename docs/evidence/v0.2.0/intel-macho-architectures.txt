@@ -1,0 +1,3 @@
+x86_64 arm64	Contents/MacOS/SpaceNotes
+x86_64 arm64	Contents/Resources/space-notes-fs
+x86_64 arm64	Contents/Resources/node

@@ -1,0 +1,96 @@
+{
+  "version": "v0.2.0",
+  "branch": "feat/macos-adaptation",
+  "commit": "3f459174e9bd207a42022f21adc6589912d9d5c1",
+  "workflow": {
+    "name": "Build macOS Universal DMG",
+    "runId": 39974114613,
+    "url": "https://github.com/levil3/SpaceNotes/actions/runs/39974114613",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "artifact": {
+    "name": "macos-universal-v0.2.0",
+    "id": 12510298845,
+    "archiveBytes": 90601018,
+    "sha256": "c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b",
+    "universalMachO": [
+      "Contents/MacOS/SpaceNotes",
+      "Contents/Resources/space-notes-fs",
+      "Contents/Resources/node"
+    ]
+  },
+  "jobs": [
+    {
+      "id": 120484141929,
+      "name": "Build universal DMG",
+      "runner": "macos-15",
+      "architecture": "arm64",
+      "conclusion": "success",
+      "checks": {
+        "applicationTests": "89/89",
+        "wkwebviewE2E": "60/60",
+        "lifecycleFunctionalStatus": "PASS",
+        "lifecycleStatus": "INCONCLUSIVE",
+        "computerUseVisualStatus": "INCONCLUSIVE",
+        "dmgVerify": "PASS",
+        "adHocSignatureVerify": "PASS"
+      }
+    },
+    {
+      "id": 120486528297,
+      "name": "Verify x86_64 slice on Intel",
+      "runner": "macos-15-intel",
+      "architecture": "x86_64",
+      "conclusion": "success",
+      "checks": {
+        "checksum": "PASS",
+        "bundleArchitectures": "PASS",
+        "smokeTest": "PASS",
+        "smokeReady": "SMOKE_READY arch=x86_64",
+        "wkwebviewE2E": "60/60"
+      }
+    }
+  ],
+  "architectureVerification": {
+    "delivery": "Single universal app and DMG; no separate architecture-specific installers.",
+    "swiftSupportAloneIsSufficient": false,
+    "reason": "Swift can compile both slices, but the app also bundles Node and the native filesystem helper. Every Mach-O must be checked independently.",
+    "localIntelRunRequired": false,
+    "localIntelReason": "The fixed Intel CI runner already executed the mounted DMG, x86_64 smoke test and 60 real WKWebView flows."
+  },
+  "evidence": {
+    "intelWKWebView": "docs/evidence/v0.2.0/e2e-wkwebview-intel.json",
+    "intelArchitectures": "docs/evidence/v0.2.0/intel-macho-architectures.txt",
+    "intelDiagnostics": "docs/evidence/v0.2.0/e2e-wkwebview-intel-diagnostics.txt",
+    "universalLifecycle": "GitHub Actions job 120484141929 log",
+    "universalWKWebView": "GitHub Actions job 120484141929 log: WKWebView E2E certified: 60/60",
+    "screenshot": "docs/evidence/v0.2.0/macos-final.png",
+    "screenshotSha256": "d149d0f04b82548be9f102bd01867df01f4e604d4f0b78a9bd2d994bc0a9b229"
+  },
+  "localRecheck": {
+    "dmgPath": "build/macos/Levil Notes 0.2.0.dmg",
+    "sha256": "8dc85ea0163c6e7e7002f78c986ad333a8d6b2d30bc65bfd272b76d062316b61",
+    "installedPath": "/Applications/Levil Notes.app",
+    "backupPath": "/Users/yuzhou/Library/Application Support/Levil Notes/install-backups/20261023-230527/Levil Notes.app",
+    "version": "0.2.0",
+    "signature": "PASS",
+    "universalMachO": "3/3",
+    "screenshot": "docs/evidence/v0.2.0/macos-final.png",
+    "screenshotSha256": "d149d0f04b82548be9f102bd01867df01f4e604d4f0b78a9bd2d994bc0a9b229",
+    "screenLocked": true,
+    "smokeTest": "INCONCLUSIVE",
+    "wkwebviewE2E": {
+      "status": "NOT CERTIFIED",
+      "passed": 54,
+      "total": 55,
+      "requiredFlows": 60,
+      "failedFlow": "transfer-native-trash",
+      "reason": "The native trash action failed with: 无法打开废纸篓目录。（Operation not permitted）. The local root cause was not proven; CI passed the same flow on both architectures."
+    },
+    "computerUse": {
+      "status": "INCONCLUSIVE",
+      "reason": "The unified Computer Use entry point returned unsupported call."
+    }
+  }
+}

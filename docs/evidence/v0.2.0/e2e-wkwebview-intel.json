@@ -1,0 +1,326 @@
+{
+  "conclusion": "CERTIFIED",
+  "environment": {
+    "location": "http://127.0.0.1:49171",
+    "timestamp": "2026-10-23T15:03:47.193Z",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+  },
+  "failed": 0,
+  "failures": [],
+  "flowContractVersion": 1,
+  "independentFlows": 60,
+  "passed": 60,
+  "requiredFlows": 60,
+  "results": [
+    {
+      "durationMs": 1,
+      "name": "shell-layout",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "activity-rail-contract",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 152,
+      "name": "file-panel-title",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 6,
+      "name": "topbar-vault-menu",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 5,
+      "name": "note-tab-strip",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "window-control-contract",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "statusbar-contract",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 332,
+      "name": "sidebar-collapse-toggle",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1589,
+      "name": "rail-navigation-cycle",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "sidebar-resize-contract",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 142,
+      "name": "file-list-populated",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1,
+      "name": "file-filter-focus",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 565,
+      "name": "file-filter-welcome",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 424,
+      "name": "file-filter-path",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 423,
+      "name": "file-filter-clear",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 404,
+      "name": "file-open-welcome",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 416,
+      "name": "file-open-second",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 142,
+      "name": "file-count-footer",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 142,
+      "name": "search-panel",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 440,
+      "name": "search-query-results",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "search-result-metadata",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "search-scope-controls",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1,
+      "name": "search-mode-control",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 222,
+      "name": "search-open-result",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 562,
+      "name": "search-empty-state",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 142,
+      "name": "outline-panel",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1,
+      "name": "outline-entries",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 146,
+      "name": "outline-click",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 150,
+      "name": "tags-panel",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 183,
+      "name": "tags-row-click",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 234,
+      "name": "backlinks-panel",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 22,
+      "name": "backlinks-content",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 159,
+      "name": "panel-metadata",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 145,
+      "name": "git-panel",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1,
+      "name": "git-branch-card",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "git-tabs",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "git-changes",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 181,
+      "name": "git-history-tab",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 186,
+      "name": "git-ignore-tab",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1,
+      "name": "git-refresh-control",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 142,
+      "name": "settings-panel",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 2,
+      "name": "settings-theme-modes",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1,
+      "name": "settings-hidden-toggle",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "settings-presets",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "settings-colors",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1,
+      "name": "settings-ranges",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 0,
+      "name": "settings-reset",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1422,
+      "name": "vault-image",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 182,
+      "name": "editor-view-toggle",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 165,
+      "name": "editor-more-menu",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 503,
+      "name": "top-level-navigation-policy",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 1002,
+      "name": "transfer-create-write-read",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 626,
+      "name": "transfer-create-nested",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 5097,
+      "name": "transfer-rename",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 2833,
+      "name": "transfer-native-trash",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 699,
+      "name": "transfer-save-event",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 2881,
+      "name": "transfer-search-index",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 686,
+      "name": "transfer-outline-index",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 2350,
+      "name": "transfer-git-diff-stage",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 2991,
+      "name": "transfer-git-commit",
+      "status": "PASS"
+    }
+  ],
+  "status": "CERTIFIED",
+  "total": 60,
+  "artifact": "Levil Notes 0.2.0.dmg",
+  "sha256": "c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b",
+  "fixtureRoot": "/var/folders/20/jp1_0n3n7kndh6rnbqb5344m0000gn/T//spacenotes-e2e.6C5iQf",
+  "host": {
+    "macOS": "24.6.0",
+    "architecture": "x64",
+    "node": "v22.23.2"
+  }
+}
