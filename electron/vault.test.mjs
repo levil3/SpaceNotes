@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const require = createRequire(import.meta.url);
 const { SettingsStore, VaultService } = require("./vault.cjs");
@@ -17,7 +17,7 @@ afterEach(async () => {
   );
 });
 
-async function createFixture() {
+async function createFixture(platformActions = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "space-notes-"));
   temporaryDirectories.push(root);
 
@@ -39,10 +39,42 @@ async function createFixture() {
 
   const settings = new SettingsStore(path.join(root, "settings.json"));
   await settings.load();
-  const vault = new VaultService(settings, () => {});
+  const vault = new VaultService(settings, () => {}, platformActions);
   await vault.open(root);
   return { root, vault };
 }
+
+describe("VaultService platform actions", () => {
+  it("delegates a validated trash request and updates the index", async () => {
+    const trashItem = vi.fn(async () => {});
+    const { root, vault } = await createFixture({ trashItem });
+    try {
+      await vault.trashNote("notes/Java Base/example.md");
+
+      expect(trashItem).toHaveBeenCalledWith(
+        path.join(root, "notes", "Java Base", "example.md"),
+      );
+      expect(vault.snapshot().files.map((file) => file.path)).not.toContain(
+        "notes/Java Base/example.md",
+      );
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects outside-vault paths before invoking the platform action", async () => {
+    const trashItem = vi.fn(async () => {});
+    const { vault } = await createFixture({ trashItem });
+    try {
+      await expect(vault.trashNote("../outside.md")).rejects.toThrow(
+        "文件路径超出当前笔记库",
+      );
+      expect(trashItem).not.toHaveBeenCalled();
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+});
 
 describe("VaultService asset resolution", () => {
   it("resolves note-relative images that do not exist at the vault root", async () => {

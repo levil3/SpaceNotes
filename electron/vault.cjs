@@ -256,9 +256,10 @@ function createSearchSnippet(content, query) {
  * Renderer requests never receive unrestricted filesystem access.
  */
 class VaultService {
-  constructor(settingsStore, onVaultChanged) {
+  constructor(settingsStore, onVaultChanged, platformActions = {}) {
     this.settingsStore = settingsStore;
     this.onVaultChanged = onVaultChanged;
+    this.trashItem = platformActions.trashItem || null;
     this.vaultPath = "";
     this.documents = new Map();
     this.directories = new Set();
@@ -618,9 +619,11 @@ class VaultService {
   }
 
   async trashNote(relativePath) {
+    if (typeof this.trashItem !== "function") {
+      throw new Error("当前宿主不支持将笔记移入废纸篓。");
+    }
     const absolute = this.resolveInsideVault(relativePath);
-    const { shell } = require("electron");
-    await shell.trashItem(absolute);
+    await this.trashItem(absolute);
     this.documents.delete(relativePath);
     this.onVaultChanged?.(this.snapshot("trashed"));
   }
