@@ -20,7 +20,7 @@
     "build:web": "tsc --noEmit && vite build",
     "build": "npm run build:web && electron-builder --win nsis --publish never",
     "start": "electron .",
-    "test": "vitest run src electron macos/bridge"
+    "test": "vitest run src electron macos/bridge scripts/macos"
   },
   "dependencies": {
     "@milkdown/crepe": "7.22.3",

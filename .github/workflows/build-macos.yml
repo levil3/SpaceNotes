@@ -78,9 +78,11 @@ jobs:
           bash scripts/macos/run-wkwebview-e2e.sh \
             "build/macos/Levil Notes.app" \
             docs/evidence/v0.2.0/e2e-wkwebview.json \
-            "build/macos/Levil Notes 0.2.0.dmg"
+            "build/macos/Levil Notes 0.2.0.dmg" \
+            docs/evidence/v0.2.0/diagnostics.log
 
       - name: Upload macOS artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: macos-universal-v0.2.0
@@ -90,8 +92,9 @@ jobs:
             build/macos/macho-architectures.txt
             build/macos/build.log
             docs/evidence/v0.2.0/e2e-wkwebview.json
+            docs/evidence/v0.2.0/diagnostics.log
             docs/evidence/v0.2.0/usage-model.json
-          if-no-files-found: error
+          if-no-files-found: warn
 
   intel-smoke:
     name: Verify x86_64 slice on Intel
@@ -136,7 +139,8 @@ jobs:
           bash scripts/macos/run-wkwebview-e2e.sh \
             "$mount_point/Levil Notes.app" \
             "$RUNNER_TEMP/e2e-wkwebview-intel.json" \
-            "artifact/Levil Notes 0.2.0.dmg"
+            "artifact/Levil Notes 0.2.0.dmg" \
+            "$RUNNER_TEMP/e2e-wkwebview-intel-diagnostics.log"
 
       - name: Upload Intel evidence
         if: always()
@@ -146,4 +150,5 @@ jobs:
           path: |
             ${{ runner.temp }}/intel-macho-architectures.txt
             ${{ runner.temp }}/e2e-wkwebview-intel.json
+            ${{ runner.temp }}/e2e-wkwebview-intel-diagnostics.log
           if-no-files-found: warn

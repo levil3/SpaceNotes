@@ -48,7 +48,12 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
     private func handleNotification(_ request: BridgeRequest) {
         if request.name == "bridgeDiagnostic" {
             let detail = request.arguments.first as? String ?? "unknown"
-            appendDiagnostic("page-js=\(detail)")
+            appendDiagnostic("page-js=\(redacted(detail))")
+            return
+        }
+        if request.name == "e2eProgress" {
+            let detail = request.arguments.first as? String ?? "unknown"
+            appendDiagnostic("e2e-step=\(redacted(detail))")
             return
         }
         guard request.name == "beginWindowDrag",
@@ -58,6 +63,23 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
             return
         }
         window.performDrag(with: event)
+    }
+
+    private func redacted(_ value: String) -> String {
+        var text = value
+        if let token = clientProvider()?.token, !token.isEmpty {
+            text = text.replacingOccurrences(of: token, with: "[redacted]")
+        }
+        text = text.replacingOccurrences(
+            of: #"(?i)(token=)[^\s&]+"#,
+            with: "$1[redacted]",
+            options: .regularExpression
+        )
+        return text.replacingOccurrences(
+            of: #"(?i)(Bearer\s+)\S+"#,
+            with: "$1[redacted]",
+            options: .regularExpression
+        )
     }
 
     private func appendDiagnostic(_ message: String) {

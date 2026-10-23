@@ -2,6 +2,22 @@ import Foundation
 import WebKit
 
 enum E2ERunner {
+    private final class CompletionGate {
+        private let lock = NSLock()
+        private var completed = false
+
+        func finish(_ action: () -> Void) {
+            lock.lock()
+            guard !completed else {
+                lock.unlock()
+                return
+            }
+            completed = true
+            lock.unlock()
+            action()
+        }
+    }
+
     static var reportPath: String? {
         guard
             let index = CommandLine.arguments.firstIndex(of: "--e2e-report"),
@@ -17,21 +33,55 @@ enum E2ERunner {
         reportPath: String,
         completion: @escaping (String) -> Void
     ) {
+        let gate = CompletionGate()
+        let timeout = DispatchWorkItem {
+            finishOnce(
+                gate: gate,
+                value: [
+                    "status": "NOT CERTIFIED",
+                    "conclusion": "NOT CERTIFIED",
+                    "total": 0,
+                    "passed": 0,
+                    "failed": 1,
+                    "results": [],
+                    "failures": [
+                        [
+                            "name": "runner-timeout",
+                            "message": "E2E did not complete within 180 seconds."
+                        ]
+                    ]
+                ],
+                reportPath: reportPath,
+                completion: completion
+            )
+        }
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + 180,
+            execute: timeout
+        )
         webView.callAsyncJavaScript(
             script,
             arguments: [:],
             in: nil,
             in: .page
         ) { result in
+            timeout.cancel()
             switch result {
             case let .success(value):
-                write(value: value, reportPath: reportPath, completion: completion)
+                finishOnce(
+                    gate: gate,
+                    value: value,
+                    reportPath: reportPath,
+                    completion: completion
+                )
             case let .failure(error):
                 let report: [String: Any] = [
                     "status": "NOT CERTIFIED",
                     "conclusion": "NOT CERTIFIED",
-                    "total": 50,
+                    "total": 0,
                     "passed": 0,
+                    "failed": 1,
+                    "results": [],
                     "failures": [
                         [
                             "name": "runner",
@@ -39,8 +89,24 @@ enum E2ERunner {
                         ]
                     ]
                 ]
-                write(value: report, reportPath: reportPath, completion: completion)
+                finishOnce(
+                    gate: gate,
+                    value: report,
+                    reportPath: reportPath,
+                    completion: completion
+                )
             }
+        }
+    }
+
+    private static func finishOnce(
+        gate: CompletionGate,
+        value: Any,
+        reportPath: String,
+        completion: @escaping (String) -> Void
+    ) {
+        gate.finish {
+            write(value: value, reportPath: reportPath, completion: completion)
         }
     }
 
@@ -73,6 +139,71 @@ enum E2ERunner {
       new Promise((resolve) => setTimeout(resolve, milliseconds));
     const results = [];
     const failures = [];
+    let aborted = false;
+    const redact = (value) => {
+      let text = String(value);
+      const token =
+        window.__SPACENOTES_BRIDGE_CONFIG__ &&
+        window.__SPACENOTES_BRIDGE_CONFIG__.token;
+      if (token) {
+        text = text.split(String(token)).join("[redacted]");
+      }
+      return text
+        .replace(/(token=)[^\\s&]+/gi, "$1[redacted]")
+        .replace(/(Bearer\\s+)\\S+/gi, "$1[redacted]");
+    };
+    const reportProgress = (message) => {
+      try {
+        const host =
+          window.webkit &&
+          window.webkit.messageHandlers &&
+          window.webkit.messageHandlers.levilNotesHost;
+        if (host && typeof host.postMessage === "function") {
+          host.postMessage({
+            name: "e2eProgress",
+            args: [redact(message).slice(0, 1000)],
+          });
+        }
+      } catch {
+        // Progress reporting must not change the certification outcome.
+      }
+    };
+    const runStep = async (name, action) => {
+      if (aborted) {
+        return;
+      }
+      const startedAt = Date.now();
+      reportProgress(`start:${name}`);
+      let timeoutId = null;
+      try {
+        await Promise.race([
+          Promise.resolve().then(action),
+          new Promise((_, reject) => {
+            timeoutId = setTimeout(
+              () => reject(new Error(`step timed out after 20000ms: ${name}`)),
+              20000,
+            );
+          }),
+        ]);
+        const durationMs = Date.now() - startedAt;
+        results.push({ name, status: "PASS", durationMs });
+        reportProgress(`pass:${name}`);
+      } catch (error) {
+        const durationMs = Date.now() - startedAt;
+        const rawMessage =
+          error instanceof Error ? error.message : String(error);
+        const message = redact(rawMessage);
+        failures.push({ name, message, durationMs });
+        reportProgress(`fail:${name}:${message}`);
+        if (message.includes("step timed out after")) {
+          aborted = true;
+        }
+      } finally {
+        if (timeoutId !== null) {
+          clearTimeout(timeoutId);
+        }
+      }
+    };
     const requireElement = (selector) => {
       const element = document.querySelector(selector);
       if (!element) {
@@ -126,18 +257,6 @@ enum E2ERunner {
       }
       throw new Error(message);
     };
-    const runStep = async (name, action) => {
-      try {
-        await action();
-        results.push({ name, status: "PASS" });
-      } catch (error) {
-        failures.push({
-          name,
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    };
-
     const clickButton = async (label) => {
       const button = Array.from(document.querySelectorAll("button")).find(
         (candidate) => candidate.getAttribute("aria-label") === label
@@ -672,6 +791,8 @@ enum E2ERunner {
     return {
       status: failures.length === 0 ? "CERTIFIED" : "NOT CERTIFIED",
       conclusion: failures.length === 0 ? "CERTIFIED" : "NOT CERTIFIED",
+      flowContractVersion: 1,
+      requiredFlows: 60,
       total: results.length + failures.length,
       passed: results.length,
       failed: failures.length,

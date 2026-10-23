@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var messageHandler: HostMessageHandler?
     private var assetHandler: NotesAssetSchemeHandler?
     private var retryPolicy = SidecarRetryPolicy()
+    private var e2eStarted = false
     private var isTerminating = false
     private var developmentOrigin: URL? {
         guard
@@ -356,13 +357,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 })
                 """
             ) { result, error in
-                self?.logPageState(result, error: error)
-                if let reportPath = E2ERunner.reportPath {
+                guard let self else { return }
+                self.logPageState(result, error: error)
+                if let reportPath = E2ERunner.reportPath, !self.e2eStarted {
+                    self.e2eStarted = true
+                    self.appendDiagnostic("e2e-started")
                     E2ERunner.run(
                         webView: webView,
                         reportPath: reportPath
                     ) { report in
-                        self?.appendDiagnostic("e2e-report=\(reportPath)")
+                        self.appendDiagnostic("e2e-report=\(reportPath)")
                         NSLog("Levil Notes E2E report: %@", report)
                     }
                 }
