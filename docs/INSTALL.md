@@ -72,7 +72,7 @@ npm run build
 构建完成后可以在以下位置找到文件：
 
 ```text
-release/Levil Notes Setup 0.1.0.exe
+release/Levil Notes Setup 0.1.1.exe
 release/win-unpacked/Levil Notes.exe
 ```
 
@@ -83,13 +83,13 @@ release/win-unpacked/Levil Notes.exe
 仓库中的 `.github/workflows/build-windows.yml` 提供 Windows 自动构建：
 
 - 在 Actions 页面手动运行 `Build Windows`，完成后下载 `windows-installer`。
-- 推送 `v0.1.0` 这类标签后，工作流会构建并发布 GitHub Release。
+- 推送 `v0.1.1` 这类标签后，工作流会构建并发布 GitHub Release。
 
 维护者发布新版本时执行：
 
 ```powershell
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 ## 笔记库兼容性
