@@ -50,6 +50,32 @@ function normalizeRelativeGitPath(value) {
   return normalized;
 }
 
+/**
+ * Windows may refer to the same directory through an 8.3 short path, a long
+ * path, or different casing. Canonicalize the nearest existing ancestor so Git
+ * output and Electron paths can be compared without misreporting a repository
+ * path as outside the workspace. Deleted files are supported because their
+ * existing parent directory can still be canonicalized.
+ */
+async function canonicalPathForComparison(value) {
+  const resolved = path.resolve(value);
+  try {
+    return await fs.realpath(resolved);
+  } catch (error) {
+    if (error.code !== "ENOENT" && error.code !== "ENOTDIR") {
+      throw error;
+    }
+    const parent = path.dirname(resolved);
+    if (parent === resolved) {
+      return resolved;
+    }
+    return path.join(
+      await canonicalPathForComparison(parent),
+      path.basename(resolved),
+    );
+  }
+}
+
 function escapeGitIgnoreComponent(component) {
   return component.replace(/([\\*?[\]])/g, "\\$1");
 }
@@ -487,9 +513,14 @@ class GitService {
   }
 
   async repositoryRelativePath(repositoryRoot, relativePath) {
-    const absolutePath = this.vaultService.resolveInsideVault(relativePath);
+    const [canonicalRoot, canonicalTarget] = await Promise.all([
+      canonicalPathForComparison(repositoryRoot),
+      canonicalPathForComparison(
+        this.vaultService.resolveInsideVault(relativePath),
+      ),
+    ]);
     return normalizeRelativeGitPath(
-      path.relative(repositoryRoot, absolutePath),
+      path.relative(canonicalRoot, canonicalTarget),
     );
   }
 

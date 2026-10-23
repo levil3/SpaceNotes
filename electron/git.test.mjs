@@ -236,6 +236,21 @@ describe("Git paths and ignore patterns", () => {
 });
 
 describe("Git local workflow", () => {
+  it("resolves repository paths when Windows casing differs", async () => {
+    if (process.platform !== "win32") {
+      return;
+    }
+
+    const { root, service } = await createRepository();
+    try {
+      expect(
+        await service.repositoryRelativePath(root.toUpperCase(), "README.md"),
+      ).toBe("README.md");
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("discards staged and unstaged changes for a tracked file", async () => {
     const { root, service } = await createRepository();
     try {
