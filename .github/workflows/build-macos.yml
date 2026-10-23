@@ -124,10 +124,10 @@ jobs:
       - name: Verify checksum and architectures
         run: |
           test "$(uname -m)" = "x86_64"
-          cd artifact
+          cd artifact/build/macos
           shasum -a 256 -c "Levil Notes 0.2.0.dmg.sha256"
-          cd ..
-          shasum -a 256 artifact/"Levil Notes 0.2.0.dmg"
+          cd "$GITHUB_WORKSPACE"
+          shasum -a 256 artifact/build/macos/"Levil Notes 0.2.0.dmg"
 
       - name: Mount DMG and inspect bundle
         run: |
@@ -136,7 +136,7 @@ jobs:
           mkdir -p "$mount_point"
           hdiutil attach -readonly -nobrowse \
             -mountpoint "$mount_point" \
-            artifact/"Levil Notes 0.2.0.dmg"
+            artifact/build/macos/"Levil Notes 0.2.0.dmg"
           trap 'hdiutil detach "$mount_point" -quiet' EXIT
           test -d "$mount_point/Levil Notes.app"
           test -L "$mount_point/Applications"
@@ -148,7 +148,7 @@ jobs:
           bash scripts/macos/run-wkwebview-e2e.sh \
             "$mount_point/Levil Notes.app" \
             "$RUNNER_TEMP/e2e-wkwebview-intel.json" \
-            "artifact/Levil Notes 0.2.0.dmg" \
+            "artifact/build/macos/Levil Notes 0.2.0.dmg" \
             "$RUNNER_TEMP/e2e-wkwebview-intel-diagnostics.log"
 
       - name: Upload Intel evidence

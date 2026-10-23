@@ -101,6 +101,24 @@ describe("macOS E2E contract", () => {
     expect(lifecycleResultIsAcceptable(report, "1")).toBe(false);
   });
 
+  it("keeps Intel artifact paths aligned with the uploaded tree", () => {
+    const root = path.resolve(directory, "../..");
+    const workflow = fs.readFileSync(
+      path.join(root, ".github/workflows/build-macos.yml"),
+      "utf8",
+    );
+
+    expect(workflow).toContain(
+      'artifact/build/macos/"Levil Notes 0.2.0.dmg"',
+    );
+    expect(workflow).toContain(
+      'cd artifact/build/macos',
+    );
+    expect(workflow).not.toContain(
+      'artifact/"Levil Notes 0.2.0.dmg"',
+    );
+  });
+
 });
 
 describeMac("macOS E2E runner behavior", () => {
