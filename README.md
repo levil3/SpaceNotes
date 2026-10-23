@@ -61,7 +61,7 @@ npm run build
 - 免安装调试版本：`release/win-unpacked/Levil Notes.exe`
 
 仓库包含 Windows 自动构建流程。手动运行 `Build Windows` 工作流可下载构建产物；
-推送 `v0.1.4` 这类标签时，会自动创建 GitHub Release 并上传安装包。
+推送 `v0.1.5` 这类标签时，会自动创建 GitHub Release 并上传安装包。
 
 ## 数据与权限
 
