@@ -35,6 +35,15 @@
   --git-conflict: #c73f49;
   --git-untracked: #a87424;
   --git-ignored: #8b929b;
+  --syntax-keyword: #a626a4;
+  --syntax-string: #2f8f56;
+  --syntax-number: #b76b01;
+  --syntax-comment: #8a9199;
+  --syntax-function: #4078c4;
+  --syntax-type: #b7791f;
+  --syntax-operator: #147d8d;
+  --syntax-tag: #c2415d;
+  --syntax-invalid: #d33f49;
   --shadow: 0 16px 52px rgb(20 28 38 / 18%);
   --ui-font: "Microsoft YaHei UI", "Microsoft YaHei",
     "Segoe UI Variable Text", "Segoe UI", sans-serif;
@@ -68,6 +77,15 @@
   --git-conflict: #f0737c;
   --git-untracked: #d4a75b;
   --git-ignored: #939aa4;
+  --syntax-keyword: #c678dd;
+  --syntax-string: #8fce87;
+  --syntax-number: #d19a66;
+  --syntax-comment: #7f8b99;
+  --syntax-function: #75a9f4;
+  --syntax-type: #e5c07b;
+  --syntax-operator: #56b6c2;
+  --syntax-tag: #e06c75;
+  --syntax-invalid: #ff7b86;
   --shadow: 0 20px 60px rgb(0 0 0 / 42%);
 }
 
@@ -2271,9 +2289,59 @@ kbd {
   line-height: 0;
 }
 
-.editor-mount .milkdown .milkdown-code-block .tools,
 .editor-mount .milkdown .milkdown-code-block .cm-gutters {
   display: none;
+}
+
+.editor-mount .milkdown .milkdown-code-block .tools {
+  display: flex;
+  min-height: 22px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: -2px 0 4px;
+}
+
+.editor-mount .milkdown .milkdown-code-block .language-button {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 3px;
+  padding: 0 5px;
+  color: var(--muted);
+  font-family: var(--ui-font);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 1;
+}
+
+.editor-mount .milkdown .milkdown-code-block .language-button:hover {
+  background: var(--accent-soft);
+  color: var(--muted);
+}
+
+.editor-mount .milkdown .milkdown-code-block .tools-button-group {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-code-block:hover
+  .tools-button-group,
+.editor-mount
+  .milkdown
+  .milkdown-code-block:focus-within
+  .tools-button-group,
+.editor-mount
+  .milkdown
+  .milkdown-code-block.selected
+  .tools-button-group {
+  opacity: 1;
 }
 
 .editor-mount .milkdown .milkdown-code-block-placeholder,
@@ -2296,11 +2364,8 @@ kbd {
 }
 
 .editor-mount .milkdown .milkdown-code-block-placeholder code,
-.editor-mount .milkdown .milkdown-code-block .cm-content,
-.editor-mount .milkdown .milkdown-code-block .cm-content * {
+.editor-mount .milkdown .milkdown-code-block .cm-content {
   color: var(--text) !important;
-  font-style: normal !important;
-  font-weight: 400 !important;
 }
 
 .editor-mount .milkdown .milkdown-code-block .cm-content {

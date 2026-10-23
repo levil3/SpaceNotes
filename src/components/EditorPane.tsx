@@ -1,7 +1,8 @@
-import { Crepe } from "@milkdown/crepe";
+import { Crepe, CrepeFeature } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/frame.css";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { codeBlockTheme } from "../lib/codeTheme";
 import { toEditorMarkdown, toVaultMarkdown } from "../lib/markdown";
 
 export interface EditorHandle {
@@ -62,12 +63,21 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       const crepe = new Crepe({
         root,
         defaultValue: toEditorMarkdown(content, path),
+        featureConfigs: {
+          [CrepeFeature.CodeMirror]: {
+            theme: codeBlockTheme,
+          },
+        },
       }).setReadonly(readOnlyRef.current);
       crepeRef.current = crepe;
 
       crepe
         .create()
         .then(() => {
+          if (crepeRef.current !== crepe) {
+            return;
+          }
+
           // Apply the latest mode after async initialization so a fast toggle
           // cannot leave the Markdown view in the wrong editability state.
           crepe.setReadonly(readOnlyRef.current);
@@ -85,6 +95,11 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
           }
           crepe.on((listener) => {
             listener.markdownUpdated((_ctx, markdown) => {
+              // A destroyed editor can finish an asynchronous update while the
+              // next note is already active. Never forward that stale content.
+              if (crepeRef.current !== crepe) {
+                return;
+              }
               onChangeRef.current(toVaultMarkdown(markdown));
             });
           });
@@ -94,8 +109,10 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         });
 
       return () => {
+        if (crepeRef.current === crepe) {
+          crepeRef.current = null;
+        }
         crepe.destroy();
-        crepeRef.current = null;
       };
     }, [path]);
 

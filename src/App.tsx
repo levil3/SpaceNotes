@@ -131,6 +131,8 @@ export default function App() {
   const editorMenuRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
   const pendingSaveRef = useRef<{ path: string; content: string } | null>(null);
+  // Tracks the newest note request so a slower, stale read cannot replace it.
+  const openRequestRef = useRef(0);
   const settingsLoadedRef = useRef(false);
   const didInitializeRef = useRef(false);
   const activePathRef = useRef("");
@@ -219,6 +221,7 @@ export default function App() {
         return;
       }
 
+      const requestId = ++openRequestRef.current;
       const pending = pendingSaveRef.current;
       if (pending) {
         await window.levilNotes.writeNote(pending.path, pending.content);
@@ -227,6 +230,9 @@ export default function App() {
 
       try {
         const document = await window.levilNotes.readNote(path);
+        if (requestId !== openRequestRef.current) {
+          return;
+        }
         const note = vault?.files.find((file) => file.path === path);
         const title = note?.title || basename(path);
         setActivePath(path);
@@ -382,14 +388,17 @@ export default function App() {
   }, [refreshGit, showToast]);
 
   const handleEditorChange = useCallback(
-    (markdown: string) => {
-      if (!activePathRef.current) {
+    (path: string, markdown: string) => {
+      // Bind each editor update to the note that produced it. Without this
+      // guard, a delayed update from the previous editor can overwrite the
+      // note the user just opened.
+      if (!path || path !== activePathRef.current) {
         return;
       }
       setActiveContent(markdown);
       setSaveState("dirty");
       pendingSaveRef.current = {
-        path: activePathRef.current,
+        path,
         content: markdown,
       };
       if (saveTimerRef.current) {
@@ -1162,7 +1171,9 @@ export default function App() {
                 path={activePath}
                 title={activeTitle}
                 content={activeContent}
-                onChange={handleEditorChange}
+                onChange={(markdown) =>
+                  handleEditorChange(activePath, markdown)
+                }
                 readOnly={activeEditorMode === "read"}
               />
             ) : (
