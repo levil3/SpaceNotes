@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect x="24" y="24" width="976" height="976" rx="224" fill="#ffffff" />
+  <rect
+    x="26.5"
+    y="26.5"
+    width="971"
+    height="971"
+    rx="221.5"
+    fill="none"
+    stroke="#e1e6ea"
+    stroke-width="5"
+  />
+
+  <path
+    d="M305 323C225 283 163 342 178 466C190 565 251 631 326 589C289 520 282 423 305 323Z"
+    fill="#a76e3f"
+    stroke="#344651"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M719 323C799 283 861 342 846 466C834 565 773 631 698 589C735 520 742 423 719 323Z"
+    fill="#a76e3f"
+    stroke="#344651"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <path
+    d="M512 211C609 211 705 267 756 365C804 457 800 575 759 675C715 781 622 833 512 833C402 833 309 781 265 675C224 575 220 457 268 365C319 267 415 211 512 211Z"
+    fill="#d99f5d"
+    stroke="#344651"
+    stroke-width="30"
+    stroke-linejoin="round"
+  />
+
+  <path
+    d="M323 440C354 378 414 345 461 359C495 369 495 430 466 484C438 536 386 570 340 547C307 530 307 486 323 440Z"
+    fill="#c48249"
+  />
+
+  <ellipse cx="430" cy="492" rx="30" ry="36" fill="#293944" />
+  <ellipse cx="594" cy="492" rx="30" ry="36" fill="#293944" />
+  <circle cx="441" cy="480" r="9" fill="#ffffff" />
+  <circle cx="605" cy="480" r="9" fill="#ffffff" />
+
+  <ellipse cx="441" cy="612" rx="119" ry="101" fill="#f2d4a6" />
+  <ellipse cx="583" cy="612" rx="119" ry="101" fill="#f2d4a6" />
+
+  <path
+    d="M461 579C475 558 549 558 563 579C576 599 553 637 512 650C471 637 448 599 461 579Z"
+    fill="#293944"
+  />
+  <path
+    d="M512 648V674M512 674C490 699 462 703 443 690M512 674C534 699 562 703 581 690"
+    fill="none"
+    stroke="#293944"
+    stroke-width="18"
+    stroke-linecap="round"
+  />
+
+  <path
+    d="M329 776C412 834 612 834 695 776C720 803 736 832 741 863C667 925 357 925 283 863C288 832 304 803 329 776Z"
+    fill="#4b708b"
+    stroke="#344651"
+    stroke-width="26"
+    stroke-linejoin="round"
+  />
+  <circle
+    cx="512"
+    cy="876"
+    r="45"
+    fill="#e6b85c"
+    stroke="#344651"
+    stroke-width="20"
+  />
+  <path
+    d="M512 849L522 873L548 876L529 894L535 920L512 906L489 920L495 894L476 876L502 873Z"
+    fill="#ffffff"
+  />
+</svg>
