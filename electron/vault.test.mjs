@@ -9,8 +9,12 @@ const { SettingsStore, VaultService } = require("./vault.cjs");
 const { createNativeFileOperations } = require("./file-operations.cjs");
 
 const temporaryDirectories = [];
-const helperPath = path.resolve("build/macos/space-notes-fs");
-const fileOperations = createNativeFileOperations(helperPath);
+const nativeFileOperations =
+  process.platform === "darwin"
+    ? createNativeFileOperations(
+        path.resolve("build/macos/space-notes-fs"),
+      )
+    : undefined;
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -44,11 +48,11 @@ async function createFixture(platformActions = {}) {
   const settings = new SettingsStore(path.join(root, "settings.json"));
   await settings.load();
   const vault = new VaultService(settings, () => {}, {
-    fileOperations,
+    ...(nativeFileOperations ? { fileOperations: nativeFileOperations } : {}),
     ...platformActions,
   });
   await vault.open(root);
-  return { root, vault, fileOperations };
+  return { root, vault, fileOperations: nativeFileOperations };
 }
 
 describe("VaultService platform actions", () => {
@@ -122,7 +126,9 @@ describe("VaultService path containment", () => {
     }
   });
 
-  it("rejects reading and writing through a file symlink outside the vault", async () => {
+  it.runIf(process.platform !== "win32")(
+    "rejects reading and writing through a file symlink outside the vault",
+    async () => {
     const { root, vault } = await createFixture();
     const outsideRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-outside-"),
@@ -145,9 +151,12 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 
-  it("rejects writing through a dangling symlink without creating its target", async () => {
+  it.runIf(process.platform !== "win32")(
+    "rejects writing through a dangling symlink without creating its target",
+    async () => {
     const { root, vault } = await createFixture();
     const outsideRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-outside-"),
@@ -166,9 +175,12 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 
-  it("rejects creating notes below a directory symlink outside the vault", async () => {
+  it.runIf(process.platform !== "win32")(
+    "rejects creating notes below a directory symlink outside the vault",
+    async () => {
     const { root, vault } = await createFixture();
     const outsideRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-outside-"),
@@ -186,9 +198,12 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 
-  it("renames and trashes symlink entries without following their targets", async () => {
+  it.runIf(process.platform !== "win32")(
+    "renames and trashes symlink entries without following their targets",
+    async () => {
     const trashedPaths = [];
     const trashItem = vi.fn(async (absolutePath) => {
       trashedPaths.push(absolutePath);
@@ -226,9 +241,12 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 
-  it("rejects renaming and trashing file symlinks outside the vault", async () => {
+  it.runIf(process.platform !== "win32")(
+    "rejects renaming and trashing file symlinks outside the vault",
+    async () => {
     const trashItem = vi.fn(async () => {});
     const { root, vault } = await createFixture({ trashItem });
     const outsideRoot = await fs.mkdtemp(
@@ -253,9 +271,12 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 
-  it("rejects a directory symlink swapped in after read validation", async () => {
+  it.runIf(process.platform === "darwin")(
+    "rejects a directory symlink swapped in after read validation",
+    async () => {
     const { root, vault, fileOperations } = await createFixture();
     const outsideRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-outside-"),
@@ -283,9 +304,12 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 
-  it("rejects a directory symlink swapped in before write side effects", async () => {
+  it.runIf(process.platform === "darwin")(
+    "rejects a directory symlink swapped in before write side effects",
+    async () => {
     const { root, vault, fileOperations } = await createFixture();
     const outsideRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-outside-"),
@@ -317,9 +341,12 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 
-  it("rejects a directory symlink swapped in before rename side effects", async () => {
+  it.runIf(process.platform === "darwin")(
+    "rejects a directory symlink swapped in before rename side effects",
+    async () => {
     const { root, vault, fileOperations } = await createFixture();
     const outsideRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-outside-"),
@@ -354,9 +381,12 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 
-  it("rejects a directory symlink swapped in before create-note side effects", async () => {
+  it.runIf(process.platform === "darwin")(
+    "rejects a directory symlink swapped in before create-note side effects",
+    async () => {
     const { root, vault, fileOperations } = await createFixture();
     const outsideRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-outside-"),
@@ -386,7 +416,8 @@ describe("VaultService path containment", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 });
 
 describe("VaultService asset resolution", () => {
@@ -439,7 +470,9 @@ describe("VaultService asset resolution", () => {
     }
   });
 
-  it("rejects attachments that escape through a symbolic link", async () => {
+  it.runIf(process.platform !== "win32")(
+    "rejects attachments that escape through a symbolic link",
+    async () => {
     const { root, vault } = await createFixture();
     const outsideRoot = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-outside-"),
@@ -459,7 +492,8 @@ describe("VaultService asset resolution", () => {
     } finally {
       await vault.closeWatcher();
     }
-  });
+    },
+  );
 });
 
 describe("VaultService hidden entries", () => {

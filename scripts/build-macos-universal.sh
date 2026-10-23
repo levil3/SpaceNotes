@@ -60,6 +60,11 @@ x64_output="$(arch -x86_64 "$BUILD_ROOT/node-universal/node" -p process.arch)"
   swift test
   swift build -c release --arch arm64 --arch x86_64
 )
+SWIFT_BIN_PATH="$(
+  cd "$MACOS_ROOT"
+  swift build -c release --arch arm64 --arch x86_64 --show-bin-path
+)"
+test -x "$SWIFT_BIN_PATH/SpaceNotes"
 bash "$ROOT/scripts/build-macos-fs-helper.sh" \
   "$BUILD_ROOT/space-notes-fs"
 
@@ -88,7 +93,7 @@ mkdir -p \
   "$APP_PATH/Contents/MacOS" \
   "$APP_PATH/Contents/Resources/web" \
   "$APP_PATH/Contents/Resources/sidecar/electron"
-cp "$MACOS_ROOT/.build/out/Products/Release/SpaceNotes" \
+cp "$SWIFT_BIN_PATH/SpaceNotes" \
   "$APP_PATH/Contents/MacOS/SpaceNotes"
 cp "$BUILD_ROOT/node-universal/node" "$APP_PATH/Contents/Resources/node"
 cp -R "$ROOT/dist/." "$APP_PATH/Contents/Resources/web/"

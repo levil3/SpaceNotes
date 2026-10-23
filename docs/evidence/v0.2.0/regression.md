@@ -8,7 +8,7 @@
 - macOS 27.0.1（26A434），Apple Silicon
 - Node.js 24.22.1（应用内 sidecar）
 - 最终本地产物：`build/macos/Levil Notes 0.2.0.dmg`
-- SHA-256：`a14a36b3ea7fb750ddce959c1ef573465d297c7b9c72995611648b8b20f9df8a`
+- SHA-256：`5f7087e2f72d190bc50f1462f0390012eee7669f80d95a91ba95d9a4aef0a5ae`
 - 已安装：`/Applications/Levil Notes.app`
 
 ## 自动化检查
@@ -49,6 +49,8 @@ x86_64 arm64  Contents/Resources/node
 
 ```text
 /tmp/Levil Notes 0.2.0 backup 20261023-202528.app
+/tmp/Levil Notes installed a14a36b3 20261023.app
+/tmp/Levil Notes installed 28c8fb1d 20261023.app
 ```
 
 ## 使用模型

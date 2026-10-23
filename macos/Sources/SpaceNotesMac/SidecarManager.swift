@@ -22,6 +22,7 @@ final class SidecarManager {
     private var errorBuffer = ""
     private var ready = false
     private var stopping = false
+    private var exitReported = false
 
     init(configuration: Configuration) {
         self.configuration = configuration
@@ -102,7 +103,7 @@ final class SidecarManager {
                 self.outputPipe.fileHandleForReading.readabilityHandler = nil
                 self.errorPipe.fileHandleForReading.readabilityHandler = nil
                 if !self.stopping {
-                    onExit(process.terminationStatus)
+                    self.reportExit(process.terminationStatus, onExit: onExit)
                 }
             }
         }
@@ -111,7 +112,7 @@ final class SidecarManager {
         do {
             launchData = try LaunchTokenPayload.data(for: configuration.token)
         } catch {
-            onExit(-1)
+            reportExit(-1, onExit: onExit)
             return
         }
 
@@ -125,7 +126,7 @@ final class SidecarManager {
                 stopping = true
                 process.terminate()
             }
-            onExit(-1)
+            reportExit(-1, onExit: onExit)
         }
     }
 
@@ -163,5 +164,11 @@ final class SidecarManager {
                 onReady(url)
             }
         }
+    }
+
+    private func reportExit(_ status: Int32, onExit: (Int32) -> Void) {
+        guard !exitReported else { return }
+        exitReported = true
+        onExit(status)
     }
 }

@@ -49,9 +49,27 @@
 
 修复后缺失 helper 会明确拒绝操作，并保留可诊断错误。
 
+### CI 与跨平台回归
+
+- Windows 测试无条件是构造 macOS helper，导致 Windows CI 在 `npm test` 阶段失败。
+- DMG checksum 清单写的是文件名，但 workflow 从仓库根目录执行校验。
+- Swift Package Manager 的 universal 产物目录会随工具链变化，构建脚本不能硬编码
+  本机缓存路径。
+
+修复后 native helper 只在 Darwin 注入，依赖 Darwin symlink/helper 的竞态用例按平台
+跳过；checksum 在 `build/macos` 内校验；主程序路径由
+`swift build --show-bin-path` 动态获取。
+
+### sidecar 退出回调
+
+- 启动失败与 `terminationHandler` 可能对同一次退出各调用一次 `onExit`。
+
+修复后 `SidecarManager` 使用一次性退出闸门，确保每次 sidecar 生命周期只上报一次
+退出状态。
+
 ## 最终结论
 
-独立 reviewer 在修复后的最终源码状态上未发现阻断项，结论为：
+独立 reviewer 在首轮报告上述 P1 后，对修复状态重新复核，未发现新的阻断项，结论为：
 
 ```text
 NO BLOCKING SOURCE FINDINGS

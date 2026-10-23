@@ -2,7 +2,7 @@
   "status": "INCONCLUSIVE",
   "conclusion": "INCONCLUSIVE",
   "artifact": "Levil Notes 0.2.0.dmg",
-  "sha256": "a14a36b3ea7fb750ddce959c1ef573465d297c7b9c72995611648b8b20f9df8a",
+  "sha256": "5f7087e2f72d190bc50f1462f0390012eee7669f80d95a91ba95d9a4aef0a5ae",
   "environment": {
     "macOS": "27.0.1",
     "hostArchitecture": "arm64",

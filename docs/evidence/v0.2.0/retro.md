@@ -65,6 +65,16 @@ Use 证据只能标记为 `INCONCLUSIVE`，不能沿用旧 SHA 的 PASS。
 
 改进方向：认证命令直接调用包内 Node 24.22.1，并在报告中记录 `process.version`。
 
+### 首次 CI 暴露了环境耦合
+
+首次 macOS CI 在拷主程序时失败，因为脚本硬编码了本机 Swift Package Manager 的
+`.build/out/Products/Release` 路径。独立复审还发现 Windows 测试会无条件加载
+macOS helper，以及 DMG checksum 的工作目录不一致。
+
+修复后主程序路径由 `swift build --show-bin-path` 动态获取，非 Darwin 测试不再加载
+native helper，checksum 在产物目录内校验。这些问题说明：本地绿色不能替代干净
+runner 上的首次构建。
+
 ## 关键指标
 
 - Node 单元/集成测试：10 个文件，68/68。
@@ -74,7 +84,7 @@ Use 证据只能标记为 `INCONCLUSIVE`，不能沿用旧 SHA 的 PASS。
 - 应用内 universal Mach-O：3/3。
 - 生产依赖漏洞：根仓库 0，macOS sidecar 0。
 - 本地产物 SHA-256：
-  `a14a36b3ea7fb750ddce959c1ef573465d297c7b9c72995611648b8b20f9df8a`。
+  `5f7087e2f72d190bc50f1462f0390012eee7669f80d95a91ba95d9a4aef0a5ae`。
 
 ## 后续行动
 

@@ -68,7 +68,10 @@ jobs:
       - name: Verify ad-hoc signature and DMG checksum
         run: |
           codesign --verify --deep --strict "build/macos/Levil Notes.app"
-          shasum -a 256 -c "build/macos/Levil Notes 0.2.0.dmg.sha256"
+          (
+            cd build/macos
+            shasum -a 256 -c "Levil Notes 0.2.0.dmg.sha256"
+          )
 
       - name: Run real WKWebView E2E certification
         run: |
