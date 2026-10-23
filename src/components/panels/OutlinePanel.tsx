@@ -59,7 +59,10 @@ export function OutlinePanel({
               )}
             </button>
           ) : (
-            <span className="outline-toggle-placeholder" />
+            <span
+              className="outline-leaf-marker"
+              aria-hidden="true"
+            />
           )}
           <button
             type="button"

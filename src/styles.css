@@ -621,13 +621,13 @@ kbd {
 }
 
 .outline-row {
-  position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
   min-width: 0;
   align-items: center;
   margin-bottom: 2px;
   border-radius: 4px;
-  padding: 0 8px 0 24px;
+  padding: 0 8px 0 4px;
   color: var(--nav-text);
   font-family: var(--ui-font);
   font-size: var(--nav-font-size);
@@ -640,26 +640,31 @@ kbd {
 }
 
 .outline-toggle,
-.outline-toggle-placeholder {
+.outline-leaf-marker {
+  display: grid;
   width: 16px;
-  height: 0;
+  height: 22px;
+  place-items: center;
 }
 
 .outline-toggle {
-  position: absolute;
-  top: 50%;
-  left: 4px;
-  display: grid;
-  height: 22px;
-  place-items: center;
   border-radius: 3px;
   color: var(--nav-icon);
-  transform: translateY(-50%);
 }
 
 .outline-toggle:hover {
   background: var(--nav-hover);
   color: var(--nav-icon-collapsed);
+}
+
+/* Leaf headings keep a quiet marker so every outline row shares one gutter. */
+.outline-leaf-marker::before {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--nav-icon);
+  content: "";
+  opacity: 0.7;
 }
 
 .outline-children {
@@ -675,7 +680,6 @@ kbd {
 .outline-entry {
   display: flex;
   min-width: 0;
-  flex: 1;
   align-items: center;
   padding: 4px 0;
   color: inherit;
