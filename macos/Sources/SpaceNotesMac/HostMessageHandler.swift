@@ -202,7 +202,9 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
                 appendDiagnostic("host-trash=refresh:done")
                 resolve(request, value: refreshed ?? NSNull())
             } catch {
-                appendDiagnostic("host-trash=failed")
+                appendDiagnostic(
+                    "host-trash=failed:\(redacted(error.localizedDescription))"
+                )
                 reject(request, message: error.localizedDescription)
             }
         }

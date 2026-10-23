@@ -38,6 +38,62 @@ describe("macOS E2E contract", () => {
 });
 
 describeMac("macOS E2E runner behavior", () => {
+  it("requires the packaged app to permit the local sidecar connection", () => {
+    const root = path.resolve(directory, "../..");
+    const temporaryRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "spacenotes-bundle-contract-"),
+    );
+    const app = path.join(temporaryRoot, "Levil Notes.app");
+    const contents = path.join(app, "Contents");
+    const executable = path.join(contents, "MacOS", "SpaceNotes");
+    const infoPlist = path.join(contents, "Info.plist");
+    const source = path.join(temporaryRoot, "main.c");
+    const manifest = path.join(temporaryRoot, "architectures.txt");
+    fs.mkdirSync(path.dirname(executable), { recursive: true });
+    fs.writeFileSync(source, "int main(void) { return 0; }\n");
+    execFileSync("clang", [
+      "-arch",
+      "arm64",
+      "-arch",
+      "x86_64",
+      "-o",
+      executable,
+      source,
+    ]);
+
+    const writeInfoPlist = (allowsLocalNetworking) => {
+      fs.writeFileSync(
+        infoPlist,
+        `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key>
+    <${allowsLocalNetworking ? "true" : "false"}/>
+  </dict>
+</dict>
+</plist>
+`,
+      );
+    };
+    const verify = () =>
+      spawnSync(
+        path.join(root, "scripts/verify-macos-bundle.sh"),
+        [app, manifest],
+        { encoding: "utf8" },
+      );
+
+    writeInfoPlist(true);
+    expect(verify()).toMatchObject({ status: 0 });
+
+    writeInfoPlist(false);
+    const rejected = verify();
+    expect(rejected.status).toBe(1);
+    expect(rejected.stderr).toContain("未允许本地网络访问");
+  });
+
   it("redacts mixed-case tokens and complex Bearer credentials", () => {
     const output = execFileSync(
       path.join(directory, "redact-log.sh"),

@@ -10,6 +10,21 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
+info_plist="$APP_PATH/Contents/Info.plist"
+if [[ ! -f "$info_plist" ]]; then
+  echo "应用缺少 Info.plist：$info_plist" >&2
+  exit 1
+fi
+local_networking="$(
+  /usr/libexec/PlistBuddy \
+    -c "Print :NSAppTransportSecurity:NSAllowsLocalNetworking" \
+    "$info_plist" 2>/dev/null || true
+)"
+if [[ "$local_networking" != "true" ]]; then
+  echo "Info.plist 未允许本地网络访问。" >&2
+  exit 1
+fi
+
 : > "$MANIFEST_PATH"
 failures=0
 
