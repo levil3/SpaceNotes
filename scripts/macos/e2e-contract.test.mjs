@@ -379,6 +379,87 @@ printf 'attach=%s detach=%s result=%s\\n' \
     );
   });
 
+  it("retries and verifies Intel DMG teardown", () => {
+    const root = path.resolve(directory, "../..");
+    const workflow = fs.readFileSync(
+      path.join(root, ".github/workflows/build-macos.yml"),
+      "utf8",
+    );
+    const detachFunction = loadShellFunction(workflow, "detach_dmg_mount");
+    const runDetach = ({ succeedsAt, infoFails = false }) =>
+      spawnSync(
+        "bash",
+        [
+          "-c",
+          `${detachFunction}
+active=1
+detach_calls=0
+hdiutil() {
+  if [[ "$1" == "info" ]]; then
+    [[ "${infoFails ? "1" : "0"}" == 1 ]] && return 2
+    [[ "$active" == 1 ]] && printf 'mounted at /tmp/test-mount\\n'
+    return 0
+  fi
+  if [[ "$1" == "detach" ]]; then
+    detach_calls=$((detach_calls + 1))
+    if [[ "$detach_calls" -ge ${succeedsAt} ]]; then
+      active=0
+      return 0
+    fi
+    return 1
+  fi
+  return 9
+}
+sleep() { :; }
+detach_dmg_mount /tmp/test-mount 3
+printf 'detach=%s active=%s result=%s\\n' \\
+  "$detach_calls" "$active" "$?"
+`,
+        ],
+        { encoding: "utf8" },
+      );
+
+    const recovered = runDetach({ succeedsAt: 3 });
+    expect(recovered.status).toBe(0);
+    expect(recovered.stdout).toContain("detach=3 active=0 result=0");
+
+    const exhausted = runDetach({ succeedsAt: 99 });
+    expect(exhausted.status).toBe(0);
+    expect(exhausted.stdout).toContain("detach=3 active=1 result=1");
+
+    const queryFailed = runDetach({ succeedsAt: 1, infoFails: true });
+    expect(queryFailed.status).toBe(0);
+    expect(queryFailed.stdout).toContain("detach=0 active=1 result=1");
+    expect(queryFailed.stderr).toContain("failed to query mounted disk images");
+  });
+
+  it("preserves the original exit code through Intel DMG cleanup", () => {
+    const root = path.resolve(directory, "../..");
+    const workflow = fs.readFileSync(
+      path.join(root, ".github/workflows/build-macos.yml"),
+      "utf8",
+    );
+    const cleanupFunction = loadShellFunction(workflow, "cleanup_mount");
+    const runCleanup = (originalStatus, detachSucceeds) =>
+      spawnSync(
+        "bash",
+        [
+          "-c",
+          `${cleanupFunction}
+mount_point=/tmp/test-mount
+detach_dmg_mount() { return ${detachSucceeds ? "0" : "1"}; }
+trap cleanup_mount EXIT
+exit ${originalStatus}
+`,
+        ],
+        { encoding: "utf8" },
+      );
+
+    expect(runCleanup(0, true).status).toBe(0);
+    expect(runCleanup(0, false).status).toBe(1);
+    expect(runCleanup(16, false).status).toBe(16);
+  });
+
 });
 
 describeMac("macOS E2E runner behavior", () => {

@@ -132,12 +132,49 @@ jobs:
       - name: Mount DMG and inspect bundle
         run: |
           set -euo pipefail
+          detach_dmg_mount() {
+            local target="$1"
+            local attempts="${2:-3}"
+            local attempt
+            local current_info
+            for ((attempt = 1; attempt <= attempts; attempt += 1)); do
+              if ! current_info="$(hdiutil info)"; then
+                echo "failed to query mounted disk images" >&2
+                return 1
+              fi
+              if ! grep -Fq "$target" <<<"$current_info"; then
+                return 0
+              fi
+              if hdiutil detach "$target" -quiet; then
+                if ! current_info="$(hdiutil info)"; then
+                  echo "failed to confirm disk image detach" >&2
+                  return 1
+                fi
+                if ! grep -Fq "$target" <<<"$current_info"; then
+                  return 0
+                fi
+              fi
+              sleep 2
+            done
+            return 1
+          }
           mount_point="$RUNNER_TEMP/levil-notes-dmg"
           mkdir -p "$mount_point"
+          cleanup_mount() {
+            local status=$?
+            trap - EXIT
+            if ! detach_dmg_mount "$mount_point"; then
+              echo "failed to detach $mount_point after 3 attempts" >&2
+              if [[ "$status" -eq 0 ]]; then
+                status=1
+              fi
+            fi
+            exit "$status"
+          }
+          trap cleanup_mount EXIT
           hdiutil attach -readonly -nobrowse \
             -mountpoint "$mount_point" \
             artifact/build/macos/"Levil Notes 0.2.0.dmg"
-          trap 'hdiutil detach "$mount_point" -quiet' EXIT
           test -d "$mount_point/Levil Notes.app"
           test -L "$mount_point/Applications"
           bash scripts/verify-macos-bundle.sh \
