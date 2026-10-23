@@ -29,6 +29,19 @@ final class SpaceNotesCoreTests: XCTestCase {
         XCTAssertEqual(policy.automaticRestarts, 1)
     }
 
+    func testSidecarClientReportsStatusAndRedactedServerReason() {
+        let error = SidecarClient.serverError(
+            statusCode: 403,
+            data: Data("Host not allowed: secret-token".utf8),
+            token: "secret-token"
+        )
+
+        XCTAssertEqual(
+            error.localizedDescription,
+            "sidecar 请求失败（HTTP 403）：Host not allowed: [redacted]"
+        )
+    }
+
     func testLaunchTokenPayloadUsesAStdInLineAndStableFingerprint() throws {
         let token = "0123456789abcdef0123456789abcdef"
         XCTAssertEqual(

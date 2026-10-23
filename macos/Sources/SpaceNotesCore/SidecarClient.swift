@@ -66,13 +66,32 @@ public struct SidecarClient: Sendable {
         let object = try? JSONSerialization.jsonObject(with: data)
         let dictionary = object as? [String: Any]
         guard (200..<300).contains(http.statusCode) else {
-            throw SidecarClientError.server(
-                dictionary?["error"] as? String ?? "sidecar 请求失败。"
+            throw Self.serverError(
+                statusCode: http.statusCode,
+                data: data,
+                token: token
             )
         }
         guard let dictionary, dictionary.keys.contains("result") else {
             throw SidecarClientError.invalidResponse
         }
         return dictionary["result"]
+    }
+
+    static func serverError(
+        statusCode: Int,
+        data: Data,
+        token: String
+    ) -> SidecarClientError {
+        let object = try? JSONSerialization.jsonObject(with: data)
+        let serverMessage = (object as? [String: Any])?["error"] as? String
+        let rawBody = serverMessage
+            ?? String(data: data, encoding: .utf8)
+            ?? ""
+        let safeBody = rawBody
+            .replacingOccurrences(of: token, with: "[redacted]")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let detail = safeBody.isEmpty ? "" : "：\(safeBody.prefix(300))"
+        return .server("sidecar 请求失败（HTTP \(statusCode)）\(detail)")
     }
 }
