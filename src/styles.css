@@ -2101,9 +2101,12 @@ kbd {
   line-height: var(--editor-line-height);
 }
 
-.editor-mount .milkdown ul,
 .editor-mount .milkdown ol {
   padding-left: 1.75em;
+}
+
+.editor-mount .milkdown ul {
+  padding-left: 7px;
 }
 
 .editor-mount .milkdown li {
@@ -2115,6 +2118,13 @@ kbd {
    with the first text line so numbers, bullets, and content share a baseline. */
 .editor-mount .milkdown .milkdown-list-item-block > .list-item {
   align-items: flex-start;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-list-item-block
+  > .list-item:has(> .label-wrapper > .label.bullet) {
+  gap: 0;
 }
 
 .editor-mount
@@ -2157,6 +2167,18 @@ kbd {
   > .label-wrapper
   > .label.bullet {
   justify-content: center;
+  color: var(--text);
+}
+
+/* Obsidian uses a black 6px bullet and a compact 31px text inset. */
+.editor-mount
+  .milkdown
+  .milkdown-list-item-block
+  > .list-item
+  > .label-wrapper
+  > .label.bullet
+  svg {
+  fill: var(--text);
 }
 
 .editor-mount
