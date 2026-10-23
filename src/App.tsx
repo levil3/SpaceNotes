@@ -54,6 +54,10 @@ type ActiveView =
 
 type EditorMode = "edit" | "read";
 
+// New and reopened notes start in a non-editable reading view. A tab remembers
+// its switched mode until it is closed.
+const DEFAULT_EDITOR_MODE: EditorMode = "read";
+
 type DialogState =
   | { kind: "create"; parent: string; value: string }
   | { kind: "rename"; path: string; value: string }
@@ -493,8 +497,8 @@ export default function App() {
   );
   const activeTitle = activeFile?.title || basename(activePath);
   const activeEditorMode: EditorMode = activePath
-    ? editorModes[activePath] || "edit"
-    : "edit";
+    ? editorModes[activePath] || DEFAULT_EDITOR_MODE
+    : DEFAULT_EDITOR_MODE;
   const fileTree = useMemo(
     () => buildFileTree(vault?.files || [], vault?.directories || []),
     [vault?.directories, vault?.files],
