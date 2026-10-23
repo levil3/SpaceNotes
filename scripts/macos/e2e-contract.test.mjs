@@ -119,6 +119,19 @@ describe("macOS E2E contract", () => {
     );
   });
 
+  it("retries transient DMG operations with a bounded failure budget", () => {
+    const root = path.resolve(directory, "../..");
+    const script = fs.readFileSync(
+      path.join(root, "scripts/build-macos-universal.sh"),
+      "utf8",
+    );
+
+    expect(script).toContain('retry_hdiutil verify 5 2 "$DMG_PATH"');
+    expect(script).toContain("retry_hdiutil attach 5 2");
+    expect(script).toContain('echo "hdiutil $operation failed after $attempts attempts"');
+    expect(script).toContain("return 1");
+  });
+
 });
 
 describeMac("macOS E2E runner behavior", () => {

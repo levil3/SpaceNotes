@@ -11,6 +11,27 @@ DMG_PATH="$BUILD_ROOT/Levil Notes 0.2.0.dmg"
 
 mkdir -p "$BUILD_ROOT" "$CACHE_ROOT"
 
+retry_hdiutil() {
+  local operation="$1"
+  local attempts="$2"
+  local delay_seconds="$3"
+  shift 3
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if hdiutil "$operation" "$@"; then
+      return 0
+    fi
+    if ((attempt == attempts)); then
+      echo "hdiutil $operation failed after $attempts attempts" >&2
+      return 1
+    fi
+    echo "hdiutil $operation attempt $attempt/$attempts failed; retrying" >&2
+    sleep "$delay_seconds"
+  done
+  return 1
+}
+
 download_node() {
   local architecture="$1"
   local archive="node-v${NODE_VERSION}-darwin-${architecture}.tar.xz"
@@ -167,7 +188,7 @@ hdiutil create -quiet -ov \
   -srcfolder "$BUILD_ROOT/dmg-stage" \
   -format UDZO \
   "$DMG_PATH"
-hdiutil verify "$DMG_PATH"
+retry_hdiutil verify 5 2 "$DMG_PATH"
 
 mount_point="$BUILD_ROOT/dmg-mount"
 rm -rf "$mount_point"
@@ -176,7 +197,7 @@ cleanup() {
   hdiutil detach "$mount_point" -quiet 2>/dev/null || true
 }
 trap cleanup EXIT
-hdiutil attach -quiet -readonly -nobrowse \
+retry_hdiutil attach 5 2 -quiet -readonly -nobrowse \
   -mountpoint "$mount_point" "$DMG_PATH"
 test -d "$mount_point/Levil Notes.app"
 test -L "$mount_point/Applications"
