@@ -40,7 +40,72 @@ git -C D:\path\to\notes remote -v
 如果命令行可以正常拉取和推送，但 SpaceNotes 中提示 Git 不可用，请完全退出应用后
 重新启动，并从开始菜单启动新版本。
 
-## 方式二：从源码运行
+## 方式二：安装 macOS 通用 DMG
+
+macOS 13.5 及以上版本可使用同一个 DMG，应用同时包含 Intel（x86_64）和
+Apple Silicon（arm64）切片。
+
+1. 打开 [SpaceNotes Releases](https://github.com/levil3/SpaceNotes/releases)。
+2. 下载 `Levil Notes x.y.z.dmg`。
+3. 双击 DMG，把 `Levil Notes` 拖入 `Applications`。
+4. 在“应用程序”中双击 `Levil Notes`。
+5. 首次启动时选择已有笔记文件夹，或新建一个空文件夹作为笔记库。
+
+当前 DMG 只使用 ad-hoc 签名，没有 Developer ID 签名，也未经过 Apple 公证。
+首次启动被 Gatekeeper 拦截时，打开“系统设置 > 隐私与安全性”，在安全提示下点击
+“仍要打开”，完成系统身份验证后再启动。不要关闭系统级安全保护，也不要把
+“仍要打开”理解为已通过 Apple 公证。
+
+可在终端核对下载文件：
+
+```bash
+shasum -a 256 "Levil Notes 0.2.0.dmg"
+cat "Levil Notes 0.2.0.dmg.sha256"
+```
+
+macOS 版复用同一份 React/TypeScript 前端和 Node 业务核心。Swift 只承载窗口、
+系统菜单、WebView 桥接、原生文件动作、sidecar 生命周期和打包。
+
+### macOS 从源码构建
+
+需要安装 Xcode Command Line Tools、Node.js 18+ 和 Git：
+
+```bash
+xcode-select --install
+git clone https://github.com/levil3/SpaceNotes.git
+cd SpaceNotes
+npm ci
+bash scripts/build-macos-universal.sh
+```
+
+构建脚本固定使用 Node.js 24.22.1 的官方 arm64/x64 包，校验 SHA-256 后用 `lipo`
+生成 universal Node，并检查 `.app` 内所有 Mach-O 都同时包含两种架构。
+
+产物：
+
+```text
+build/macos/Levil Notes.app
+build/macos/Levil Notes 0.2.0.dmg
+build/macos/Levil Notes 0.2.0.dmg.sha256
+build/macos/macho-architectures.txt
+```
+
+`.github/workflows/build-macos.yml` 可在 Actions 页面手动运行
+`Build macOS Universal DMG`。arm64 任务构建 DMG；Intel 任务下载同一产物，挂载、
+校验全部 Mach-O，并实际启动 x86_64 切片和 sidecar。
+
+### macOS 设置与卸载
+
+应用设置位于：
+
+```text
+~/Library/Application Support/Levil Notes/settings.json
+```
+
+卸载时先退出应用，再把 `Levil Notes.app` 移到废纸篓。笔记库不会随应用删除。
+如需同时清除应用设置，可在确认不再需要后删除上述 `Levil Notes` 设置目录。
+
+## 方式三：从源码运行
 
 需要 Windows 10/11 x64、Node.js 18+、npm 和 Git。
 

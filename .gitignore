@@ -2,6 +2,9 @@ node_modules/
 dist/
 release/
 work/
+build/
+.cache/
+macos/.build/
 *.log
 .DS_Store
 Thumbs.db

@@ -1,0 +1,113 @@
+name: Build macOS Universal DMG
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/macos-adaptation
+  pull_request:
+    paths:
+      - ".github/workflows/build-macos.yml"
+      - "electron/**"
+      - "macos/**"
+      - "scripts/**"
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  universal:
+    name: Build universal DMG
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Run application tests
+        run: npm test
+
+      - name: Build and verify universal artifacts
+        run: |
+          set -o pipefail
+          mkdir -p build/macos
+          bash scripts/build-macos-universal.sh 2>&1 | tee build/macos/build.log
+
+      - name: Verify ad-hoc signature and DMG checksum
+        run: |
+          codesign --verify --deep --strict "build/macos/Levil Notes.app"
+          shasum -a 256 -c "build/macos/Levil Notes 0.2.0.dmg.sha256"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal-v0.2.0
+          path: |
+            build/macos/Levil Notes 0.2.0.dmg
+            build/macos/Levil Notes 0.2.0.dmg.sha256
+            build/macos/macho-architectures.txt
+            build/macos/build.log
+          if-no-files-found: error
+
+  intel-smoke:
+    name: Verify x86_64 slice on Intel
+    needs: universal
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Download universal artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-universal-v0.2.0
+          path: artifact
+
+      - name: Verify checksum and architectures
+        run: |
+          test "$(uname -m)" = "x86_64"
+          cd artifact
+          shasum -a 256 -c "Levil Notes 0.2.0.dmg.sha256"
+          cd ..
+          shasum -a 256 artifact/"Levil Notes 0.2.0.dmg"
+
+      - name: Mount DMG and inspect bundle
+        run: |
+          set -euo pipefail
+          mount_point="$RUNNER_TEMP/levil-notes-dmg"
+          mkdir -p "$mount_point"
+          hdiutil attach -readonly -nobrowse \
+            -mountpoint "$mount_point" \
+            artifact/"Levil Notes 0.2.0.dmg"
+          trap 'hdiutil detach "$mount_point" -quiet' EXIT
+          test -d "$mount_point/Levil Notes.app"
+          test -L "$mount_point/Applications"
+          bash scripts/verify-macos-bundle.sh \
+            "$mount_point/Levil Notes.app" \
+            "$RUNNER_TEMP/intel-macho-architectures.txt"
+          codesign --verify --deep --strict "$mount_point/Levil Notes.app"
+          "$mount_point/Levil Notes.app/Contents/MacOS/SpaceNotes" --smoke-test
+
+      - name: Upload Intel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-intel-evidence
+          path: |
+            ${{ runner.temp }}/intel-macho-architectures.txt
+          if-no-files-found: warn

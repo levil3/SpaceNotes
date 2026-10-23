@@ -1,17 +1,16 @@
 # SpaceNotes
 
-SpaceNotes 是一款面向 Windows 的本地优先 Markdown 笔记应用。它可以直接打开普通
-Markdown 文件夹，也可以使用已有的 Obsidian 笔记库，并将编辑、搜索、大纲、反链和
-Git 工作流集中在一个桌面界面中。
-
-当前 `feat/macos-adaptation` 分支用于验证 macOS 适配流程。
+SpaceNotes 是一款本地优先 Markdown 笔记应用，支持 Windows 与 macOS。它可以直接
+打开普通 Markdown 文件夹，也可以使用已有的 Obsidian 笔记库，并将编辑、搜索、
+大纲、反链和 Git 工作流集中在一个桌面界面中。
 
 ![SpaceNotes 界面预览](docs/images/spacenotes-preview.png)
 
 ## 下载与安装
 
 普通用户可从 [Releases](https://github.com/levil3/SpaceNotes/releases) 下载
-`Levil Notes Setup x.y.z.exe`，按照 [安装文档](docs/INSTALL.md) 完成安装。
+Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS 通用 DMG
+`Levil Notes x.y.z.dmg`，按照 [安装文档](docs/INSTALL.md) 完成安装。
 
 首次启动后，可以直接选择自己的笔记文件夹。笔记库只是普通目录，不会被锁定或导入；
 现有的 Obsidian 仓库、Markdown 文件和 Git 历史都可以继续使用。
@@ -30,7 +29,8 @@ Git 工作流集中在一个桌面界面中。
 ## 系统要求
 
 - Windows 10/11 x64。
-- 使用 Git 功能时需要安装 [Git for Windows](https://git-scm.com/download/win)。
+- macOS 13.5 或更高版本，支持 Intel 与 Apple Silicon。
+- 使用 Git 功能时需要在系统中安装 Git。
 - 从源码运行或构建时需要 Node.js 18 或更高版本。
 
 ## 从源码运行
@@ -65,6 +65,17 @@ npm run build
 仓库包含 Windows 自动构建流程。手动运行 `Build Windows` 工作流可下载构建产物；
 推送 `v0.1.3` 这类标签时，会自动创建 GitHub Release 并上传安装包。
 
+macOS 使用 AppKit + WKWebView 薄壳并内置 Node sidecar。构建 universal DMG：
+
+```bash
+npm ci
+bash scripts/build-macos-universal.sh
+```
+
+产物位于 `build/macos/Levil Notes 0.2.0.dmg`，同目录包含 SHA-256 与全部 Mach-O
+架构清单。`Build macOS Universal DMG` 工作流会在 arm64 runner 构建，并在 Intel
+runner 挂载 DMG、校验架构并启动 x86_64 切片。
+
 ## 数据与权限
 
 - 笔记始终保存在你选择的本地文件夹中。
@@ -81,6 +92,8 @@ electron/main.cjs       Electron 生命周期、窗口、协议和 IPC
 electron/preload.cjs    受限 IPC API
 electron/vault.cjs      笔记库索引、搜索、附件和设置
 electron/git.cjs        系统 Git CLI 封装
+electron/sidecar.cjs    macOS sidecar HTTP/SSE 传输与认证
+macos/                  AppKit + WKWebView 宿主与 sidecar 监管
 src/App.tsx             应用状态、标签和工作区编排
 src/components/         UI 组件与左侧面板
 src/lib/markdown.ts     编辑器图片 URL 与原始 Markdown 往返
