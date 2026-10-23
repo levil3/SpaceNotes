@@ -36,6 +36,8 @@ describe("macOS E2E contract", () => {
     expect(script).toContain('name: "e2eProgress"');
     expect(script).toContain("let aborted = false");
     expect(script).toContain("if (aborted)");
+    expect(script).toContain("waiting:app-shell");
+    expect(script).toContain("app shell did not become ready within 30000ms");
     expect(script).toContain("requiredFlows: 60");
   });
 

@@ -75,6 +75,12 @@ function verifyE2EContract() {
   if (!script.includes('name: "e2eProgress"')) {
     throw new Error("E2E steps do not report progress to the native host.");
   }
+  if (
+    !script.includes("waiting:app-shell") ||
+    !script.includes("app shell did not become ready within 30000ms")
+  ) {
+    throw new Error("E2E does not wait for the application shell to hydrate.");
+  }
   if (flowNames.length !== 60) {
     throw new Error(`Expected 60 E2E flows, found ${flowNames.length}.`);
   }

@@ -280,6 +280,45 @@ enum E2ERunner {
         (candidate) => candidate.textContent.trim().startsWith(label)
       );
 
+    const appShellWaitStartedAt = Date.now();
+    reportProgress("waiting:app-shell");
+    try {
+      await waitFor(
+        () => document.querySelector(".app-shell"),
+        "app shell did not become ready within 30000ms",
+        30000,
+      );
+      reportProgress("ready:app-shell");
+    } catch (error) {
+      const message = redact(
+        error instanceof Error ? error.message : String(error),
+      );
+      reportProgress(`startup-failure:app-shell:${message}`);
+      return {
+        status: "NOT CERTIFIED",
+        conclusion: "NOT CERTIFIED",
+        flowContractVersion: 1,
+        requiredFlows: 60,
+        total: 0,
+        passed: 0,
+        failed: 1,
+        independentFlows: 0,
+        results: [],
+        failures: [
+          {
+            name: "app-shell-ready",
+            message,
+            durationMs: Date.now() - appShellWaitStartedAt,
+          },
+        ],
+        environment: {
+          userAgent: navigator.userAgent,
+          location: location.origin,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
+
     await runStep("shell-layout", async () => {
       expect(requireElement(".app-shell"), "app shell is missing");
       expect(requireElement(".topbar"), "topbar is missing");
