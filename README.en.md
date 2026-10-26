@@ -1,6 +1,6 @@
 # SpaceNotes
 
-[简体中文](README.md) | [English](README.en.md)
+**Language / 语言:** [简体中文](README.md) | [English](README.en.md)
 
 SpaceNotes is a local-first Markdown notes application for Windows and macOS. It
 opens ordinary Markdown folders and existing Obsidian vaults, bringing editing,
