@@ -179,6 +179,7 @@ export interface LevilNotesApi {
     message: string,
     selectedPaths: string[],
   ): Promise<{ output: string; status: GitStatus }>;
+  gitPreviewCommit(selectedPaths: string[]): Promise<string>;
   gitFetch(): Promise<{ output: string; status: GitStatus }>;
   gitPull(): Promise<{ output: string; status: GitStatus }>;
   gitPush(): Promise<{ output: string; status: GitStatus }>;

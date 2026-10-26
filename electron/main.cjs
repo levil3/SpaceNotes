@@ -150,6 +150,9 @@ function registerIpcHandlers() {
   ipcMain.handle("git:commit", (_event, message, selectedPaths) =>
     gitService.commit(message, selectedPaths),
   );
+  ipcMain.handle("git:preview-commit", (_event, selectedPaths) =>
+    gitService.previewCommit(selectedPaths),
+  );
   ipcMain.handle("git:fetch", () => gitService.fetch());
   ipcMain.handle("git:pull", () => gitService.pull());
   ipcMain.handle("git:push", () => gitService.push());

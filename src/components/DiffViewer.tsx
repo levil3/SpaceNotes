@@ -1,10 +1,10 @@
-import { FileDiff, GitCommitHorizontal } from "lucide-react";
+import { FileDiff, FileSearch, GitCommitHorizontal } from "lucide-react";
 
 interface DiffViewerProps {
   title: string;
   subtitle: string;
   diff: string;
-  mode: "working" | "commit";
+  mode: "working" | "preview" | "commit";
 }
 
 export function DiffViewer({
@@ -19,6 +19,8 @@ export function DiffViewer({
         <div className="diff-heading-icon">
           {mode === "working" ? (
             <FileDiff size={18} />
+          ) : mode === "preview" ? (
+            <FileSearch size={18} />
           ) : (
             <GitCommitHorizontal size={18} />
           )}

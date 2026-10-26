@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Clock3,
   EyeOff,
+  FileSearch,
   GitBranch,
   Plus,
   RefreshCw,
@@ -82,6 +83,7 @@ interface GitPanelProps {
   onOpenFile(path: string): void;
   onDiscard(path: string): void;
   onToggleStage(changePath: string, staged: boolean): void;
+  onPreviewCommit(): void;
   onCommit(pushAfter: boolean): void;
   onFetch(): void;
   onPull(): void;
@@ -107,6 +109,7 @@ export function GitPanel({
   onOpenFile,
   onDiscard,
   onToggleStage,
+  onPreviewCommit,
   onCommit,
   onFetch,
   onPull,
@@ -576,6 +579,16 @@ export function GitPanel({
               placeholder="提交说明"
               rows={3}
             />
+            <button
+              type="button"
+              className="commit-preview-trigger"
+              disabled={busy || !selectedPaths.size}
+              onClick={onPreviewCommit}
+            >
+              <FileSearch size={13} />
+              <span>预览提交内容</span>
+              <small>{selectedPaths.size} 个文件</small>
+            </button>
             <div className="commit-actions">
               <button
                 type="button"

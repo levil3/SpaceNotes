@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld("levilNotes", {
     ipcRenderer.invoke("git:stage", paths, staged),
   gitCommit: (message, selectedPaths) =>
     ipcRenderer.invoke("git:commit", message, selectedPaths),
+  gitPreviewCommit: (selectedPaths) =>
+    ipcRenderer.invoke("git:preview-commit", selectedPaths),
   gitFetch: () => ipcRenderer.invoke("git:fetch"),
   gitPull: () => ipcRenderer.invoke("git:pull"),
   gitPush: () => ipcRenderer.invoke("git:push"),

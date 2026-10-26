@@ -84,6 +84,62 @@ describe("GitService commit safety", () => {
   });
 });
 
+describe("GitService commit preview", () => {
+  it("combines tracked and untracked changes without staging them", async () => {
+    const { root, service } = await createRepository();
+    await fs.writeFile(path.join(root, "README.md"), "updated\n", "utf8");
+    await fs.mkdir(path.join(root, "notes"), { recursive: true });
+    await fs.writeFile(
+      path.join(root, "notes", "new-note.md"),
+      "# New note\n",
+      "utf8",
+    );
+    await fs.mkdir(path.join(root, "assets"), { recursive: true });
+    await fs.writeFile(
+      path.join(root, "assets", "preview.bin"),
+      Buffer.from([0, 1, 2, 3]),
+    );
+
+    const preview = await service.previewCommit([
+      "README.md",
+      "notes/new-note.md",
+      "assets/preview.bin",
+    ]);
+
+    expect(preview).toContain("diff --git a/README.md b/README.md");
+    expect(preview).toContain("-initial");
+    expect(preview).toContain("+updated");
+    expect(preview).toContain("diff --git a/notes/new-note.md");
+    expect(preview).toContain("@@ -0,0 +1 @@\n+# New note");
+    expect(preview).not.toContain("+# New note\n+");
+    expect(preview).toContain(
+      "diff --git a/assets/preview.bin b/assets/preview.bin",
+    );
+    expect(preview).toContain("Binary files /dev/null and");
+
+    const status = await service.status();
+    expect(
+      status.changes.find((change) => change.path === "README.md")?.staged,
+    ).toBe(false);
+  });
+
+  it("previews staged files before the repository has a first commit", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "spacenotes-git-"));
+    await git(root, ["init", "-b", "main"]);
+    await fs.writeFile(path.join(root, "first.md"), "# First note\n", "utf8");
+    await git(root, ["add", "first.md"]);
+
+    const service = new GitService({
+      getVaultPath: () => root,
+      resolveInsideVault: (relativePath) => path.resolve(root, relativePath),
+    });
+    const preview = await service.previewCommit(["first.md"]);
+
+    expect(preview).toContain("diff --git a/first.md b/first.md");
+    expect(preview).toContain("+# First note");
+  });
+});
+
 describe("Git status labels", () => {
   it("maps porcelain status codes to Chinese labels", () => {
     expect(decodeGitStatus("M")).toBe("已修改");

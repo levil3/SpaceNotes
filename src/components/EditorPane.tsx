@@ -4,6 +4,7 @@ import "@milkdown/crepe/theme/frame.css";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { codeBlockTheme } from "../lib/codeTheme";
 import { toEditorMarkdown, toVaultMarkdown } from "../lib/markdown";
+import { NoteFindBar } from "./NoteFindBar";
 
 export interface EditorHandle {
   jumpToHeading(text: string): void;
@@ -122,6 +123,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
 
     return (
       <div className={`editor-mount ${readOnly ? "is-readonly" : ""}`}>
+        <NoteFindBar documentRef={rootRef} content={content} />
         {showInlineTitle ? (
           <h1 className="note-inline-title" dir="auto">
             {title}

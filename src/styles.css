@@ -1759,6 +1759,36 @@ kbd {
   color: var(--faint);
 }
 
+.commit-preview-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 29px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--canvas) 98%, var(--accent) 2%);
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: left;
+}
+
+.commit-preview-trigger:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.commit-preview-trigger span {
+  flex: 1;
+}
+
+.commit-preview-trigger small {
+  color: var(--faint);
+  font-size: 9px;
+}
+
 .commit-actions {
   display: flex;
   gap: 6px;
@@ -2029,12 +2059,84 @@ kbd {
 }
 
 .editor-mount {
+  position: relative;
   height: 100%;
   overflow: auto;
   padding: 20px max(40px, calc((100% - var(--content-width)) / 2)) 56px;
   user-select: text;
   scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent;
   scrollbar-width: thin;
+}
+
+.note-find-layer {
+  position: sticky;
+  z-index: 40;
+  top: 0;
+  display: flex;
+  height: 0;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.note-find-bar {
+  display: flex;
+  width: min(390px, calc(100vw - 120px));
+  height: 36px;
+  align-items: center;
+  gap: 4px;
+  transform: translateY(3px);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--canvas) 94%, var(--text) 6%);
+  box-shadow: 0 5px 18px rgb(20 28 38 / 15%);
+  padding: 0 5px 0 9px;
+  color: var(--muted);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.note-find-bar > svg {
+  flex: 0 0 auto;
+  color: var(--faint);
+}
+
+.note-find-bar input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 0 4px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.note-find-bar input::placeholder {
+  color: var(--faint);
+}
+
+.note-find-count {
+  min-width: 46px;
+  color: var(--faint);
+  font-size: 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.note-find-bar .icon-button {
+  width: 25px;
+  height: 25px;
+  flex-basis: 25px;
+}
+
+::highlight(spacenotes-find-all) {
+  background-color: color-mix(in srgb, #e7b84b 42%, transparent);
+  color: inherit;
+}
+
+::highlight(spacenotes-find-active) {
+  background-color: #f1c453;
+  color: #1f2328;
 }
 
 .editor-content {
