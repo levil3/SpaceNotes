@@ -514,12 +514,16 @@ export default function App() {
     [vault?.directories, vault?.files],
   );
 
-  const startNewNote = () => {
+  const startNewNoteInFolder = (parent: string) => {
     setDialog({
       kind: "create",
-      parent: parentFolder(activePath),
+      parent,
       value: "",
     });
+  };
+
+  const startNewNote = () => {
+    startNewNoteInFolder(parentFolder(activePath));
   };
 
   const confirmDialog = async () => {
@@ -1289,6 +1293,17 @@ export default function App() {
               }}
             >
               打开
+            </button>
+          ) : null}
+          {contextMenu.kind === "folder" ? (
+            <button
+              type="button"
+              onClick={() => {
+                startNewNoteInFolder(contextMenu.path);
+                setContextMenu(null);
+              }}
+            >
+              在此文件夹中新建笔记
             </button>
           ) : null}
           <button
