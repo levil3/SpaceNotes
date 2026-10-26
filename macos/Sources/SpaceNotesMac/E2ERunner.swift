@@ -116,8 +116,15 @@ enum E2ERunner {
         completion: (String) -> Void
     ) {
         do {
+            var reportValue = value
+            if var report = value as? [String: Any] {
+                report["executionMode"] = ProcessInfo.processInfo.environment[
+                    "SPACENOTES_BACKGROUND_E2E"
+                ] == "1" ? "background-offscreen" : "foreground"
+                reportValue = report
+            }
             let data = try JSONSerialization.data(
-                withJSONObject: value,
+                withJSONObject: reportValue,
                 options: [.prettyPrinted, .sortedKeys]
             )
             let directory = URL(fileURLWithPath: reportPath)
@@ -347,9 +354,33 @@ enum E2ERunner {
     });
     await runStep("window-control-contract", async () => {
       expect(
+        document.documentElement.dataset.hostPlatform === "macos",
+        "macOS host platform marker is missing"
+      );
+      expect(
         document.querySelectorAll(".window-controls > button").length === 3,
         "window controls changed"
       );
+      expect(
+        getComputedStyle(
+          document.querySelector(".window-controls")
+        ).display === "none",
+        "custom Windows window controls are visible on macOS"
+      );
+      document.documentElement.removeAttribute("data-host-platform");
+      try {
+        expect(
+          getComputedStyle(
+            document.querySelector(".window-controls")
+          ).display !== "none",
+          "custom Windows window controls are hidden by default"
+        );
+      } finally {
+        document.documentElement.setAttribute(
+          "data-host-platform",
+          "macos"
+        );
+      }
     });
     await runStep("statusbar-contract", async () => {
       expect(requireElement(".statusbar"), "status bar is missing");

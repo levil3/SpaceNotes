@@ -27,10 +27,15 @@ Swift 薄壳如何呈现现有 Windows 界面，并把窗口、菜单、宿主�
 
 ## Answer
 
-- 保留 React 顶栏和 Windows 风格窗口按钮，Swift 使用内容铺满的无标题栏窗口。
+- 保留 React 顶栏，Swift 使用内容铺满的透明标题栏窗口并显示 AppKit 原生交通灯。
+- Web 层 Windows 窗口按钮只在 macOS 宿主标记下隐藏，Windows 默认样式保持不变。
 - 增加 macOS 原生应用菜单，只承载退出、隐藏、全屏、编辑和窗口等系统级操作。
 - 系统菜单快捷键由 Swift 处理，现有业务快捷键继续由 React 处理。
 - 关闭窗口后应用继续驻留 Dock；点击 Dock 图标重新打开窗口。
 - 设置保存到 `~/Library/Application Support/Levil Notes/settings.json`。
-- `trashNote` 由 Swift 使用 `FileManager.trashItem`，随后通知 sidecar 刷新索引。
+- `trashNote` 由 Swift 基于已打开的父目录 FD 使用排他式原子重命名移入废纸篓，
+  随后通知 sidecar 刷新索引。
 - 正常退出时终止 sidecar；异常退出最多重启一次，再次失败显示诊断信息。
+
+2026-10-26 superseded: 用户明确要求 macOS 使用系统原生交通灯；原始“与 Windows
+按钮保持一致”的决定不再适用于 macOS 表现层。

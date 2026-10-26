@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - feat/macos-adaptation
+    tags:
+      - "v*"
   pull_request:
     paths:
       - ".github/workflows/build-macos.yml"
@@ -63,14 +66,20 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build/macos
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            export SPACENOTES_VERSION="${GITHUB_REF_NAME#v}"
+          fi
           bash scripts/build-macos-universal.sh 2>&1 | tee build/macos/build.log
+          dmg_path="$(find build/macos -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          test -n "$dmg_path"
+          printf 'MACOS_DMG_PATH=%s\n' "$dmg_path" >> "$GITHUB_ENV"
 
       - name: Verify ad-hoc signature and DMG checksum
         run: |
           codesign --verify --deep --strict "build/macos/Levil Notes.app"
           (
-            cd build/macos
-            shasum -a 256 -c "Levil Notes 0.2.0.dmg.sha256"
+            cd "$(dirname "$MACOS_DMG_PATH")"
+            shasum -a 256 -c "$(basename "$MACOS_DMG_PATH").sha256"
           )
 
       - name: Run real WKWebView E2E certification
@@ -78,7 +87,7 @@ jobs:
           bash scripts/macos/run-wkwebview-e2e.sh \
             "build/macos/Levil Notes.app" \
             docs/evidence/v0.2.0/e2e-wkwebview.json \
-            "build/macos/Levil Notes 0.2.0.dmg" \
+            "$MACOS_DMG_PATH" \
             docs/evidence/v0.2.0/diagnostics.log
 
       - name: Run native lifecycle regression
@@ -93,10 +102,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-universal-v0.2.0
+          name: macos-universal
           path: |
-            build/macos/Levil Notes 0.2.0.dmg
-            build/macos/Levil Notes 0.2.0.dmg.sha256
+            build/macos/*.dmg
+            build/macos/*.dmg.sha256
             build/macos/macho-architectures.txt
             build/macos/build.log
             docs/evidence/v0.2.0/e2e-wkwebview.json
@@ -118,20 +127,27 @@ jobs:
       - name: Download universal artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-universal-v0.2.0
+          name: macos-universal
           path: artifact
 
       - name: Verify checksum and architectures
         run: |
           test "$(uname -m)" = "x86_64"
-          cd artifact/build/macos
-          shasum -a 256 -c "Levil Notes 0.2.0.dmg.sha256"
-          cd "$GITHUB_WORKSPACE"
-          shasum -a 256 artifact/build/macos/"Levil Notes 0.2.0.dmg"
+          dmg_path="$(find "$PWD/artifact/build/macos" \
+            -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          test -n "$dmg_path"
+          (
+            cd "$(dirname "$dmg_path")"
+            shasum -a 256 -c "$(basename "$dmg_path").sha256"
+          )
+          shasum -a 256 "$dmg_path"
 
       - name: Mount DMG and inspect bundle
         run: |
           set -euo pipefail
+          dmg_path="$(find "$PWD/artifact/build/macos" \
+            -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          test -n "$dmg_path"
           detach_dmg_mount() {
             local target="$1"
             local attempts="${2:-3}"
@@ -174,7 +190,7 @@ jobs:
           trap cleanup_mount EXIT
           hdiutil attach -readonly -nobrowse \
             -mountpoint "$mount_point" \
-            artifact/build/macos/"Levil Notes 0.2.0.dmg"
+            "$dmg_path"
           test -d "$mount_point/Levil Notes.app"
           test -L "$mount_point/Applications"
           bash scripts/verify-macos-bundle.sh \
@@ -185,8 +201,13 @@ jobs:
           bash scripts/macos/run-wkwebview-e2e.sh \
             "$mount_point/Levil Notes.app" \
             "$RUNNER_TEMP/e2e-wkwebview-intel.json" \
-            "artifact/build/macos/Levil Notes 0.2.0.dmg" \
+            "$dmg_path" \
             "$RUNNER_TEMP/e2e-wkwebview-intel-diagnostics.log"
+          SPACENOTES_APP_BUNDLE="$mount_point/Levil Notes.app" \
+          SPACENOTES_DMG_PATH="$dmg_path" \
+          SPACENOTES_ALLOW_INCONCLUSIVE_VISUAL=1 \
+            bash scripts/macos/run-lifecycle-e2e.sh \
+              "$RUNNER_TEMP/lifecycle-intel.json"
 
       - name: Upload Intel evidence
         if: always()
@@ -197,4 +218,33 @@ jobs:
             ${{ runner.temp }}/intel-macho-architectures.txt
             ${{ runner.temp }}/e2e-wkwebview-intel.json
             ${{ runner.temp }}/e2e-wkwebview-intel-diagnostics.log
+            ${{ runner.temp }}/lifecycle-intel.json
           if-no-files-found: warn
+
+  release:
+    name: Publish universal DMG
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - universal
+      - intel-smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download certified macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-universal
+          path: release-artifact
+
+      - name: Attach DMG to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifact/build/macos/*.dmg
+            release-artifact/build/macos/*.dmg.sha256
+            release-artifact/build/macos/macho-architectures.txt
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          generate_release_notes: true

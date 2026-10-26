@@ -1,0 +1,78 @@
+{
+  "version": "v0.2.0",
+  "date": "2026-10-26",
+  "branch": "feat/macos-adaptation",
+  "baseCommit": "5b8a295",
+  "scope": "final local worktree build installed on Apple Silicon",
+  "status": "PASS_WITH_CI_PENDING",
+  "tests": {
+    "node": {
+      "files": 11,
+      "passed": 91,
+      "failed": 0
+    },
+    "swift": {
+      "executed": 20,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "No mounted test volume was provided."
+    }
+  },
+  "artifact": {
+    "path": "build/macos/Levil Notes 0.2.0.dmg",
+    "sha256": "3f8f2b5d48900a64e93767eb6b9db762ea43023985a20360031d79b317e8580e",
+    "dmgVerify": "PASS",
+    "adHocSignature": "PASS",
+    "universalMachO": "3/3"
+  },
+  "installation": {
+    "path": "/Applications/Levil Notes.app",
+    "mainExecutableSha256": "189bd4d39a049f27a9f4f20baa1b890df11f230a2fe54f80285810e862af4666",
+    "signature": "PASS",
+    "previousAppBackup": "build/macos/backups/Levil Notes-live-20261026-150511.app"
+  },
+  "backgroundE2E": {
+    "status": "CERTIFIED",
+    "passed": 60,
+    "total": 60,
+    "executionMode": "background-offscreen",
+    "windowFrame": "{{1984, 1144}, {1420, 900}}",
+    "screenIntersections": 0,
+    "nativeWindowControls": {
+      "close": true,
+      "minimize": true,
+      "fullScreen": true
+    },
+    "sameOriginNavigationCanceled": true,
+    "externalApplicationLaunchAttempts": 0,
+    "report": "docs/evidence/v0.2.0/e2e-wkwebview.json",
+    "reportSha256": "3a6ad44057abad91e61af232186bf980d71b9a96c1eb5da6add260b3959d41f5",
+    "diagnostics": "docs/evidence/v0.2.0/e2e-wkwebview-diagnostics.txt",
+    "diagnosticsSha256": "2370fc2eac3886f7d3ca77a770d2fe707b9eab3ce9f7f921539b96c96aa110ce"
+  },
+  "visualEvidence": {
+    "screenshot": "docs/evidence/v0.2.0/macos-final.png",
+    "screenshotSha256": "20b624b18238446f7fe522db59a2e6aa0fdc381416d2a2b23acfa04404e04936",
+    "nativeControls": "docs/evidence/v0.2.0/macos-native-controls.png",
+    "nativeControlsSha256": "3019feab75012c338af36a027fafeb39624215e79c909823881850d9e4f23511"
+  },
+  "ciCoverage": {
+    "status": "PENDING_PUSH",
+    "requiredRunners": [
+      "macos-15",
+      "macos-15-intel"
+    ],
+    "requiredChecks": [
+      "universal build and DMG verification",
+      "background WKWebView E2E",
+      "native window lifecycle",
+      "Intel mounted-DMG smoke and background WKWebView E2E"
+    ]
+  },
+  "boundaries": [
+    "The local Windows-style foreground lifecycle test was not rerun because the user required testing without taking over the active desktop.",
+    "Computer Use remains INCONCLUSIVE; screenshots are not represented as Computer Use evidence.",
+    "The lifecycle.json in this directory is retained as pre-final local evidence and does not certify this final DMG."
+  ]
+}

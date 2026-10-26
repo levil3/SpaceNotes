@@ -65,7 +65,8 @@
     "intelDiagnostics": "docs/evidence/v0.2.0/e2e-wkwebview-intel-diagnostics.txt",
     "universalLifecycle": "GitHub Actions job 120484141929 log",
     "universalWKWebView": "GitHub Actions job 120484141929 log: WKWebView E2E certified: 60/60",
-    "screenshot": "docs/evidence/v0.2.0/macos-final.png",
+    "screenshot": "docs/evidence/v0.2.0/macos-final-5b8a295.png",
+    "screenshotSourceCommit": "5b8a295",
     "screenshotSha256": "d149d0f04b82548be9f102bd01867df01f4e604d4f0b78a9bd2d994bc0a9b229"
   },
   "localRecheck": {
@@ -76,7 +77,8 @@
     "version": "0.2.0",
     "signature": "PASS",
     "universalMachO": "3/3",
-    "screenshot": "docs/evidence/v0.2.0/macos-final.png",
+    "screenshot": "docs/evidence/v0.2.0/macos-final-5b8a295.png",
+    "screenshotSourceCommit": "5b8a295",
     "screenshotSha256": "d149d0f04b82548be9f102bd01867df01f4e604d4f0b78a9bd2d994bc0a9b229",
     "screenLocked": true,
     "smokeTest": "INCONCLUSIVE",

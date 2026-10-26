@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import XCTest
 @testable import SpaceNotesCore
 
@@ -59,6 +60,7 @@ final class SpaceNotesCoreTests: XCTestCase {
             WebNavigationPolicy.decision(
                 url: URL(string: "https://example.com/docs")!,
                 isMainFrame: true,
+                isTrustedOrigin: false,
                 isTrustedDocument: false
             ),
             .openExternally
@@ -67,7 +69,29 @@ final class SpaceNotesCoreTests: XCTestCase {
             WebNavigationPolicy.decision(
                 url: URL(string: "file:///tmp/outside.html")!,
                 isMainFrame: true,
+                isTrustedOrigin: false,
                 isTrustedDocument: false
+            ),
+            .cancel
+        )
+    }
+
+    func testSameOriginAssetNavigationIsCanceledInsteadOfOpenedInBrowser() {
+        let policy = TrustedWebDocumentPolicy(
+            trustedOrigins: [URL(string: "http://127.0.0.1:43123/")!]
+        )
+        let assetURL = URL(
+            string: "http://127.0.0.1:43123/assets?target=evil.svg&note=welcome.md"
+        )!
+
+        XCTAssertTrue(policy.isTrustedOrigin(assetURL))
+        XCTAssertFalse(policy.isTrustedDocument(assetURL))
+        XCTAssertEqual(
+            WebNavigationPolicy.decision(
+                url: assetURL,
+                isMainFrame: true,
+                isTrustedOrigin: policy.isTrustedOrigin(assetURL),
+                isTrustedDocument: policy.isTrustedDocument(assetURL)
             ),
             .cancel
         )
@@ -289,6 +313,42 @@ final class SpaceNotesCoreTests: XCTestCase {
         )
     }
 
+    func testMoveToTrashUsesSystemTrashForCurrentVolume() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileName = "space-notes-\(UUID().uuidString).md"
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        let note = root.appendingPathComponent(fileName)
+        XCTAssertTrue(
+            FileManager.default.createFile(
+                atPath: note.path,
+                contents: Data("# System trash".utf8)
+            )
+        )
+
+        let resultingURL = try VaultPathGuard.moveToTrash(
+            relativePath: fileName,
+            in: root
+        )
+        defer { try? FileManager.default.removeItem(at: resultingURL) }
+        XCTAssertEqual(
+            resultingURL.deletingLastPathComponent()
+                .resolvingSymlinksInPath()
+                .standardizedFileURL,
+            FileManager.default.urls(
+                for: .trashDirectory,
+                in: .userDomainMask
+            ).first?
+                .resolvingSymlinksInPath()
+                .standardizedFileURL
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: note.path))
+    }
+
     func testMoveToTrashDoesNotOverwriteTrashCollision() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -334,6 +394,105 @@ final class SpaceNotesCoreTests: XCTestCase {
             ),
             "# Move me"
         )
+    }
+
+    func testMoveExclusiveKeepsOpenedDestinationAfterPathSwap() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let sourceDirectory = base.appendingPathComponent(
+            "source",
+            isDirectory: true
+        )
+        let destinationDirectory = base.appendingPathComponent(
+            "destination",
+            isDirectory: true
+        )
+        let retainedDirectory = base.appendingPathComponent(
+            "destination-retained",
+            isDirectory: true
+        )
+        let outsideDirectory = base.appendingPathComponent(
+            "outside",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: base) }
+        for directory in [
+            sourceDirectory,
+            destinationDirectory,
+            outsideDirectory
+        ] {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+        }
+        let note = sourceDirectory.appendingPathComponent("note.md")
+        XCTAssertTrue(
+            FileManager.default.createFile(
+                atPath: note.path,
+                contents: Data("# Race me".utf8)
+            )
+        )
+
+        let sourceFD = try VaultPathGuard.openDirectoryExclusively(
+            at: sourceDirectory
+        )
+        defer { Darwin.close(sourceFD) }
+        let destinationFD = try VaultPathGuard.openDirectoryExclusively(
+            at: destinationDirectory
+        )
+        defer { Darwin.close(destinationFD) }
+
+        try FileManager.default.moveItem(
+            at: destinationDirectory,
+            to: retainedDirectory
+        )
+        try FileManager.default.createSymbolicLink(
+            at: destinationDirectory,
+            withDestinationURL: outsideDirectory
+        )
+
+        let movedName = try VaultPathGuard.moveExclusive(
+            fileName: "note.md",
+            sourceDirectoryFD: sourceFD,
+            destinationDirectoryFD: destinationFD
+        )
+
+        XCTAssertEqual(movedName, "note.md")
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: retainedDirectory
+                    .appendingPathComponent(movedName)
+                    .path
+            )
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: outsideDirectory
+                    .appendingPathComponent("note.md")
+                    .path
+            )
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: note.path))
+    }
+
+    func testOpenDirectoryExclusivelyResolvesSystemTemporaryPath() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+
+        let directoryFD = try VaultPathGuard.openDirectoryExclusively(
+            at: directory
+        )
+        defer { Darwin.close(directoryFD) }
+        var status = stat()
+
+        XCTAssertEqual(Darwin.fstat(directoryFD, &status), 0)
+        XCTAssertEqual(status.st_mode & S_IFMT, S_IFDIR)
     }
 
     func testDefaultTrashRootUsesUserTrashForCurrentVolume() throws {

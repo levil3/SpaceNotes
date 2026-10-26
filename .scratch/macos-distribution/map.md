@@ -28,7 +28,7 @@ Intel 与 Apple Silicon 的无签名 DMG。
 - [定义功能一致性的独立认证协议](issues/04-functional-parity-evidence.md): 独立认证者按使用模型抽样 3,000 次零失败、零数据损坏，并跑至少 50 条端到端流程。
 - [研究通用 Node 运行时与 DMG 打包](issues/05-universal-node-and-dmg-research.md): Node 24.22.1 双架构可 lipo 合并并在两切片运行；最低 macOS 13.5；无签名 DMG 需手动通过 Gatekeeper。
 - [确定 macOS 支持矩阵与安装体验](issues/06-distribution-support-matrix.md): macOS 13.5+、双架构 CI、无 Intel 实机门槛、无自动更新、无签名安装需手动放行。
-- [确定 macOS 窗口、菜单与生命周期](issues/07-macos-window-menu-lifecycle.md): 保留 Windows 风格内容与窗口按钮；系统菜单和宿主文件动作原生实现；关窗驻留 Dock。
+- [确定 macOS 窗口、菜单与生命周期](issues/07-macos-window-menu-lifecycle.md): 共享 React 内容，窗口使用 AppKit 原生交通灯，系统菜单和宿主文件动作原生实现，关窗驻留 Dock 并复用窗口状态。
 
 ## Not yet specified
 

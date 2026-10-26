@@ -62,6 +62,48 @@ describe("macOS E2E contract", () => {
     expect(script).toContain("requiredFlows: 60");
   });
 
+  it("keeps local WKWebView E2E hidden from the active desktop", () => {
+    const root = path.resolve(directory, "../..");
+    const runner = fs.readFileSync(
+      path.join(root, "scripts/macos/run-wkwebview-e2e.sh"),
+      "utf8",
+    );
+    const delegate = fs.readFileSync(
+      path.join(root, "macos/Sources/SpaceNotesMac/AppDelegate.swift"),
+      "utf8",
+    );
+    const main = fs.readFileSync(
+      path.join(root, "macos/Sources/SpaceNotesMac/main.swift"),
+      "utf8",
+    );
+
+    expect(runner).toContain("export SPACENOTES_BACKGROUND_E2E=1");
+    expect(runner).toContain(
+      "native-window-controls=close=true,minimize=true,full-screen=true",
+    );
+    expect(runner).toContain("background-window-offscreen=true");
+    expect(runner).toContain("background-window-screen-intersections=0");
+    expect(runner).toContain(
+      "background-same-origin-navigation-canceled=true",
+    );
+    expect(runner).toContain(
+      "background-external-navigation-suppressed=",
+    );
+    expect(delegate).toContain("window.alphaValue = 0");
+    expect(delegate).toContain("window.ignoresMouseEvents = true");
+    expect(delegate).toContain("override func constrainFrameRect(");
+    expect(delegate).toContain("screen.frame.intersects(window.frame)");
+    expect(delegate).toContain("background-window-offscreen=");
+    expect(delegate).toContain(
+      "background-same-origin-navigation-canceled=true",
+    );
+    expect(delegate).toContain("if !backgroundE2E");
+    expect(delegate).toContain("native-window-controls=");
+    expect(main).toContain(
+      "application.setActivationPolicy(backgroundE2E ? .accessory : .regular)",
+    );
+  });
+
   it("keeps lifecycle certification inconclusive without visual evidence", () => {
     const report = buildLifecycleReport(
       {
@@ -78,6 +120,12 @@ describe("macOS E2E contract", () => {
         MENUS: "Levil Notes, File, Window",
         WINDOW_LIFECYCLE_PID: "1",
         WINDOW_LIFECYCLE_SIDECAR_PID: "2",
+        WINDOW_CLOSED_PROCESS_ALIVE: "1",
+        WINDOW_REOPEN_OBSERVED: "1",
+        WINDOW_WEBVIEW_RETAINED: "1",
+        WINDOW_INSTANCE_REUSED: "1",
+        NATIVE_WINDOW_CONTROL_SUBROLES:
+          "AXCloseButton, AXFullScreenButton, AXMinimizeButton",
         CRASH_APP_PID: "3",
         ORIGINAL_SIDECAR_PID: "4",
         REPLACEMENT_SIDECAR_PID: "5",
@@ -90,6 +138,16 @@ describe("macOS E2E contract", () => {
 
     expect(report.functionalStatus).toBe("PASS");
     expect(report.status).toBe("INCONCLUSIVE");
+    expect(report.menuAccessibility.closeWindowCommand).toBe(
+      "native-close-button + Window menu",
+    );
+    expect(report.windowLifecycle.webViewRetainedAcrossClose).toBe(true);
+    expect(report.windowLifecycle.reusedExistingWindowInstance).toBe(true);
+    expect(report.nativeWindowControls.subroles).toEqual([
+      "AXCloseButton",
+      "AXFullScreenButton",
+      "AXMinimizeButton",
+    ]);
     expect(lifecycleResultIsAcceptable(report, "0")).toBe(false);
     expect(lifecycleResultIsAcceptable(report, "1")).toBe(true);
   });
@@ -110,6 +168,12 @@ describe("macOS E2E contract", () => {
         MENUS: "Levil Notes, File, Window",
         WINDOW_LIFECYCLE_PID: "1",
         WINDOW_LIFECYCLE_SIDECAR_PID: "2",
+        WINDOW_CLOSED_PROCESS_ALIVE: "1",
+        WINDOW_REOPEN_OBSERVED: "1",
+        WINDOW_WEBVIEW_RETAINED: "1",
+        WINDOW_INSTANCE_REUSED: "1",
+        NATIVE_WINDOW_CONTROL_SUBROLES:
+          "AXCloseButton, AXFullScreenButton, AXMinimizeButton",
         CRASH_APP_PID: "3",
         ORIGINAL_SIDECAR_PID: "4",
         REPLACEMENT_SIDECAR_PID: "5",
@@ -131,15 +195,39 @@ describe("macOS E2E contract", () => {
       "utf8",
     );
 
-    expect(workflow).toContain(
-      'artifact/build/macos/"Levil Notes 0.2.0.dmg"',
+    expect(workflow).toContain("find \"$PWD/artifact/build/macos\"");
+    expect(workflow).toContain('basename "$dmg_path"');
+    expect(workflow).toContain("SPACENOTES_DMG_PATH=");
+  });
+
+  it("publishes the certified DMG when a version tag is released", () => {
+    const root = path.resolve(directory, "../..");
+    const workflow = fs.readFileSync(
+      path.join(root, ".github/workflows/build-macos.yml"),
+      "utf8",
     );
-    expect(workflow).toContain(
-      'cd artifact/build/macos',
+
+    expect(workflow).toContain('      - "v*"');
+    expect(workflow).toContain("softprops/action-gh-release@v2");
+    expect(workflow).toContain("release-artifact/build/macos/*.dmg");
+    expect(workflow).toContain("needs:\n      - universal\n      - intel-smoke");
+    expect(workflow).toContain("fail_on_unmatched_files: true");
+  });
+
+  it("runs native lifecycle checks on both Apple Silicon and Intel", () => {
+    const root = path.resolve(directory, "../..");
+    const workflow = fs.readFileSync(
+      path.join(root, ".github/workflows/build-macos.yml"),
+      "utf8",
     );
-    expect(workflow).not.toContain(
-      'artifact/"Levil Notes 0.2.0.dmg"',
-    );
+    const jobs = workflow.slice(workflow.indexOf("\njobs:"));
+    const intelStart = jobs.indexOf("\n  intel-smoke:");
+    const universalJob = jobs.slice(0, intelStart);
+    const intelJob = jobs.slice(intelStart);
+
+    expect(universalJob).toContain("scripts/macos/run-lifecycle-e2e.sh");
+    expect(intelJob).toContain("scripts/macos/run-lifecycle-e2e.sh");
+    expect(intelJob).toContain("lifecycle-intel.json");
   });
 
   it("executes the app shell wait before the first E2E flow", async () => {

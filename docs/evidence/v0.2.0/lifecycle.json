@@ -1,34 +1,75 @@
 {
-  "status": "NOT CERTIFIED",
-  "conclusion": "NOT CERTIFIED",
-  "functionalStatus": "NOT CERTIFIED",
+  "status": "INCONCLUSIVE",
+  "functionalStatus": "PASS",
+  "scope": "pre-final local lifecycle evidence; not certification for the final DMG",
+  "superseded": true,
   "artifact": "Levil Notes 0.2.0.dmg",
-  "sha256": "8dc85ea0163c6e7e7002f78c986ad333a8d6b2d30bc65bfd272b76d062316b61",
+  "sha256": "f7609b733d5c81677f272238e19c110c501a3aa473794ca977b040a0cec27453",
   "environment": {
-    "macOS": "27.0.1",
+    "macOS": "27.0.0",
     "hostArchitecture": "arm64",
     "installedPath": "/Applications/Levil Notes.app"
   },
-  "reason": "The final local artifact was installed and statically verified, but the local lifecycle round could not start a GUI session because the macOS console was locked (CGSSessionScreenIsLocked=1). Smoke initialization was terminated without claiming success. CI independently passed the functional lifecycle suite; this file records the separate local result.",
-  "previousRound": {
+  "windowLifecycle": {
     "status": "PASS",
-    "sha256": "f4d4e54d087345e02500e4e20c9e5942a5a1fe43ca8114980a931b8a722139de",
-    "note": "Historical result only. It does not certify the final artifact and must not be used as final evidence."
+    "appPID": 10346,
+    "sidecarPID": 10369,
+    "closedWindowWithoutTerminating": true,
+    "reopenedFromDockRequest": true,
+    "webViewRetainedAcrossClose": true,
+    "reusedExistingWindowInstance": true,
+    "diagnosticsMarkers": [
+      "window-closed-app-persisted",
+      "window-closed-webview-retained=true",
+      "window-reopened-from-dock-request",
+      "window-reopened-existing-instance"
+    ]
   },
+  "menuAccessibility": {
+    "status": "PASS",
+    "menus": [
+      "Apple",
+      "Levil Notes",
+      "编辑",
+      "显示",
+      "窗口"
+    ],
+    "closeWindowCommand": "native-close-button + Window menu"
+  },
+  "singleSidecarCrash": {
+    "status": "PASS",
+    "appPID": 10509,
+    "originalSidecarPID": 10517,
+    "replacementSidecarPID": 10589,
+    "tokenRotated": true,
+    "tokenTransport": {
+      "status": "PASS",
+      "delivery": "stdin-first-line",
+      "visibleInProcessEnvironment": false
+    },
+    "tokenFingerprints": {
+      "algorithm": "sha256",
+      "diagnosticsAfterCrashLine": 1666,
+      "original": "cb8e42c28326c7f7d315be4e3a83913cdf9e7c8031b17eff456bea354a4feef7",
+      "replacement": "3f2703ce486c86df11af6cc547d66227965fb4c9ced9949d98708d02728bb7de"
+    },
+    "automaticRestart": true,
+    "webViewReloaded": true
+  },
+  "repeatedSidecarCrash": {
+    "status": "PASS",
+    "appRemainedAlive": true,
+    "automaticRestartStopped": true,
+    "sidecarRemainedStopped": true
+  },
+  "normalQuit": {
+    "status": "PASS",
+    "appAfterQuit": "absent",
+    "sidecarAfterQuit": "absent"
+  },
+  "diagnosticsLog": "/Users/yuzhou/Library/Application Support/Levil Notes/diagnostics.log",
   "computerUseVisualCapture": {
     "status": "INCONCLUSIVE",
-    "reason": "The unified Computer Use entry point was unavailable and the desktop remained locked, preventing native-window observation and interaction."
-  },
-  "ciCoverage": {
-    "workflow": ".github/workflows/build-macos.yml",
-    "status": "PASS",
-    "runId": 39974114613,
-    "url": "https://github.com/levil3/SpaceNotes/actions/runs/39974114613",
-    "commit": "3f459174e9bd207a42022f21adc6589912d9d5c1",
-    "sha256": "c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b",
-    "functionalStatus": "PASS",
-    "overallStatus": "INCONCLUSIVE",
-    "visualStatus": "INCONCLUSIVE",
-    "reason": "The arm64 CI runner validated window lifecycle, menus, one-time sidecar restart, repeated-crash handling and normal quit. Visual capture remained INCONCLUSIVE and was explicitly accepted by the workflow gate."
+    "reason": "Computer Use app binding failed with ScreenCaptureKit SCStreamErrorDomain -3811. Native screencapture and Accessibility verified the three traffic lights; this is not claimed as Computer Use evidence."
   }
 }

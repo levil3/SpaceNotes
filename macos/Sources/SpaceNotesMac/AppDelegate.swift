@@ -2,8 +2,20 @@ import AppKit
 import SpaceNotesCore
 import WebKit
 
+private final class BackgroundE2EWindow: NSWindow {
+    override func constrainFrameRect(
+        _ frameRect: NSRect,
+        to screen: NSScreen?
+    ) -> NSRect {
+        frameRect
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let smokeTest = CommandLine.arguments.contains("--smoke-test")
+    private let backgroundE2E = ProcessInfo.processInfo.environment[
+        "SPACENOTES_BACKGROUND_E2E"
+    ] == "1"
     private var window: NSWindow?
     private var sidecar: SidecarManager?
     private var client: SidecarClient?
@@ -29,6 +41,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if backgroundE2E {
+            appendDiagnostic("background-e2e=true")
+        }
         configureMainMenu()
         startSidecar()
     }
@@ -56,10 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hasVisibleWindows flag: Bool
     ) -> Bool {
         appendDiagnostic("window-reopened-from-dock-request")
-        if window == nil, let client {
-            showWindow(client: client)
-        } else if let window {
+        if let window {
+            appendDiagnostic("window-reopened-existing-instance")
             window.makeKeyAndOrderFront(nil)
+        } else if let client {
+            showWindow(client: client)
         }
         return true
     }
@@ -157,21 +173,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = WKUserContentController()
         configuration.userContentController = controller
 
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1420, height: 900),
-            styleMask: [
-                .titled,
-                .closable,
-                .miniaturizable,
-                .resizable,
-                .fullSizeContentView
-            ],
-            backing: .buffered,
-            defer: false
-        )
+        let contentRect = NSRect(x: 0, y: 0, width: 1420, height: 900)
+        let styleMask: NSWindow.StyleMask = [
+            .titled,
+            .closable,
+            .miniaturizable,
+            .resizable,
+            .fullSizeContentView
+        ]
+        let window: NSWindow = backgroundE2E
+            ? BackgroundE2EWindow(
+                contentRect: contentRect,
+                styleMask: styleMask,
+                backing: .buffered,
+                defer: false
+            )
+            : NSWindow(
+                contentRect: contentRect,
+                styleMask: styleMask,
+                backing: .buffered,
+                defer: false
+            )
         window.minSize = NSSize(width: 1040, height: 680)
         window.setContentSize(NSSize(width: 1420, height: 900))
         window.isRestorable = false
+        window.isReleasedWhenClosed = false
         window.title = "Levil Notes"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -181,14 +207,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alpha: 1
         )
         window.collectionBehavior.insert(.fullScreenPrimary)
-        for button in [
-            NSWindow.ButtonType.closeButton,
-            .miniaturizeButton,
-            .zoomButton
-        ] {
-            window.standardWindowButton(button)?.isHidden = true
+        let nativeControls = [
+            ("close", NSWindow.ButtonType.closeButton),
+            ("minimize", .miniaturizeButton),
+            ("full-screen", .zoomButton)
+        ].map { name, type in
+            let button = window.standardWindowButton(type)
+            return "\(name)=\(button != nil && button?.isHidden == false)"
         }
-        window.center()
+        appendDiagnostic(
+            "native-window-controls=\(nativeControls.joined(separator: ","))"
+        )
+        if backgroundE2E {
+            window.alphaValue = 0
+            window.hasShadow = false
+            window.ignoresMouseEvents = true
+            window.animationBehavior = .none
+        } else {
+            window.center()
+        }
 
         let documentPolicy = makeDocumentPolicy(for: client)
         let messageHandler = HostMessageHandler(
@@ -224,16 +261,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         window.delegate = self
         self.window = window
-        window.makeKeyAndOrderFront(nil)
-        logWindowFrame("shown", window: window)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            window.setContentSize(NSSize(width: 1420, height: 900))
-            window.center()
+        if backgroundE2E {
+            let intersections = moveFullyOffscreen(window)
+            appendDiagnostic(
+                "background-window-screen-intersections=\(intersections)"
+            )
+            appendDiagnostic(
+                "background-window-offscreen=\(intersections == 0)"
+            )
+            window.orderFront(nil)
+        } else {
             window.makeKeyAndOrderFront(nil)
-            self.logWindowFrame("settled", window: window)
+        }
+        logWindowFrame("shown", window: window)
+        if !backgroundE2E {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                [weak self, weak window] in
+                guard
+                    let self,
+                    let window,
+                    self.window === window,
+                    window.isVisible
+                else {
+                    return
+                }
+                window.setContentSize(NSSize(width: 1420, height: 900))
+                window.center()
+                window.makeKeyAndOrderFront(nil)
+                self.logWindowFrame("settled", window: window)
+            }
         }
         load(client: client, webView: webView)
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        if !backgroundE2E {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private func moveFullyOffscreen(_ window: NSWindow) -> Int {
+        let screens = NSScreen.screens
+        guard let firstScreen = screens.first else {
+            return 1
+        }
+        let screenUnion = screens.dropFirst().reduce(firstScreen.frame) {
+            $0.union($1.frame)
+        }
+        window.setFrameOrigin(
+            NSPoint(x: screenUnion.maxX + 64, y: screenUnion.maxY + 64)
+        )
+        return screens.reduce(into: 0) { count, screen in
+            if screen.frame.intersects(window.frame) {
+                count += 1
+            }
+        }
     }
 
     private func reload(client: SidecarClient) {
@@ -268,6 +347,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) {
         navigationDelegate = NavigationDelegate(
             documentPolicy: documentPolicy,
+            openExternal: { [weak self] url in
+                guard let self else { return }
+                if self.backgroundE2E {
+                    let host = url.host ?? "unknown"
+                    self.appendDiagnostic(
+                        "background-external-navigation-suppressed=\(host)"
+                    )
+                } else {
+                    NSWorkspace.shared.open(url)
+                }
+            },
+            onSameOriginNavigationCanceled: { [weak self] in
+                self?.appendDiagnostic(
+                    "background-same-origin-navigation-canceled=true"
+                )
+            },
             onFinish: { [weak self, weak webView] in
                 self?.schedulePageChecks(webView: webView)
             }
@@ -299,6 +394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         {"baseUrl":"\(client.baseURL.absoluteString)","token":"\(client.token)"}
         """
         let userScript = """
+        document.documentElement?.setAttribute("data-host-platform", "macos");
         window.__SPACENOTES_BRIDGE_CONFIG__ = \(configJSON);
         \(bridgeSource)
         """
@@ -549,7 +645,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
+        guard
+            let closedWindow = notification.object as? NSWindow,
+            closedWindow === window
+        else {
+            return
+        }
         appendDiagnostic("window-closed-app-persisted")
+        appendDiagnostic(
+            "window-closed-webview-retained=\(webView != nil)"
+        )
     }
 
     @objc private func closeMainWindow() {

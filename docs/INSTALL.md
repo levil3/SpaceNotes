@@ -154,7 +154,9 @@ release/win-unpacked/Levil Notes.exe
 仓库中的 `.github/workflows/build-windows.yml` 提供 Windows 自动构建：
 
 - 在 Actions 页面手动运行 `Build Windows`，完成后下载 `windows-installer`。
-- 推送 `v0.1.3` 这类标签后，工作流会构建并发布 GitHub Release。
+- 推送 `v0.2.0` 这类标签后，Windows 工作流会构建并上传 `.exe`。
+- `.github/workflows/build-macos.yml` 会在同一标签上构建 universal DMG，并在
+  arm64 与 Intel 验证通过后上传到同一个 GitHub Release。
 
 维护者发布新版本时执行：
 

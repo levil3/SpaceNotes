@@ -6,8 +6,16 @@ MACOS_ROOT="$ROOT/macos"
 BUILD_ROOT="$ROOT/build/macos"
 CACHE_ROOT="${SPACENOTES_MACOS_CACHE:-$ROOT/.cache/macos}"
 NODE_VERSION="24.22.1"
+VERSION="${SPACENOTES_VERSION:-$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$ROOT/package.json")}"
+VERSION="${VERSION#v}"
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+  echo "invalid macOS version: $VERSION" >&2
+  exit 1
+fi
+BUILD_VERSION="${SPACENOTES_BUILD_VERSION:-2}"
 APP_PATH="$BUILD_ROOT/Levil Notes.app"
-DMG_PATH="$BUILD_ROOT/Levil Notes 0.2.0.dmg"
+DMG_PATH="$BUILD_ROOT/Levil Notes $VERSION.dmg"
+DMG_SHA_PATH="$DMG_PATH.sha256"
 
 mkdir -p "$BUILD_ROOT" "$CACHE_ROOT"
 
@@ -223,6 +231,10 @@ cat > "$APP_PATH/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+plutil -replace CFBundleShortVersionString -string "$VERSION" \
+  "$APP_PATH/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$BUILD_VERSION" \
+  "$APP_PATH/Contents/Info.plist"
 printf 'APPL????' > "$APP_PATH/Contents/PkgInfo"
 
 plutil -lint "$APP_PATH/Contents/Info.plist"
@@ -254,5 +266,5 @@ test -L "$mount_point/Applications"
 (
   cd "$BUILD_ROOT"
   shasum -a 256 "$(basename "$DMG_PATH")"
-) | tee "$BUILD_ROOT/Levil Notes 0.2.0.dmg.sha256"
+) | tee "$DMG_SHA_PATH"
 echo "构建完成：$DMG_PATH"

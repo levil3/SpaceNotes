@@ -4,13 +4,21 @@ import WebKit
 
 final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     private let documentPolicy: TrustedWebDocumentPolicy
+    private let openExternal: (URL) -> Void
+    private let onSameOriginNavigationCanceled: () -> Void
     private let onFinish: () -> Void
 
     init(
         documentPolicy: TrustedWebDocumentPolicy,
+        openExternal: @escaping (URL) -> Void = {
+            NSWorkspace.shared.open($0)
+        },
+        onSameOriginNavigationCanceled: @escaping () -> Void = {},
         onFinish: @escaping () -> Void
     ) {
         self.documentPolicy = documentPolicy
+        self.openExternal = openExternal
+        self.onSameOriginNavigationCanceled = onSameOriginNavigationCanceled
         self.onFinish = onFinish
     }
 
@@ -37,6 +45,7 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
         let decision = WebNavigationPolicy.decision(
             url: url,
             isMainFrame: navigationAction.targetFrame?.isMainFrame == true,
+            isTrustedOrigin: documentPolicy.isTrustedOrigin(url),
             isTrustedDocument: documentPolicy.isTrustedDocument(url)
         )
         switch decision {
@@ -46,7 +55,9 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
         case .openExternally:
             openExternally(url)
         case .cancel:
-            break
+            if documentPolicy.isTrustedOrigin(url) {
+                onSameOriginNavigationCanceled()
+            }
         }
         decisionHandler(.cancel)
     }
@@ -61,6 +72,7 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
            WebNavigationPolicy.decision(
                url: url,
                isMainFrame: false,
+               isTrustedOrigin: documentPolicy.isTrustedOrigin(url),
                isTrustedDocument: documentPolicy.isTrustedDocument(url)
            ) == .openExternally {
             openExternally(url)
@@ -83,9 +95,10 @@ final class NavigationDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
         if WebNavigationPolicy.decision(
             url: url,
             isMainFrame: false,
+            isTrustedOrigin: false,
             isTrustedDocument: false
         ) == .openExternally {
-            NSWorkspace.shared.open(url)
+            openExternal(url)
         }
     }
 }

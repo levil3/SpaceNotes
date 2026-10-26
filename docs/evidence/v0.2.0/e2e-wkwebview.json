@@ -1,25 +1,20 @@
 {
-  "conclusion": "NOT CERTIFIED",
+  "conclusion": "CERTIFIED",
   "environment": {
-    "location": "http://127.0.0.1:55024",
-    "timestamp": "2026-10-23T15:07:23.777Z",
+    "location": "http://127.0.0.1:63362",
+    "timestamp": "2026-10-26T07:05:59.071Z",
     "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
   },
-  "failed": 1,
-  "failures": [
-    {
-      "durationMs": 20002,
-      "message": "step timed out after 20000ms: transfer-native-trash",
-      "name": "transfer-native-trash"
-    }
-  ],
+  "executionMode": "background-offscreen",
+  "failed": 0,
+  "failures": [],
   "flowContractVersion": 1,
-  "independentFlows": 55,
-  "passed": 54,
+  "independentFlows": 60,
+  "passed": 60,
   "requiredFlows": 60,
   "results": [
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "shell-layout",
       "status": "PASS"
     },
@@ -29,7 +24,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 141,
+      "durationMs": 142,
       "name": "file-panel-title",
       "status": "PASS"
     },
@@ -44,22 +39,22 @@
       "status": "PASS"
     },
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "window-control-contract",
       "status": "PASS"
     },
     {
-      "durationMs": 0,
+      "durationMs": 1,
       "name": "statusbar-contract",
       "status": "PASS"
     },
     {
-      "durationMs": 324,
+      "durationMs": 321,
       "name": "sidebar-collapse-toggle",
       "status": "PASS"
     },
     {
-      "durationMs": 991,
+      "durationMs": 989,
       "name": "rail-navigation-cycle",
       "status": "PASS"
     },
@@ -69,7 +64,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 143,
+      "durationMs": 549,
       "name": "file-list-populated",
       "status": "PASS"
     },
@@ -79,42 +74,42 @@
       "status": "PASS"
     },
     {
-      "durationMs": 568,
+      "durationMs": 1999,
       "name": "file-filter-welcome",
       "status": "PASS"
     },
     {
-      "durationMs": 424,
+      "durationMs": 999,
       "name": "file-filter-path",
       "status": "PASS"
     },
     {
-      "durationMs": 423,
+      "durationMs": 999,
       "name": "file-filter-clear",
       "status": "PASS"
     },
     {
-      "durationMs": 406,
+      "durationMs": 2000,
       "name": "file-open-welcome",
       "status": "PASS"
     },
     {
-      "durationMs": 408,
+      "durationMs": 2000,
       "name": "file-open-second",
       "status": "PASS"
     },
     {
-      "durationMs": 143,
+      "durationMs": 1000,
       "name": "file-count-footer",
       "status": "PASS"
     },
     {
-      "durationMs": 144,
+      "durationMs": 1000,
       "name": "search-panel",
       "status": "PASS"
     },
     {
-      "durationMs": 426,
+      "durationMs": 2000,
       "name": "search-query-results",
       "status": "PASS"
     },
@@ -124,7 +119,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "search-scope-controls",
       "status": "PASS"
     },
@@ -134,42 +129,42 @@
       "status": "PASS"
     },
     {
-      "durationMs": 226,
+      "durationMs": 999,
       "name": "search-open-result",
       "status": "PASS"
     },
     {
-      "durationMs": 568,
+      "durationMs": 3000,
       "name": "search-empty-state",
       "status": "PASS"
     },
     {
-      "durationMs": 144,
+      "durationMs": 998,
       "name": "outline-panel",
       "status": "PASS"
     },
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "outline-entries",
       "status": "PASS"
     },
     {
-      "durationMs": 143,
+      "durationMs": 1000,
       "name": "outline-click",
       "status": "PASS"
     },
     {
-      "durationMs": 143,
+      "durationMs": 1000,
       "name": "tags-panel",
       "status": "PASS"
     },
     {
-      "durationMs": 184,
+      "durationMs": 1000,
       "name": "tags-row-click",
       "status": "PASS"
     },
     {
-      "durationMs": 144,
+      "durationMs": 1000,
       "name": "backlinks-panel",
       "status": "PASS"
     },
@@ -179,22 +174,22 @@
       "status": "PASS"
     },
     {
-      "durationMs": 142,
+      "durationMs": 999,
       "name": "panel-metadata",
       "status": "PASS"
     },
     {
-      "durationMs": 145,
+      "durationMs": 999,
       "name": "git-panel",
       "status": "PASS"
     },
     {
-      "durationMs": 0,
+      "durationMs": 1,
       "name": "git-branch-card",
       "status": "PASS"
     },
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "git-tabs",
       "status": "PASS"
     },
@@ -204,12 +199,12 @@
       "status": "PASS"
     },
     {
-      "durationMs": 183,
+      "durationMs": 999,
       "name": "git-history-tab",
       "status": "PASS"
     },
     {
-      "durationMs": 184,
+      "durationMs": 1000,
       "name": "git-ignore-tab",
       "status": "PASS"
     },
@@ -219,17 +214,17 @@
       "status": "PASS"
     },
     {
-      "durationMs": 144,
+      "durationMs": 999,
       "name": "settings-panel",
       "status": "PASS"
     },
     {
-      "durationMs": 0,
+      "durationMs": 1,
       "name": "settings-theme-modes",
       "status": "PASS"
     },
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "settings-hidden-toggle",
       "status": "PASS"
     },
@@ -244,7 +239,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "settings-ranges",
       "status": "PASS"
     },
@@ -254,62 +249,76 @@
       "status": "PASS"
     },
     {
-      "durationMs": 1210,
+      "durationMs": 3097,
       "name": "vault-image",
       "status": "PASS"
     },
     {
-      "durationMs": 184,
+      "durationMs": 1000,
       "name": "editor-view-toggle",
       "status": "PASS"
     },
     {
-      "durationMs": 163,
+      "durationMs": 966,
       "name": "editor-more-menu",
       "status": "PASS"
     },
     {
-      "durationMs": 505,
+      "durationMs": 2033,
       "name": "top-level-navigation-policy",
       "status": "PASS"
     },
     {
-      "durationMs": 58,
+      "durationMs": 48,
       "name": "transfer-create-write-read",
       "status": "PASS"
     },
     {
-      "durationMs": 54,
+      "durationMs": 23,
       "name": "transfer-create-nested",
       "status": "PASS"
     },
     {
-      "durationMs": 174,
+      "durationMs": 92,
       "name": "transfer-rename",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 87,
+      "name": "transfer-native-trash",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 266,
+      "name": "transfer-save-event",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 19,
+      "name": "transfer-search-index",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 43,
+      "name": "transfer-outline-index",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 211,
+      "name": "transfer-git-diff-stage",
+      "status": "PASS"
+    },
+    {
+      "durationMs": 170,
+      "name": "transfer-git-commit",
       "status": "PASS"
     }
   ],
-  "ciCoverage": {
-    "status": "CERTIFIED",
-    "runId": 39974114613,
-    "url": "https://github.com/levil3/SpaceNotes/actions/runs/39974114613",
-    "commit": "3f459174e9bd207a42022f21adc6589912d9d5c1",
-    "sha256": "c2d0f95b8f0bb08a22b10c4e758328fba94e09688353b0e19173ae6640d2ac1b",
-    "arm64": {
-      "passed": 60,
-      "total": 60
-    },
-    "intel": {
-      "passed": 60,
-      "total": 60,
-      "evidence": "docs/evidence/v0.2.0/e2e-wkwebview-intel.json"
-    }
-  },
-  "status": "NOT CERTIFIED",
-  "total": 55,
+  "status": "CERTIFIED",
+  "total": 60,
   "artifact": "Levil Notes 0.2.0.dmg",
-  "sha256": "8dc85ea0163c6e7e7002f78c986ad333a8d6b2d30bc65bfd272b76d062316b61",
-  "fixtureRoot": "/var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T//spacenotes-e2e.nJNnOJ",
+  "sha256": "3f8f2b5d48900a64e93767eb6b9db762ea43023985a20360031d79b317e8580e",
+  "fixtureRoot": "/var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T//spacenotes-e2e.44Ub95",
   "host": {
     "macOS": "27.0.0",
     "architecture": "arm64",

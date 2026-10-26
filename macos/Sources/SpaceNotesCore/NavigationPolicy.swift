@@ -10,12 +10,14 @@ public enum WebNavigationPolicy {
     public static func decision(
         url: URL,
         isMainFrame: Bool,
+        isTrustedOrigin: Bool,
         isTrustedDocument: Bool
     ) -> WebNavigationDecision {
         if isMainFrame && isTrustedDocument {
             return .allow
         }
-        if !isTrustedDocument,
+        if !isTrustedOrigin,
+           !isTrustedDocument,
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             return .openExternally
         }

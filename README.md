@@ -62,8 +62,9 @@ npm run build
 - 安装包输出目录：`release/`
 - 免安装调试版本：`release/win-unpacked/Levil Notes.exe`
 
-仓库包含 Windows 自动构建流程。手动运行 `Build Windows` 工作流可下载构建产物；
-推送 `v0.1.3` 这类标签时，会自动创建 GitHub Release 并上传安装包。
+仓库包含 Windows 与 macOS 自动构建流程。推送 `v0.2.0` 这类标签时，Windows
+工作流上传 `.exe`，macOS 工作流在双架构验证通过后向同一个 GitHub Release 上传
+universal `.dmg` 及其 SHA-256、Mach-O 架构清单。
 
 macOS 使用 AppKit + WKWebView 薄壳并内置 Node sidecar。构建 universal DMG：
 

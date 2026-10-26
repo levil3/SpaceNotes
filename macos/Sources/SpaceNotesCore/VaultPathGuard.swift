@@ -47,11 +47,12 @@ public enum VaultPathGuard {
         return candidate
     }
 
+    @discardableResult
     public static func moveToTrash(
         relativePath: String,
         in vaultRoot: URL,
         trashRoot: URL? = nil
-    ) throws {
+    ) throws -> URL {
         _ = try resolve(relativePath: relativePath, in: vaultRoot)
         let components = relativePath
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -105,21 +106,18 @@ public enum VaultPathGuard {
             at: destinationRoot,
             withIntermediateDirectories: true
         )
-        let trashFD = Darwin.open(
-            destinationRoot.path,
-            O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
+        let destinationFD = try openDirectoryExclusively(
+            at: destinationRoot
         )
-        guard trashFD >= 0 else {
-            throw posixError("无法打开废纸篓目录。", code: errno)
-        }
-        defer { Darwin.close(trashFD) }
+        defer { Darwin.close(destinationFD) }
 
         let fileName = components.last!
-        try moveExclusive(
+        let movedName = try moveExclusive(
             fileName: fileName,
             sourceDirectoryFD: parentFD,
-            destinationDirectoryFD: trashFD
+            destinationDirectoryFD: destinationFD
         )
+        return destinationRoot.appendingPathComponent(movedName)
     }
 
     static func defaultTrashRoot(for vaultRoot: URL) throws -> URL {
@@ -141,10 +139,7 @@ public enum VaultPathGuard {
         }
 
         if vaultStatus.st_dev == homeStatus.st_dev {
-            return FileManager.default.urls(
-                for: .trashDirectory,
-                in: .userDomainMask
-            ).first ?? URL(
+            return userTrashRoot() ?? URL(
                 fileURLWithPath: homePath,
                 isDirectory: true
             ).appendingPathComponent(".Trash", isDirectory: true)
@@ -160,6 +155,15 @@ public enum VaultPathGuard {
                 String(getuid()),
                 isDirectory: true
             )
+    }
+
+    private static func userTrashRoot() -> URL? {
+        FileManager.default.urls(
+            for: .trashDirectory,
+            in: .userDomainMask
+        ).first?
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
     }
 
     private static func volumeRoot(
@@ -181,11 +185,41 @@ public enum VaultPathGuard {
         return current
     }
 
-    private static func moveExclusive(
+    static func openDirectoryExclusively(at directory: URL) throws -> Int32 {
+        let resolvedPath = directory.path.withCString {
+            Darwin.realpath($0, nil)
+        }
+        guard let resolvedPath else {
+            throw posixError("无法解析目标目录。", code: errno)
+        }
+        defer { Darwin.free(resolvedPath) }
+        let components = String(cString: resolvedPath)
+            .split(separator: "/", omittingEmptySubsequences: true)
+        let flags = O_SEARCH | O_NOFOLLOW | O_CLOEXEC
+        var currentFD = Darwin.open("/", flags)
+        guard currentFD >= 0 else {
+            throw posixError("无法打开文件系统根目录。", code: errno)
+        }
+        for component in components {
+            let nextFD = component.withCString {
+                Darwin.openat(currentFD, $0, flags)
+            }
+            guard nextFD >= 0 else {
+                let errorCode = errno
+                Darwin.close(currentFD)
+                throw posixError("无法安全打开目标目录。", code: errorCode)
+            }
+            Darwin.close(currentFD)
+            currentFD = nextFD
+        }
+        return currentFD
+    }
+
+    static func moveExclusive(
         fileName: String,
         sourceDirectoryFD: Int32,
         destinationDirectoryFD: Int32
-    ) throws {
+    ) throws -> String {
         let fileURL = URL(fileURLWithPath: fileName)
         let stem = fileURL.deletingPathExtension().lastPathComponent
         let fileExtension = fileURL.pathExtension
@@ -206,7 +240,7 @@ public enum VaultPathGuard {
                 }
             }
             if renamed == 0 {
-                return
+                return candidate
             }
             let errorCode = errno
             if errorCode == EEXIST {

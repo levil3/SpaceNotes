@@ -334,6 +334,21 @@ pre {
   border: 1px solid currentColor;
 }
 
+:root[data-host-platform="macos"] .window-controls {
+  display: none;
+}
+
+:root[data-host-platform="macos"] .topbar-leading {
+  padding-left: 76px;
+}
+
+:root[data-host-platform="macos"]
+  .app-shell.sidebar-collapsed
+  .topbar-leading {
+  width: 144px;
+  flex-basis: 144px;
+}
+
 .app-body {
   display: flex;
   min-height: 0;

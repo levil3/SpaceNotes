@@ -13,6 +13,13 @@ function statusFromEnvironment(environment, name) {
   return status;
 }
 
+function flagFromEnvironment(environment, name) {
+  if (environment[name] !== "1") {
+    throw new Error(`${name} must be 1.`);
+  }
+  return true;
+}
+
 function buildLifecycleReport(environment, { sha256 }) {
   const windowLifecycleStatus = statusFromEnvironment(
     environment,
@@ -71,17 +78,37 @@ function buildLifecycleReport(environment, { sha256 }) {
       status: windowLifecycleStatus,
       appPID: Number(environment.WINDOW_LIFECYCLE_PID),
       sidecarPID: Number(environment.WINDOW_LIFECYCLE_SIDECAR_PID),
-      closedWindowWithoutTerminating: true,
-      reopenedFromDockRequest: true,
+      closedWindowWithoutTerminating: flagFromEnvironment(
+        environment,
+        "WINDOW_CLOSED_PROCESS_ALIVE",
+      ),
+      reopenedFromDockRequest: flagFromEnvironment(
+        environment,
+        "WINDOW_REOPEN_OBSERVED",
+      ),
+      webViewRetainedAcrossClose: flagFromEnvironment(
+        environment,
+        "WINDOW_WEBVIEW_RETAINED",
+      ),
+      reusedExistingWindowInstance: flagFromEnvironment(
+        environment,
+        "WINDOW_INSTANCE_REUSED",
+      ),
       diagnosticsMarkers: [
         "window-closed-app-persisted",
+        "window-closed-webview-retained=true",
         "window-reopened-from-dock-request",
+        "window-reopened-existing-instance",
       ],
+    },
+    nativeWindowControls: {
+      status: windowLifecycleStatus,
+      subroles: environment.NATIVE_WINDOW_CONTROL_SUBROLES.split(/,\s*/),
     },
     menuAccessibility: {
       status: menuAccessibilityStatus,
       menus: environment.MENUS.split(", "),
-      closeWindowCommand: "Cmd-W",
+      closeWindowCommand: "native-close-button + Window menu",
     },
     singleSidecarCrash: {
       status: singleCrashStatus,

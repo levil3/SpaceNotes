@@ -38,6 +38,14 @@ public struct TrustedWebDocumentPolicy {
         }
     }
 
+    public func isTrustedOrigin(_ url: URL) -> Bool {
+        isTrustedOrigin(
+            scheme: url.scheme,
+            host: url.host,
+            port: url.port
+        )
+    }
+
     private func effectivePort(for url: URL) -> Int? {
         effectivePort(scheme: url.scheme, port: url.port)
     }

@@ -1,6 +1,6 @@
 # SpaceNotes macOS 薄壳与通用 DMG
 
-Status: implemented-ci-certified-local-computer-use-blocked
+Status: implemented-local-verified-ci-pending
 Version: v0.2.0
 
 ## Delivery Record
@@ -23,6 +23,25 @@ Version: v0.2.0
   evidence.
 - Local Computer Use is blocked by `CGSSessionScreenIsLocked=1`; issue #10 remains
   open until an interactive-session visual check is completed.
+
+## 2026-10-26 Native Controls Revision
+
+- macOS now uses the AppKit close, minimize and full-screen traffic lights.
+- The Web-layer Windows controls are hidden only when the Swift host injects
+  `data-host-platform="macos"`; the Windows default remains unchanged.
+- Closing the window retains the same `NSWindow` and `WKWebView`; Dock reopen
+  reuses that instance so React workspace state is not recreated.
+- System Trash moves now use the already-opened source parent directory FD with
+  `renameatx_np(..., RENAME_EXCL)`, eliminating the second source-path lookup.
+- Local E2E runs the installed app with a zero-alpha, non-activating, mouse-
+  transparent window outside the active desktop. The final installed-app run
+  passed 60/60 and never became the frontmost application.
+- CI runs real visible-window lifecycle checks on both `macos-15` and
+  `macos-15-intel`; Intel validates the app from the mounted universal DMG.
+- Local universal DMG SHA-256:
+  `9a87c737faf6ffd032d7f713131e791937345eb068530b5741bccaa5d4649f6d`.
+- This revision is local and uncommitted; the CI record above still belongs to
+  commit `3f45917` and is not evidence for the new worktree.
 
 ## Problem Statement
 
@@ -57,7 +76,7 @@ macOS 第一版采用薄壳方案：
 9. 作为 macOS 用户，我想通过原生目录选择器打开笔记库，以便正确继承系统权限。
 10. 作为 macOS 用户，我想在 Finder 中定位当前笔记，以便使用系统文件工作流。
 11. 作为 macOS 用户，我想把笔记移入废纸篓而不是永久删除，以便误操作时可以恢复。
-12. 作为 macOS 用户，我想使用与 Windows 一致的窗口按钮布局，以便视觉和操作习惯保持不变。
+12. 作为 macOS 用户，我想使用系统原生的关闭、最小化和缩放交通灯，以便应用符合 macOS 的操作习惯。
 13. 作为 macOS 用户，我想使用标准应用菜单完成退出、隐藏、全屏和窗口操作，以便符合 macOS 系统习惯。
 14. 作为 macOS 用户，我想关闭窗口后应用继续驻留 Dock，并从 Dock 重新打开窗口，以便保持当前工作状态。
 15. 作为 macOS 用户，我想查看 Git 状态、差异、历史、分支和忽略规则，以便在应用内继续现有 Git 工作流。
@@ -94,7 +113,8 @@ macOS 第一版采用薄壳方案：
 - Swift 负责应用启动、窗口、系统菜单、目录选择、Finder 定位、废纸篓、sidecar
   生命周期和 DMG 打包。
 - Swift 不实现搜索、Markdown 索引、Git 分类或笔记业务规则。
-- 应用保留 React 顶栏和 Windows 风格窗口按钮，窗口内容铺满并使用无标题栏容器。
+- 应用保留共享 React 顶栏，但 macOS 宿主显示 AppKit 原生交通灯并隐藏 Web 层
+  Windows 风格窗口按钮；窗口内容铺满并使用透明标题栏。
 - 原生菜单只承载退出、隐藏、全屏、编辑和窗口等系统级操作。
 - 系统菜单快捷键由 Swift 处理，既有业务快捷键继续由 React 处理。
 - 关闭最后一个窗口后应用继续驻留 Dock；点击 Dock 图标重新显示窗口。
@@ -133,7 +153,9 @@ macOS 第一版采用薄壳方案：
 - sidecar 使用相同设置文件完成最近笔记库恢复和外观配置。
 - `vault:choose` 使用 `NSOpenPanel`；选择后由 sidecar 校验目录并建立索引。
 - `showInFolder` 使用 Finder。
-- `trashNote` 使用 `FileManager.trashItem`，成功后再通知 sidecar 刷新索引和广播事件。
+- `trashNote` 持有已打开的父目录文件描述符，并使用带 `RENAME_EXCL` 的
+  `renameatx_np` 原子移入当前卷废纸篓，避免删除路径校验与移动之间的竞态；
+  成功后再通知 sidecar 刷新索引和广播事件。
 - 退出应用时先停止文件监听和服务，再终止 Node 子进程。
 
 ### Distribution

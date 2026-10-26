@@ -18,6 +18,7 @@ FIXTURE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/spacenotes-e2e.XXXXXX")"
 SETTINGS_BACKUP="$BACKUP_ROOT/settings.json"
 APP_PID=""
 DIAGNOSTICS_START_BYTES=0
+export SPACENOTES_BACKGROUND_E2E=1
 
 redact_diagnostics() {
   "$ROOT/scripts/macos/redact-log.sh" "$@"
@@ -143,7 +144,8 @@ if [[ ! -s "$REPORT_PATH" ]]; then
 fi
 
 validate_report() {
-node - "$REPORT_PATH" "$DMG_PATH" "$FIXTURE_ROOT" "$DIAGNOSTICS_PATH" <<'NODE'
+node - "$REPORT_PATH" "$DMG_PATH" "$FIXTURE_ROOT" \
+  "$EVIDENCE_DIAGNOSTICS_PATH" <<'NODE'
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -194,8 +196,16 @@ report.host = {
 fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
 const failures = [];
+const diagnostics = diagnosticsPath && fs.existsSync(diagnosticsPath)
+  ? redact(fs.readFileSync(diagnosticsPath, "utf8"))
+  : "";
 if (!["CERTIFIED", "PASS"].includes(report.status)) {
   failures.push(`unexpected status ${report.status}`);
+}
+if (report.executionMode !== "background-offscreen") {
+  failures.push(
+    `expected background-offscreen execution, got ${report.executionMode}`,
+  );
 }
 if (!["CERTIFIED", "PASS"].includes(report.conclusion)) {
   failures.push(`unexpected conclusion ${report.conclusion}`);
@@ -213,6 +223,23 @@ if (!Array.isArray(report.results) || report.results.length !== report.total) {
 }
 if (!Array.isArray(report.failures) || report.failures.length !== 0) {
   failures.push("failure list is not empty");
+}
+const nativeControls =
+  "native-window-controls=close=true,minimize=true,full-screen=true";
+if (!diagnostics.includes(nativeControls)) {
+  failures.push("native macOS window controls were not created");
+}
+if (!diagnostics.includes("background-window-offscreen=true")) {
+  failures.push("background E2E window was not moved offscreen");
+}
+if (!diagnostics.includes("background-window-screen-intersections=0")) {
+  failures.push("background E2E window still intersects a display");
+}
+if (!diagnostics.includes("background-same-origin-navigation-canceled=true")) {
+  failures.push("same-origin asset navigation was not canceled");
+}
+if (diagnostics.includes("background-external-navigation-suppressed=")) {
+  failures.push("background E2E attempted to open an external application");
 }
 const requiredFlowNames = [
   "shell-layout",
@@ -238,8 +265,7 @@ if (failures.length) {
   if (Array.isArray(report.failures) && report.failures.length) {
     process.stderr.write(`${JSON.stringify(report.failures, null, 2)}\n`);
   }
-  if (diagnosticsPath && fs.existsSync(diagnosticsPath)) {
-    const diagnostics = redact(fs.readFileSync(diagnosticsPath, "utf8"));
+  if (diagnostics) {
     process.stderr.write("last application diagnostics:\n");
     process.stderr.write(`${diagnostics.split("\n").slice(-160).join("\n")}\n`);
   }
@@ -251,14 +277,13 @@ process.stdout.write(
 NODE
 }
 
+persist_diagnostics
 if ! validate_report; then
   tail -n 120 "$LOG_PATH" >&2 || true
-  persist_diagnostics
   dump_diagnostics
   exit 1
 fi
 
-persist_diagnostics
 kill -TERM "$APP_PID" 2>/dev/null || true
 wait "$APP_PID" 2>/dev/null || true
 APP_PID=""
