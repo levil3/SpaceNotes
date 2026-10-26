@@ -15,11 +15,11 @@ const items: Array<{
   hotkey: string;
   Icon: typeof Files;
 }> = [
-  { id: "files", label: "文件", hotkey: "Ctrl+1", Icon: Files },
-  { id: "outline", label: "大纲", hotkey: "Ctrl+2", Icon: ListTree },
+  { id: "files", label: "文件", hotkey: "Alt+1", Icon: Files },
+  { id: "outline", label: "大纲", hotkey: "Alt+2", Icon: ListTree },
   { id: "search", label: "搜索", hotkey: "Ctrl+Shift+F", Icon: Search },
-  { id: "tags", label: "标签", hotkey: "Ctrl+3", Icon: Tags },
-  { id: "backlinks", label: "反向链接", hotkey: "Ctrl+4", Icon: Link2 },
+  { id: "tags", label: "标签", hotkey: "Alt+3", Icon: Tags },
+  { id: "backlinks", label: "反向链接", hotkey: "Alt+4", Icon: Link2 },
   { id: "git", label: "Git", hotkey: "Ctrl+Shift+G", Icon: GitBranch },
 ];
 

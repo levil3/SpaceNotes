@@ -415,6 +415,27 @@ export default function App() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const command = event.ctrlKey || event.metaKey;
+      if (
+        event.altKey &&
+        !command &&
+        !event.shiftKey &&
+        ["1", "2", "3", "4", "5", "6", "7"].includes(event.key)
+      ) {
+        event.preventDefault();
+        const panels: SidebarPanel[] = [
+          "files",
+          "outline",
+          "search",
+          "tags",
+          "backlinks",
+          "git",
+          "settings",
+        ];
+        setActivePanel(panels[Number(event.key) - 1]);
+        setSettings((current) => ({ ...current, sidebarCollapsed: false }));
+        return;
+      }
+
       if (!command) {
         if (event.key === "Escape") {
           setContextMenu(null);
@@ -443,16 +464,6 @@ export default function App() {
       } else if (event.key.toLowerCase() === "p") {
         event.preventDefault();
         setActivePanel("files");
-        setSettings((current) => ({ ...current, sidebarCollapsed: false }));
-      } else if (["1", "2", "3", "4"].includes(event.key)) {
-        event.preventDefault();
-        const panels: SidebarPanel[] = [
-          "files",
-          "outline",
-          "tags",
-          "backlinks",
-        ];
-        setActivePanel(panels[Number(event.key) - 1]);
         setSettings((current) => ({ ...current, sidebarCollapsed: false }));
       }
     };

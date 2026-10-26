@@ -2144,6 +2144,43 @@ kbd {
   min-height: 100%;
 }
 
+.format-context-toolbar {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  box-shadow: 0 7px 22px rgb(20 28 38 / 18%);
+  padding: 3px;
+  user-select: none;
+}
+
+.format-context-toolbar button {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.format-context-toolbar button:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.format-context-toolbar button:active {
+  background: var(--accent-hover);
+  color: var(--accent-text);
+}
+
 .note-inline-title {
   max-width: none;
   margin: 0 0 22px;

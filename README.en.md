@@ -23,6 +23,8 @@ Markdown files, and Git history can continue to be used in place.
 ## Features
 
 - Live Markdown editing with a reading-first default and an editing mode.
+- Heading shortcuts, a right-click formatting toolbar, and filename-based H1
+  insertion.
 - File tree, title and full-text search, smart and exact matching, tags,
   backlinks, and a collapsible outline.
 - Multiple editor tabs, autosave, in-note `Ctrl+F`, and editor appearance
