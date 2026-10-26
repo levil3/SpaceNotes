@@ -36,6 +36,11 @@ jobs:
           node-version: 24.22.1
           cache: npm
 
+      - name: Read application version
+        run: |
+          node -e 'console.log(`APP_VERSION=${require("./package.json").version}`)' \
+            >> "$GITHUB_ENV"
+
       - name: Install application dependencies
         run: npm ci
 
@@ -55,19 +60,16 @@ jobs:
 
       - name: Run bridge and sidecar usage model
         run: |
-          mkdir -p docs/evidence/v0.2.0
+          mkdir -p "docs/evidence/v${APP_VERSION}"
           node macos/scripts/usage-model.cjs \
             --iterations 3000 \
             --seed 20261023 \
-            --report docs/evidence/v0.2.0/usage-model.json
+            --report "docs/evidence/v${APP_VERSION}/usage-model.json"
 
       - name: Build and verify universal artifacts
         run: |
           set -o pipefail
           mkdir -p build/macos
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            export SPACENOTES_VERSION="${GITHUB_REF_NAME#v}"
-          fi
           bash macos/scripts/build-universal.sh 2>&1 | tee build/macos/build.log
           dmg_path="$(find build/macos -maxdepth 1 -type f -name '*.dmg' -print -quit)"
           test -n "$dmg_path"
@@ -85,9 +87,9 @@ jobs:
         run: |
           bash macos/scripts/run-wkwebview-e2e.sh \
             "build/macos/Levil Notes.app" \
-            docs/evidence/v0.2.0/e2e-wkwebview.json \
+            "docs/evidence/v${APP_VERSION}/e2e-wkwebview.json" \
             "$MACOS_DMG_PATH" \
-            docs/evidence/v0.2.0/diagnostics.log
+            "docs/evidence/v${APP_VERSION}/diagnostics.log"
 
       - name: Run native lifecycle regression
         env:
@@ -95,7 +97,7 @@ jobs:
           SPACENOTES_ALLOW_INCONCLUSIVE_VISUAL: "1"
         run: |
           bash macos/scripts/run-lifecycle-e2e.sh \
-            docs/evidence/v0.2.0/lifecycle.json
+            "docs/evidence/v${APP_VERSION}/lifecycle.json"
 
       - name: Upload macOS artifacts
         if: always()
@@ -107,10 +109,10 @@ jobs:
             build/macos/*.dmg.sha256
             build/macos/macho-architectures.txt
             build/macos/build.log
-            docs/evidence/v0.2.0/e2e-wkwebview.json
-            docs/evidence/v0.2.0/diagnostics.log
-            docs/evidence/v0.2.0/lifecycle.json
-            docs/evidence/v0.2.0/usage-model.json
+            docs/evidence/v${{ env.APP_VERSION }}/e2e-wkwebview.json
+            docs/evidence/v${{ env.APP_VERSION }}/diagnostics.log
+            docs/evidence/v${{ env.APP_VERSION }}/lifecycle.json
+            docs/evidence/v${{ env.APP_VERSION }}/usage-model.json
           if-no-files-found: warn
 
   intel-smoke:

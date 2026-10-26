@@ -2,9 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+VERSION="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$ROOT/package.json")"
 APP_BUNDLE="${SPACENOTES_APP_BUNDLE:-/Applications/Levil Notes.app}"
-REPORT_PATH="${1:-$ROOT/docs/evidence/v0.2.0/lifecycle.json}"
-DMG_PATH="${SPACENOTES_DMG_PATH:-$ROOT/build/macos/Levil Notes 0.2.0.dmg}"
+REPORT_PATH="${1:-$ROOT/docs/evidence/v${VERSION}/lifecycle.json}"
+DMG_PATH="${SPACENOTES_DMG_PATH:-$ROOT/build/macos/Levil Notes ${VERSION}.dmg}"
 DIAGNOSTICS="$HOME/Library/Application Support/Levil Notes/diagnostics.log"
 APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/SpaceNotes"
 SIDECAR_PATTERN="$APP_BUNDLE/Contents/Resources/node $APP_BUNDLE/Contents/Resources/sidecar/macos/sidecar/sidecar-entry.cjs"

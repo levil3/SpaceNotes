@@ -6,7 +6,7 @@ MACOS_ROOT="$ROOT/macos"
 BUILD_ROOT="$ROOT/build/macos"
 CACHE_ROOT="${SPACENOTES_MACOS_CACHE:-$ROOT/.cache/macos}"
 NODE_VERSION="24.22.1"
-VERSION="${SPACENOTES_VERSION:-$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$ROOT/package.json")}"
+VERSION="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$ROOT/package.json")"
 VERSION="${VERSION#v}"
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
   echo "invalid macOS version: $VERSION" >&2
@@ -221,7 +221,7 @@ cat > "$APP_PATH/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.2.0</string>
+  <string>0.0.0</string>
   <key>CFBundleVersion</key>
   <string>2</string>
   <key>LSMinimumSystemVersion</key>

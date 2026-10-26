@@ -34,9 +34,14 @@ cd .. && bash macos/scripts/build-universal.sh
 For UI automation that must not interrupt the active desktop:
 
 ```bash
+version="$(node -p 'require("./package.json").version')"
 bash macos/scripts/run-wkwebview-e2e.sh \
   "build/macos/Levil Notes.app" \
-  docs/evidence/v0.2.0/e2e-wkwebview.json \
-  "build/macos/Levil Notes 0.2.0.dmg" \
-  docs/evidence/v0.2.0/diagnostics.log
+  "docs/evidence/v${version}/e2e-wkwebview.json" \
+  "build/macos/Levil Notes ${version}.dmg" \
+  "docs/evidence/v${version}/diagnostics.log"
 ```
+
+`docs/evidence/v0.2.0` is retained as the original macOS certification
+baseline. It is historical evidence and never controls the packaged version.
+The root `package.json` is the only version source for apps and DMGs.

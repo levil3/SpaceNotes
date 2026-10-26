@@ -2,9 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+VERSION="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$ROOT/package.json")"
 APP_BUNDLE="${1:-$ROOT/build/macos/Levil Notes.app}"
-REPORT_PATH="${2:-$ROOT/docs/evidence/v0.2.0/e2e-wkwebview.json}"
-DMG_PATH="${3:-$ROOT/build/macos/Levil Notes 0.2.0.dmg}"
+REPORT_PATH="${2:-$ROOT/docs/evidence/v${VERSION}/e2e-wkwebview.json}"
+DMG_PATH="${3:-$ROOT/build/macos/Levil Notes ${VERSION}.dmg}"
 EVIDENCE_DIAGNOSTICS_PATH="${4:-$(dirname "$REPORT_PATH")/diagnostics.log}"
 
 APP_BUNDLE="$(cd "$(dirname "$APP_BUNDLE")" && pwd)/$(basename "$APP_BUNDLE")"

@@ -62,9 +62,10 @@ npm run build
 - 安装包输出目录：`release/`
 - 免安装调试版本：`release/win-unpacked/Levil Notes.exe`
 
-仓库包含 Windows 与 macOS 自动构建流程。推送 `v0.2.0` 这类标签时，
-`Release Desktop` 会并行构建 Windows x64 和 macOS universal 产物；只有两端都
-通过构建与验证后，才一次性发布 `.exe`、`.dmg`、SHA-256 和 Mach-O 架构清单。
+仓库包含 Windows 与 macOS 自动构建流程。应用版本唯一取自根目录
+`package.json`；只有与它完全一致的 `v*` 标签才能触发
+`Release Desktop`。工作流会并行构建 Windows x64 和 macOS universal 产物，
+两端都通过验证后才一次性发布 `.exe`、`.dmg`、SHA-256 和 Mach-O 架构清单。
 
 macOS 使用 AppKit + WKWebView 薄壳并内置 Node sidecar。构建 universal DMG：
 
@@ -73,9 +74,9 @@ npm ci
 bash macos/scripts/build-universal.sh
 ```
 
-产物位于 `build/macos/Levil Notes 0.2.0.dmg`，同目录包含 SHA-256 与全部 Mach-O
-架构清单。`Build macOS Universal DMG` 工作流会在 arm64 runner 构建，并在 Intel
-runner 挂载 DMG、校验架构并启动 x86_64 切片。
+产物位于 `build/macos/Levil Notes <package.json version>.dmg`，同目录包含
+SHA-256 与全部 Mach-O 架构清单。`Build macOS Universal DMG` 工作流会在 arm64
+runner 构建，并在 Intel runner 挂载 DMG、校验架构并启动 x86_64 切片。
 
 ## 数据与权限
 

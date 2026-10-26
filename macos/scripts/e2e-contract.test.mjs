@@ -239,6 +239,57 @@ describeMac("macOS E2E contract", () => {
     expect(workflow).toContain("SPACENOTES_DMG_PATH=");
   });
 
+  it("uses the root package version for apps, DMGs and release tags", () => {
+    const root = path.resolve(directory, "../..");
+    const readJson = (relativePath) =>
+      JSON.parse(fs.readFileSync(path.join(root, relativePath), "utf8"));
+    const appPackage = readJson("package.json");
+    const appLock = readJson("package-lock.json");
+    const sidecarPackage = readJson("macos/sidecar/package.json");
+    const sidecarLock = readJson("macos/sidecar/package-lock.json");
+    const buildScript = fs.readFileSync(
+      path.join(root, "macos/scripts/build-universal.sh"),
+      "utf8",
+    );
+    const wkwebviewScript = fs.readFileSync(
+      path.join(root, "macos/scripts/run-wkwebview-e2e.sh"),
+      "utf8",
+    );
+    const lifecycleScript = fs.readFileSync(
+      path.join(root, "macos/scripts/run-lifecycle-e2e.sh"),
+      "utf8",
+    );
+    const macosWorkflow = fs.readFileSync(
+      path.join(root, ".github/workflows/build-macos.yml"),
+      "utf8",
+    );
+    const releaseWorkflow = fs.readFileSync(
+      path.join(root, ".github/workflows/release.yml"),
+      "utf8",
+    );
+
+    expect(appLock.version).toBe(appPackage.version);
+    expect(appLock.packages[""].version).toBe(appPackage.version);
+    expect(sidecarPackage.version).toBe(appPackage.version);
+    expect(sidecarLock.version).toBe(appPackage.version);
+    expect(sidecarLock.packages[""].version).toBe(appPackage.version);
+
+    expect(buildScript).toContain(
+      `VERSION="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$ROOT/package.json")"`,
+    );
+    expect(buildScript).not.toContain("SPACENOTES_VERSION");
+    expect(wkwebviewScript).toContain('"$ROOT/package.json"');
+    expect(lifecycleScript).toContain('"$ROOT/package.json"');
+    expect(macosWorkflow).not.toContain("SPACENOTES_VERSION");
+    expect(releaseWorkflow).toContain(
+      "Verify tag matches package version",
+    );
+    expect(releaseWorkflow).toContain('package_version="$(node');
+    expect(releaseWorkflow).toContain(
+      'tag_version="${GITHUB_REF_NAME#v}"',
+    );
+  });
+
   it("publishes Windows and macOS artifacts atomically on a version tag", () => {
     const root = path.resolve(directory, "../..");
     const release = fs.readFileSync(
@@ -261,6 +312,8 @@ describeMac("macOS E2E contract", () => {
     expect(release).toContain(
       "uses: ./.github/workflows/build-macos.yml",
     );
+    expect(release).toContain("validate-version:");
+    expect(release).toContain("needs:\n      - validate-version");
     expect(release).toContain("needs:\n      - windows\n      - macos");
     expect(release).toContain("release-assets/windows/*.exe");
     expect(release).toContain("release-assets/macos/build/macos/*.dmg");

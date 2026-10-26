@@ -45,11 +45,10 @@ git -C D:\path\to\notes remote -v
 macOS 13.5 及以上版本可使用同一个 DMG，应用同时包含 Intel（x86_64）和
 Apple Silicon（arm64）切片。
 
-当前 v0.2.0 验证产物在分支
-[Actions run 39974114613](https://github.com/levil3/SpaceNotes/actions/runs/39974114613)
-的 `macos-universal-v0.2.0` artifact 中。下载并解压后：
+CI 构建的 `macos-universal` artifact 包含 universal DMG。DMG 版本严格取自
+主分支根目录的 `package.json`。下载并解压后：
 
-1. 双击 `Levil Notes 0.2.0.dmg`，把 `Levil Notes` 拖入 `Applications`。
+1. 双击 `Levil Notes <version>.dmg`，把 `Levil Notes` 拖入 `Applications`。
 2. 在“应用程序”中双击 `Levil Notes`。
 3. 首次启动时选择已有笔记文件夹，或新建一个空文件夹作为笔记库。
 
@@ -65,8 +64,8 @@ DMG。
 可在终端核对下载文件：
 
 ```bash
-shasum -a 256 "Levil Notes 0.2.0.dmg"
-cat "Levil Notes 0.2.0.dmg.sha256"
+shasum -a 256 "Levil Notes <version>.dmg"
+cat "Levil Notes <version>.dmg.sha256"
 ```
 
 macOS 版复用同一份 React/TypeScript 前端和 Node 业务核心。Swift 只承载窗口、
@@ -91,8 +90,8 @@ bash macos/scripts/build-universal.sh
 
 ```text
 build/macos/Levil Notes.app
-build/macos/Levil Notes 0.2.0.dmg
-build/macos/Levil Notes 0.2.0.dmg.sha256
+build/macos/Levil Notes <version>.dmg
+build/macos/Levil Notes <version>.dmg.sha256
 build/macos/macho-architectures.txt
 ```
 
@@ -143,7 +142,7 @@ npm run build
 构建完成后可以在以下位置找到文件：
 
 ```text
-release/Levil Notes Setup 0.2.0.exe
+release/Levil Notes Setup <version>.exe
 release/win-unpacked/Levil Notes.exe
 ```
 
@@ -154,15 +153,16 @@ release/win-unpacked/Levil Notes.exe
 仓库中的 `.github/workflows/release.yml` 提供双平台原子发布：
 
 - 在 Actions 页面手动运行 `Build Windows`，完成后下载 `windows-installer`。
-- 推送 `v0.2.0` 这类标签后，`Release Desktop` 会并行构建 Windows `.exe` 和
-  macOS universal `.dmg`。
+- 推送与 `package.json` 版本一致的 `v*` 标签后，`Release Desktop` 会并行构建
+  Windows `.exe` 和 macOS universal `.dmg`。标签不一致时发布会直接失败。
 - 任一平台失败时不会创建残缺 Release；两端均成功后才会一次性上传全部产物。
 
 维护者发布新版本时执行：
 
-```powershell
-git tag v0.2.0
-git push origin v0.2.0
+```bash
+version="$(node -p 'require("./package.json").version')"
+git tag "v${version}"
+git push origin "v${version}"
 ```
 
 ## 笔记库兼容性

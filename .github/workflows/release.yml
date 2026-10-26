@@ -9,10 +9,32 @@ permissions:
   contents: write
 
 jobs:
+  validate-version:
+    name: Verify tag matches package version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Verify release tag
+        run: |
+          package_version="$(node -p 'require("./package.json").version')"
+          tag_version="${GITHUB_REF_NAME#v}"
+          if [[ "$tag_version" != "$package_version" ]]; then
+            printf 'release tag %s does not match package.json %s\n' \
+              "$tag_version" "$package_version" >&2
+            exit 1
+          fi
+
   windows:
+    needs:
+      - validate-version
     uses: ./.github/workflows/build-windows.yml
 
   macos:
+    needs:
+      - validate-version
     uses: ./.github/workflows/build-macos.yml
 
   release:
