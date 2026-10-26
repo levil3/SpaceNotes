@@ -49,6 +49,7 @@ import type {
 
 type ActiveView =
   | { kind: "note" }
+  | { kind: "commit-preview"; paths: string[]; diff: string }
   | { kind: "working-diff"; path: string; diff: string }
   | { kind: "commit-diff"; hash: string; diff: string };
 
@@ -131,6 +132,8 @@ export default function App() {
   const editorMenuRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
   const pendingSaveRef = useRef<{ path: string; content: string } | null>(null);
+  // Tracks the newest note request so a slower, stale read cannot replace it.
+  const openRequestRef = useRef(0);
   const settingsLoadedRef = useRef(false);
   const didInitializeRef = useRef(false);
   const activePathRef = useRef("");
@@ -219,6 +222,7 @@ export default function App() {
         return;
       }
 
+      const requestId = ++openRequestRef.current;
       const pending = pendingSaveRef.current;
       if (pending) {
         await window.levilNotes.writeNote(pending.path, pending.content);
@@ -227,6 +231,9 @@ export default function App() {
 
       try {
         const document = await window.levilNotes.readNote(path);
+        if (requestId !== openRequestRef.current) {
+          return;
+        }
         const note = vault?.files.find((file) => file.path === path);
         const title = note?.title || basename(path);
         setActivePath(path);
@@ -382,14 +389,17 @@ export default function App() {
   }, [refreshGit, showToast]);
 
   const handleEditorChange = useCallback(
-    (markdown: string) => {
-      if (!activePathRef.current) {
+    (path: string, markdown: string) => {
+      // Bind each editor update to the note that produced it. Without this
+      // guard, a delayed update from the previous editor can overwrite the
+      // note the user just opened.
+      if (!path || path !== activePathRef.current) {
         return;
       }
       setActiveContent(markdown);
       setSaveState("dirty");
       pendingSaveRef.current = {
-        path: activePathRef.current,
+        path,
         content: markdown,
       };
       if (saveTimerRef.current) {
@@ -664,6 +674,29 @@ export default function App() {
     }
   };
 
+  const previewCommit = async () => {
+    const paths = (gitStatus?.changes || [])
+      .filter(
+        (change) =>
+          selectedGitPaths.has(change.path) && !change.conflict,
+      )
+      .map((change) => change.path);
+    if (!paths.length) {
+      showToast("请先选择要提交的文件。");
+      return;
+    }
+
+    setGitBusy(true);
+    try {
+      const diff = await window.levilNotes.gitPreviewCommit(paths);
+      setActiveView({ kind: "commit-preview", paths, diff });
+    } catch (error) {
+      showToast(String(error instanceof Error ? error.message : error));
+    } finally {
+      setGitBusy(false);
+    }
+  };
+
   const runGitAction = async (
     action: () => Promise<{ output: string; status: GitStatus }>,
   ) => {
@@ -689,6 +722,9 @@ export default function App() {
       setGitStatus(result.status);
       setCommitMessage("");
       setSelectedGitPaths(new Set());
+      setActiveView((current) =>
+        current.kind === "commit-preview" ? { kind: "note" } : current,
+      );
       showToast(result.output || "提交完成");
       if (pushAfter) {
         const pushResult = await window.levilNotes.gitPush();
@@ -948,6 +984,7 @@ export default function App() {
                   setDialog({ kind: "git-discard", path })
                 }
                 onToggleStage={(path, staged) => void toggleStage(path, staged)}
+                onPreviewCommit={() => void previewCommit()}
                 onCommit={(pushAfter) => void commitChanges(pushAfter)}
                 onFetch={() => void runGitAction(window.levilNotes.gitFetch)}
                 onPull={() => void runGitAction(window.levilNotes.gitPull)}
@@ -1141,6 +1178,16 @@ export default function App() {
                   也兼容 Obsidian 创建的 Markdown 笔记库
                 </span>
               </div>
+            ) : activeView.kind === "commit-preview" ? (
+              <DiffViewer
+                title="提交内容预览"
+                subtitle={`${activeView.paths.length} 个文件 · ${
+                  commitMessage.trim().split(/\r?\n/)[0] ||
+                  "尚未填写提交说明"
+                }`}
+                diff={activeView.diff}
+                mode="preview"
+              />
             ) : activeView.kind === "working-diff" ? (
               <DiffViewer
                 title={activeView.path}
@@ -1162,7 +1209,9 @@ export default function App() {
                 path={activePath}
                 title={activeTitle}
                 content={activeContent}
-                onChange={handleEditorChange}
+                onChange={(markdown) =>
+                  handleEditorChange(activePath, markdown)
+                }
                 readOnly={activeEditorMode === "read"}
               />
             ) : (

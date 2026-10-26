@@ -40,7 +40,7 @@ function loadShellFunction(script, name) {
   throw new Error(`unterminated shell function ${name}`);
 }
 
-describe("macOS E2E contract", () => {
+describeMac("macOS E2E contract", () => {
   it("keeps exactly 60 unique flows and all protected transfer flows", () => {
     const { flowNames } = loadE2EContract();
     expect(flowNames).toHaveLength(60);
@@ -65,7 +65,7 @@ describe("macOS E2E contract", () => {
   it("keeps local WKWebView E2E hidden from the active desktop", () => {
     const root = path.resolve(directory, "../..");
     const runner = fs.readFileSync(
-      path.join(root, "scripts/macos/run-wkwebview-e2e.sh"),
+      path.join(root, "macos/scripts/run-wkwebview-e2e.sh"),
       "utf8",
     );
     const delegate = fs.readFileSync(
@@ -102,6 +102,45 @@ describe("macOS E2E contract", () => {
     expect(main).toContain(
       "application.setActivationPolicy(backgroundE2E ? .accessory : .regular)",
     );
+  });
+
+  it("keeps macOS implementation isolated and lazily loaded", () => {
+    const root = path.resolve(directory, "../..");
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(root, "package.json"), "utf8"),
+    );
+    const main = fs.readFileSync(
+      path.join(root, "electron/main.cjs"),
+      "utf8",
+    );
+    const sharedStyles = fs.readFileSync(
+      path.join(root, "src/styles.css"),
+      "utf8",
+    );
+    const macosRequire = main.indexOf(
+      'require("../macos/sidecar/file-operations.cjs")',
+    );
+    const darwinGuard = main.lastIndexOf(
+      'process.platform === "darwin"',
+      macosRequire,
+    );
+    const whenReady = main.lastIndexOf("app.whenReady().then", macosRequire);
+
+    expect(macosRequire).toBeGreaterThan(darwinGuard);
+    expect(darwinGuard).toBeGreaterThan(whenReady);
+    expect(packageJson.build.files).not.toContain("macos/**/*");
+    expect(packageJson.scripts.test).not.toMatch(/ electron macos(?:\s|$)/);
+    expect(sharedStyles).not.toContain('data-host-platform="macos"');
+    expect(fs.existsSync(path.join(root, "macos/web/macos.css"))).toBe(true);
+
+    for (const legacyPath of [
+      "scripts/build-macos-universal.sh",
+      "scripts/macos/run-wkwebview-e2e.sh",
+      "electron/sidecar.cjs",
+      "electron/file-operations.cjs",
+    ]) {
+      expect(fs.existsSync(path.join(root, legacyPath))).toBe(false);
+    }
   });
 
   it("keeps lifecycle certification inconclusive without visual evidence", () => {
@@ -200,18 +239,43 @@ describe("macOS E2E contract", () => {
     expect(workflow).toContain("SPACENOTES_DMG_PATH=");
   });
 
-  it("publishes the certified DMG when a version tag is released", () => {
+  it("publishes Windows and macOS artifacts atomically on a version tag", () => {
     const root = path.resolve(directory, "../..");
-    const workflow = fs.readFileSync(
+    const release = fs.readFileSync(
+      path.join(root, ".github/workflows/release.yml"),
+      "utf8",
+    );
+    const windows = fs.readFileSync(
+      path.join(root, ".github/workflows/build-windows.yml"),
+      "utf8",
+    );
+    const macos = fs.readFileSync(
       path.join(root, ".github/workflows/build-macos.yml"),
       "utf8",
     );
 
-    expect(workflow).toContain('      - "v*"');
-    expect(workflow).toContain("softprops/action-gh-release@v2");
-    expect(workflow).toContain("release-artifact/build/macos/*.dmg");
-    expect(workflow).toContain("needs:\n      - universal\n      - intel-smoke");
-    expect(workflow).toContain("fail_on_unmatched_files: true");
+    expect(release).toContain('      - "v*"');
+    expect(release).toContain(
+      "uses: ./.github/workflows/build-windows.yml",
+    );
+    expect(release).toContain(
+      "uses: ./.github/workflows/build-macos.yml",
+    );
+    expect(release).toContain("needs:\n      - windows\n      - macos");
+    expect(release).toContain("release-assets/windows/*.exe");
+    expect(release).toContain("release-assets/macos/build/macos/*.dmg");
+    expect(release).toContain(
+      "release-assets/macos/build/macos/*.dmg.sha256",
+    );
+    expect(release).toContain("softprops/action-gh-release@v2");
+    expect(release).toContain("fail_on_unmatched_files: true");
+
+    expect(windows).toContain("workflow_call:");
+    expect(windows).toContain("contents: read");
+    expect(windows).not.toContain("softprops/action-gh-release@v2");
+    expect(macos).toContain("workflow_call:");
+    expect(macos).not.toContain('      - "v*"');
+    expect(macos).not.toContain("softprops/action-gh-release@v2");
   });
 
   it("runs native lifecycle checks on both Apple Silicon and Intel", () => {
@@ -225,8 +289,8 @@ describe("macOS E2E contract", () => {
     const universalJob = jobs.slice(0, intelStart);
     const intelJob = jobs.slice(intelStart);
 
-    expect(universalJob).toContain("scripts/macos/run-lifecycle-e2e.sh");
-    expect(intelJob).toContain("scripts/macos/run-lifecycle-e2e.sh");
+    expect(universalJob).toContain("macos/scripts/run-lifecycle-e2e.sh");
+    expect(intelJob).toContain("macos/scripts/run-lifecycle-e2e.sh");
     expect(intelJob).toContain("lifecycle-intel.json");
   });
 
@@ -271,7 +335,7 @@ describe("macOS E2E contract", () => {
   it("selects a lifecycle sidecar only from the current app process", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
-      path.join(root, "scripts/macos/run-lifecycle-e2e.sh"),
+      path.join(root, "macos/scripts/run-lifecycle-e2e.sh"),
       "utf8",
     );
     const waitFunction = loadShellFunction(script, "wait_for_child_pid");
@@ -297,7 +361,7 @@ printf 'pid=%s\\n' "$pid"
   it("keeps every lifecycle sidecar lookup scoped to its owning app", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
-      path.join(root, "scripts/macos/run-lifecycle-e2e.sh"),
+      path.join(root, "macos/scripts/run-lifecycle-e2e.sh"),
       "utf8",
     );
     const launchFunction = loadShellFunction(script, "launch_app");
@@ -343,7 +407,7 @@ printf 'app=%s sidecar=%s\\n' "$app_pid" "$sidecar_pid"
   it("exercises DMG retry recovery and exhaustion without real hdiutil", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
-      path.join(root, "scripts/build-macos-universal.sh"),
+      path.join(root, "macos/scripts/build-universal.sh"),
       "utf8",
     );
     const retryFunction = loadShellFunction(script, "retry_hdiutil");
@@ -378,7 +442,7 @@ printf 'count=%s result=%s\\n' "$count" "$?"
   it("detaches a partial mount before retrying DMG attachment", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
-      path.join(root, "scripts/build-macos-universal.sh"),
+      path.join(root, "macos/scripts/build-universal.sh"),
       "utf8",
     );
     const activeFunction = loadShellFunction(script, "mount_point_is_active");
@@ -427,7 +491,7 @@ printf 'attach=%s detach=%s result=%s events=%s\\n' \
   it("fails closed when a partial mount cannot be detached", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
-      path.join(root, "scripts/build-macos-universal.sh"),
+      path.join(root, "macos/scripts/build-universal.sh"),
       "utf8",
     );
     const activeFunction = loadShellFunction(script, "mount_point_is_active");
@@ -593,7 +657,7 @@ describeMac("macOS E2E runner behavior", () => {
     };
     const verify = () =>
       spawnSync(
-        path.join(root, "scripts/verify-macos-bundle.sh"),
+        path.join(root, "macos/scripts/verify-bundle.sh"),
         [app, manifest],
         { encoding: "utf8" },
       );

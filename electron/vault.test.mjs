@@ -6,7 +6,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const require = createRequire(import.meta.url);
 const { SettingsStore, VaultService } = require("./vault.cjs");
-const { createNativeFileOperations } = require("./file-operations.cjs");
+const {
+  createNativeFileOperations,
+} = require("../macos/sidecar/file-operations.cjs");
 
 const temporaryDirectories = [];
 const nativeFileOperations =

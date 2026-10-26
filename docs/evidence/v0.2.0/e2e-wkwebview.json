@@ -1,8 +1,8 @@
 {
   "conclusion": "CERTIFIED",
   "environment": {
-    "location": "http://127.0.0.1:63362",
-    "timestamp": "2026-10-26T07:05:59.071Z",
+    "location": "http://127.0.0.1:56314",
+    "timestamp": "2026-10-26T07:39:40.421Z",
     "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
   },
   "executionMode": "background-offscreen",
@@ -19,7 +19,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 0,
+      "durationMs": 1,
       "name": "activity-rail-contract",
       "status": "PASS"
     },
@@ -39,22 +39,22 @@
       "status": "PASS"
     },
     {
-      "durationMs": 0,
+      "durationMs": 1,
       "name": "window-control-contract",
       "status": "PASS"
     },
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "statusbar-contract",
       "status": "PASS"
     },
     {
-      "durationMs": 321,
+      "durationMs": 322,
       "name": "sidebar-collapse-toggle",
       "status": "PASS"
     },
     {
-      "durationMs": 989,
+      "durationMs": 987,
       "name": "rail-navigation-cycle",
       "status": "PASS"
     },
@@ -64,7 +64,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 549,
+      "durationMs": 481,
       "name": "file-list-populated",
       "status": "PASS"
     },
@@ -79,12 +79,12 @@
       "status": "PASS"
     },
     {
-      "durationMs": 999,
+      "durationMs": 1001,
       "name": "file-filter-path",
       "status": "PASS"
     },
     {
-      "durationMs": 999,
+      "durationMs": 1000,
       "name": "file-filter-clear",
       "status": "PASS"
     },
@@ -99,12 +99,12 @@
       "status": "PASS"
     },
     {
-      "durationMs": 1000,
+      "durationMs": 999,
       "name": "file-count-footer",
       "status": "PASS"
     },
     {
-      "durationMs": 1000,
+      "durationMs": 999,
       "name": "search-panel",
       "status": "PASS"
     },
@@ -114,7 +114,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 0,
+      "durationMs": 1,
       "name": "search-result-metadata",
       "status": "PASS"
     },
@@ -134,22 +134,22 @@
       "status": "PASS"
     },
     {
-      "durationMs": 3000,
+      "durationMs": 2999,
       "name": "search-empty-state",
       "status": "PASS"
     },
     {
-      "durationMs": 998,
+      "durationMs": 1001,
       "name": "outline-panel",
       "status": "PASS"
     },
     {
-      "durationMs": 0,
+      "durationMs": 1,
       "name": "outline-entries",
       "status": "PASS"
     },
     {
-      "durationMs": 1000,
+      "durationMs": 999,
       "name": "outline-click",
       "status": "PASS"
     },
@@ -164,7 +164,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 1000,
+      "durationMs": 999,
       "name": "backlinks-panel",
       "status": "PASS"
     },
@@ -184,7 +184,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 1,
+      "durationMs": 0,
       "name": "git-branch-card",
       "status": "PASS"
     },
@@ -199,7 +199,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 999,
+      "durationMs": 1000,
       "name": "git-history-tab",
       "status": "PASS"
     },
@@ -214,7 +214,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 999,
+      "durationMs": 1000,
       "name": "settings-panel",
       "status": "PASS"
     },
@@ -234,7 +234,7 @@
       "status": "PASS"
     },
     {
-      "durationMs": 0,
+      "durationMs": 1,
       "name": "settings-colors",
       "status": "PASS"
     },
@@ -254,62 +254,62 @@
       "status": "PASS"
     },
     {
-      "durationMs": 1000,
+      "durationMs": 999,
       "name": "editor-view-toggle",
       "status": "PASS"
     },
     {
-      "durationMs": 966,
+      "durationMs": 932,
       "name": "editor-more-menu",
       "status": "PASS"
     },
     {
-      "durationMs": 2033,
+      "durationMs": 2068,
       "name": "top-level-navigation-policy",
       "status": "PASS"
     },
     {
-      "durationMs": 48,
+      "durationMs": 73,
       "name": "transfer-create-write-read",
       "status": "PASS"
     },
     {
-      "durationMs": 23,
+      "durationMs": 34,
       "name": "transfer-create-nested",
       "status": "PASS"
     },
     {
-      "durationMs": 92,
+      "durationMs": 226,
       "name": "transfer-rename",
       "status": "PASS"
     },
     {
-      "durationMs": 87,
+      "durationMs": 102,
       "name": "transfer-native-trash",
       "status": "PASS"
     },
     {
-      "durationMs": 266,
+      "durationMs": 312,
       "name": "transfer-save-event",
       "status": "PASS"
     },
     {
-      "durationMs": 19,
+      "durationMs": 16,
       "name": "transfer-search-index",
       "status": "PASS"
     },
     {
-      "durationMs": 43,
+      "durationMs": 20,
       "name": "transfer-outline-index",
       "status": "PASS"
     },
     {
-      "durationMs": 211,
+      "durationMs": 218,
       "name": "transfer-git-diff-stage",
       "status": "PASS"
     },
     {
-      "durationMs": 170,
+      "durationMs": 268,
       "name": "transfer-git-commit",
       "status": "PASS"
     }
@@ -317,8 +317,8 @@
   "status": "CERTIFIED",
   "total": 60,
   "artifact": "Levil Notes 0.2.0.dmg",
-  "sha256": "3f8f2b5d48900a64e93767eb6b9db762ea43023985a20360031d79b317e8580e",
-  "fixtureRoot": "/var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T//spacenotes-e2e.44Ub95",
+  "sha256": "f72822e245773eb035489ef9d327882b0ebf510a0237485d8106b28dad399965",
+  "fixtureRoot": "/var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T//spacenotes-e2e.KzONZZ",
   "host": {
     "macOS": "27.0.0",
     "architecture": "arm64",

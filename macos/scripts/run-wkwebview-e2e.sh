@@ -21,7 +21,7 @@ DIAGNOSTICS_START_BYTES=0
 export SPACENOTES_BACKGROUND_E2E=1
 
 redact_diagnostics() {
-  "$ROOT/scripts/macos/redact-log.sh" "$@"
+  "$ROOT/macos/scripts/redact-log.sh" "$@"
 }
 
 current_diagnostics() {

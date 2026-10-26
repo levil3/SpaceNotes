@@ -61,6 +61,22 @@ class FakeEventSource {
 }
 
 describe("WKWebView levilNotes bridge", () => {
+  it("keeps the Windows preload and macOS bridge surfaces in sync", async () => {
+    const preload = await fs.readFile(
+      path.join("electron", "preload.cjs"),
+      "utf8",
+    );
+    const preloadMethods = [
+      ...preload.matchAll(/^  ([A-Za-z][A-Za-z0-9]*):/gm),
+    ].map((match) => match[1]).sort();
+    const { window } = await loadBridge({
+      fetchImpl: async () => response(null),
+      EventSourceImpl: FakeEventSource,
+    });
+
+    expect(Object.keys(window.levilNotes).sort()).toEqual(preloadMethods);
+  });
+
   it("maps business calls to authenticated sidecar requests", async () => {
     const fetchImpl = vi.fn(async () =>
       response({ path: "note.md", content: "# Note" }),
@@ -82,6 +98,24 @@ describe("WKWebView levilNotes bridge", () => {
           Authorization: "Bearer bridge-token",
         }),
         body: JSON.stringify({ args: ["note.md"] }),
+      }),
+    );
+  });
+
+  it("maps commit preview through the shared Git API", async () => {
+    const fetchImpl = vi.fn(async () => response({ output: "preview" }));
+    const { window } = await loadBridge({
+      fetchImpl,
+      EventSourceImpl: FakeEventSource,
+    });
+
+    await expect(
+      window.levilNotes.gitPreviewCommit(["notes/today.md"]),
+    ).resolves.toEqual({ output: "preview" });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://127.0.0.1:43210/api/gitPreviewCommit",
+      expect.objectContaining({
+        body: JSON.stringify({ args: [["notes/today.md"]] }),
       }),
     );
   });

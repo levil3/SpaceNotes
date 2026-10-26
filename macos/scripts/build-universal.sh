@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 MACOS_ROOT="$ROOT/macos"
 BUILD_ROOT="$ROOT/build/macos"
 CACHE_ROOT="${SPACENOTES_MACOS_CACHE:-$ROOT/.cache/macos}"
@@ -144,7 +144,7 @@ SWIFT_BIN_PATH="$(
   swift build -c release --arch arm64 --arch x86_64 --show-bin-path
 )"
 test -x "$SWIFT_BIN_PATH/SpaceNotes"
-bash "$ROOT/scripts/build-macos-fs-helper.sh" \
+bash "$MACOS_ROOT/native/build-fs-helper.sh" \
   "$BUILD_ROOT/space-notes-fs"
 
 rm -rf "$BUILD_ROOT/sidecar-runtime"
@@ -171,7 +171,8 @@ iconutil -c icns "$BUILD_ROOT/icon.iconset" \
 mkdir -p \
   "$APP_PATH/Contents/MacOS" \
   "$APP_PATH/Contents/Resources/web" \
-  "$APP_PATH/Contents/Resources/sidecar/electron"
+  "$APP_PATH/Contents/Resources/sidecar/electron" \
+  "$APP_PATH/Contents/Resources/sidecar/macos/sidecar"
 cp "$SWIFT_BIN_PATH/SpaceNotes" \
   "$APP_PATH/Contents/MacOS/SpaceNotes"
 cp "$BUILD_ROOT/node-universal/node" "$APP_PATH/Contents/Resources/node"
@@ -179,18 +180,22 @@ cp -R "$ROOT/dist/." "$APP_PATH/Contents/Resources/web/"
 cp "$MACOS_ROOT/bridge/levilNotesBridge.js" \
   "$APP_PATH/Contents/Resources/levilNotesBridge.js"
 cp "$ROOT/electron/api.cjs" "$ROOT/electron/git.cjs" \
-  "$ROOT/electron/file-operations.cjs" \
-  "$ROOT/electron/sidecar.cjs" "$ROOT/electron/sidecar-entry.cjs" \
   "$ROOT/electron/vault.cjs" \
   "$APP_PATH/Contents/Resources/sidecar/electron/"
+cp "$MACOS_ROOT/sidecar/sidecar-entry.cjs" \
+  "$MACOS_ROOT/sidecar/server.cjs" \
+  "$MACOS_ROOT/sidecar/file-operations.cjs" \
+  "$APP_PATH/Contents/Resources/sidecar/macos/sidecar/"
 cp "$BUILD_ROOT/space-notes-fs" \
-  "$APP_PATH/Contents/Resources/space-notes-fs"
+  "$APP_PATH/Contents/Resources/sidecar/space-notes-fs"
 cp "$BUILD_ROOT/sidecar-runtime/package.json" \
   "$APP_PATH/Contents/Resources/sidecar/"
 cp -R "$BUILD_ROOT/sidecar-runtime/node_modules" \
   "$APP_PATH/Contents/Resources/sidecar/"
 cp "$BUILD_ROOT/LevilNotes.icns" \
   "$APP_PATH/Contents/Resources/LevilNotes.icns"
+cp "$MACOS_ROOT/web/macos.css" \
+  "$APP_PATH/Contents/Resources/macos.css"
 
 cat > "$APP_PATH/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -239,7 +244,7 @@ printf 'APPL????' > "$APP_PATH/Contents/PkgInfo"
 
 plutil -lint "$APP_PATH/Contents/Info.plist"
 codesign --force --deep --sign - "$APP_PATH"
-"$ROOT/scripts/verify-macos-bundle.sh" \
+"$MACOS_ROOT/scripts/verify-bundle.sh" \
   "$APP_PATH" "$BUILD_ROOT/macho-architectures.txt"
 
 mkdir -p "$BUILD_ROOT/dmg-stage"

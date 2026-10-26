@@ -1,14 +1,14 @@
 const path = require("node:path");
-const { createLevilNotesApi } = require("./api.cjs");
+const { createLevilNotesApi } = require("../../electron/api.cjs");
 const {
   requireNativeFileOperations,
 } = require("./file-operations.cjs");
-const { GitService } = require("./git.cjs");
+const { GitService } = require("../../electron/git.cjs");
 const {
   createEventBroadcaster,
   createSidecarServer,
-} = require("./sidecar.cjs");
-const { SettingsStore, VaultService } = require("./vault.cjs");
+} = require("./server.cjs");
+const { SettingsStore, VaultService } = require("../../electron/vault.cjs");
 
 function requiredEnvironment(name) {
   const value = process.env[name];
@@ -18,10 +18,11 @@ function requiredEnvironment(name) {
   return value;
 }
 
-function readLaunchToken(stream = process.stdin) {
+function readLaunchTokens(stream = process.stdin) {
   return new Promise((resolve, reject) => {
     let buffer = "";
     let settled = false;
+    const tokens = {};
     const finish = (callback) => {
       if (settled) {
         return;
@@ -40,20 +41,30 @@ function readLaunchToken(stream = process.stdin) {
         finish(() => reject(new Error("sidecar 启动令牌过长。")));
         return;
       }
-      const newline = buffer.indexOf("\n");
-      if (newline === -1) {
-        return;
+      let newline;
+      while ((newline = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newline).replace(/\r$/, "");
+        buffer = buffer.slice(newline + 1);
+        for (const [environmentName, key] of [
+          ["SPACENOTES_TOKEN", "token"],
+          ["SPACENOTES_INTERNAL_TOKEN", "internalToken"],
+        ]) {
+          const prefix = `${environmentName}=`;
+          if (!line.startsWith(prefix)) {
+            continue;
+          }
+          const value = line.slice(prefix.length);
+          if (!value || value.length > 1024) {
+            finish(() => reject(new Error("sidecar 启动令牌无效。")));
+            return;
+          }
+          tokens[key] = value;
+        }
+        if (tokens.token && tokens.internalToken) {
+          finish(() => resolve(tokens));
+          return;
+        }
       }
-      const line = buffer.slice(0, newline).replace(/\r$/, "");
-      const prefix = "SPACENOTES_TOKEN=";
-      const token = line.startsWith(prefix)
-        ? line.slice(prefix.length)
-        : "";
-      if (!token || token.length > 1024) {
-        finish(() => reject(new Error("sidecar 启动令牌无效。")));
-        return;
-      }
-      finish(() => resolve(token));
     };
     const onEnd = () => {
       finish(() => reject(new Error("sidecar 未收到启动令牌。")));
@@ -83,7 +94,7 @@ function reportLog(event, error) {
 }
 
 async function main() {
-  const token = await readLaunchToken();
+  const { token, internalToken } = await readLaunchTokens();
   const settingsPath = requiredEnvironment("SPACENOTES_SETTINGS_PATH");
   const webRoot = path.resolve(
     requiredEnvironment("SPACENOTES_WEB_ROOT"),
@@ -128,17 +139,16 @@ async function main() {
       closeWindow: unsupportedHostAction,
     },
   });
-  const api = {
-    ...sharedApi,
-    openVault: (rootPath) => vaultService.open(rootPath),
-  };
+  const api = sharedApi;
   const sidecar = createSidecarServer({
     api,
     vaultService,
     webRoot,
     token,
+    internalToken,
     allowedOrigins,
     internalHandlers: {
+      openVault: (rootPath) => vaultService.open(rootPath),
       refresh: () => vaultService.refreshIndex(),
     },
     broadcaster,
@@ -198,4 +208,4 @@ main().catch((error) => {
   process.exit(1);
 });
 
-module.exports = { readLaunchToken };
+module.exports = { readLaunchTokens };

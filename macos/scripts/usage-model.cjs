@@ -10,14 +10,14 @@ const { GitService } = require("../../electron/git.cjs");
 const {
   createEventBroadcaster,
   createSidecarServer,
-} = require("../../electron/sidecar.cjs");
+} = require("../sidecar/server.cjs");
 const {
   SettingsStore,
   VaultService,
 } = require("../../electron/vault.cjs");
 const {
   createNativeFileOperations,
-} = require("../../electron/file-operations.cjs");
+} = require("../sidecar/file-operations.cjs");
 
 const execFileAsync = promisify(execFile);
 const ROOT = path.resolve(__dirname, "../..");

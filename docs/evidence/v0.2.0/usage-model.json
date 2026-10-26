@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-23T13:44:44.934Z",
+  "generatedAt": "2026-10-26T07:37:45.959Z",
   "status": "PASS",
   "iterationsRequested": 3000,
   "operationsExecuted": 3000,
@@ -25,10 +25,10 @@
   "eventVerified": true,
   "dataIntegrity": "zero-corruption",
   "git": {
-    "initialHead": "bf17b4a77e5f10b45a7cdcc09b85281546bdca1a",
-    "committedHead": "7e43ac1430cee2c964d128e07c34a9fcd706cd86",
-    "commitOutput": "[main 7e43ac1] test: certify macOS usage model\n 40 files changed, 96 insertions(+), 24 deletions(-)\n create mode 100644 certification.md\n create mode 100644 model-created-20261023-13.md\n create mode 100644 model-created-20261023-19.md\n create mode 100644 model-created-20261023-20.md\n create mode 100644 model-created-20261023-21.md\n create mode 100644 model-created-20261023-25.md\n create mode 100644 model-created-20261023-26.md\n create mode 100644 model-created-20261023-27.md\n create mode 100644 model-created-20261023-29.md\n create mode 100644 model-created-20261023-30.md\n create mode 100644 model-created-20261023-31.md\n create mode 100644 model-created-20261023-33.md\n create mode 100644 model-created-20261023-34.md\n create mode 100644 model-created-20261023-37.md\n create mode 100644 model-created-20261023-38.md\n create mode 100644 model-created-20261023-39.md\n create mode 100644 model-created-20261023-40.md\n create mode 100644 model-created-20261023-41.md\n create mode 100644 model-created-20261023-42.md\n create mode 100644 model-created-20261023-43.md\n create mode 100644 model-created-20261023-44.md\n create mode 100644 model-created-20261023-9.md\n create mode 100644 model-renamed-20261023-1049.md\n create mode 100644 model-renamed-20261023-1061.md\n create mode 100644 model-renamed-20261023-1217.md\n create mode 100644 model-renamed-20261023-181.md\n create mode 100644 model-renamed-20261023-527.md\n create mode 100644 model-renamed-20261023-574.md\n create mode 100644 model-renamed-20261023-818.md\n create mode 100644 model-renamed-20261023-911.md\n create mode 100644 model-renamed-20261023-929.md\n create mode 100644 model-renamed-20261023-937.md\n delete mode 100644 note-0.md\n delete mode 100644 note-1.md\n delete mode 100644 note-2.md\n delete mode 100644 note-3.md\n delete mode 100644 note-4.md\n delete mode 100644 note-5.md\n delete mode 100644 note-6.md\n delete mode 100644 note-7.md",
-    "pushOutput": "To /var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T/spacenotes-usage-model-uOE7nl/remote.git\n   bf17b4a..7e43ac1  main -> main",
+    "initialHead": "113c5e34071c677c1285bc253692944a817837ac",
+    "committedHead": "76d9cdfa9e3980181ef691b0dcd9d872a872b421",
+    "commitOutput": "[main 76d9cdf] test: certify macOS usage model\n 40 files changed, 96 insertions(+), 24 deletions(-)\n create mode 100644 certification.md\n create mode 100644 model-created-20261023-13.md\n create mode 100644 model-created-20261023-19.md\n create mode 100644 model-created-20261023-20.md\n create mode 100644 model-created-20261023-21.md\n create mode 100644 model-created-20261023-25.md\n create mode 100644 model-created-20261023-26.md\n create mode 100644 model-created-20261023-27.md\n create mode 100644 model-created-20261023-29.md\n create mode 100644 model-created-20261023-30.md\n create mode 100644 model-created-20261023-31.md\n create mode 100644 model-created-20261023-33.md\n create mode 100644 model-created-20261023-34.md\n create mode 100644 model-created-20261023-37.md\n create mode 100644 model-created-20261023-38.md\n create mode 100644 model-created-20261023-39.md\n create mode 100644 model-created-20261023-40.md\n create mode 100644 model-created-20261023-41.md\n create mode 100644 model-created-20261023-42.md\n create mode 100644 model-created-20261023-43.md\n create mode 100644 model-created-20261023-44.md\n create mode 100644 model-created-20261023-9.md\n create mode 100644 model-renamed-20261023-1049.md\n create mode 100644 model-renamed-20261023-1061.md\n create mode 100644 model-renamed-20261023-1217.md\n create mode 100644 model-renamed-20261023-181.md\n create mode 100644 model-renamed-20261023-527.md\n create mode 100644 model-renamed-20261023-574.md\n create mode 100644 model-renamed-20261023-818.md\n create mode 100644 model-renamed-20261023-911.md\n create mode 100644 model-renamed-20261023-929.md\n create mode 100644 model-renamed-20261023-937.md\n delete mode 100644 note-0.md\n delete mode 100644 note-1.md\n delete mode 100644 note-2.md\n delete mode 100644 note-3.md\n delete mode 100644 note-4.md\n delete mode 100644 note-5.md\n delete mode 100644 note-6.md\n delete mode 100644 note-7.md",
+    "pushOutput": "To /var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T/spacenotes-usage-model-X3JkZf/remote.git\n   113c5e3..76d9cdf  main -> main",
     "pullOutput": "Already up to date.",
     "branchCount": 1,
     "logCount": 1,
@@ -40,7 +40,7 @@
     "architecture": "arm64",
     "node": "v22.23.2",
     "os": "27.0.0",
-    "fixtureRoot": "/var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T/spacenotes-usage-model-uOE7nl",
+    "fixtureRoot": "/var/folders/xb/dl8cz4l95fnc67dg34b5rfgm0000gn/T/spacenotes-usage-model-X3JkZf",
     "fileAccess": "native-fd-relative-helper"
   }
 }

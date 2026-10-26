@@ -1,0 +1,48 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    uses: ./.github/workflows/build-windows.yml
+
+  macos:
+    uses: ./.github/workflows/build-macos.yml
+
+  release:
+    name: Publish Windows EXE and macOS DMG
+    needs:
+      - windows
+      - macos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: release-assets/windows
+
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-universal
+          path: release-assets/macos
+
+      - name: Publish complete desktop release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/windows/*.exe
+            release-assets/macos/build/macos/*.dmg
+            release-assets/macos/build/macos/*.dmg.sha256
+            release-assets/macos/build/macos/macho-architectures.txt
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          generate_release_notes: true

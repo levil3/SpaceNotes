@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 APP_PATH="${1:-$ROOT/build/macos/Levil Notes.app}"
 MANIFEST_PATH="${2:-$ROOT/build/macos/macho-architectures.txt}"
 

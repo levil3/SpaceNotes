@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
+const describeMac = process.platform === "darwin" ? describe : describe.skip;
 const temporaryDirectories = [];
 const children = new Set();
 
@@ -72,7 +73,7 @@ function waitForSseResponse(port, token) {
   });
 }
 
-describe("sidecar process contract", () => {
+describeMac("sidecar process contract", () => {
   it("shuts down cleanly on SIGTERM while SSE is connected", async () => {
     const root = await fs.mkdtemp(
       path.join(os.tmpdir(), "space-notes-sidecar-process-"),
@@ -91,7 +92,7 @@ describe("sidecar process contract", () => {
     const helperPath = path.resolve("build/macos/space-notes-fs");
     const child = spawn(
       process.execPath,
-      [path.resolve("electron/sidecar-entry.cjs")],
+      [path.resolve("macos/sidecar/sidecar-entry.cjs")],
       {
         cwd: path.resolve("."),
         env: {
@@ -106,7 +107,8 @@ describe("sidecar process contract", () => {
     );
     children.add(child);
     child.stdin.end(
-      "SPACENOTES_TOKEN=process-token-0123456789abcdef0123456789abcdef\n",
+      "SPACENOTES_TOKEN=process-token-0123456789abcdef0123456789abcdef\n"
+        + "SPACENOTES_INTERNAL_TOKEN={{SECRET_host_only}}\n",
     );
     const ready = await waitForReady(child);
 
@@ -210,7 +212,7 @@ describe("sidecar process contract", () => {
     const helperPath = path.resolve("build/macos/space-notes-fs");
     const child = spawn(
       process.execPath,
-      [path.resolve("electron/sidecar-entry.cjs")],
+      [path.resolve("macos/sidecar/sidecar-entry.cjs")],
       {
         cwd: path.resolve("."),
         env: {
@@ -224,15 +226,18 @@ describe("sidecar process contract", () => {
       },
     );
     children.add(child);
-    child.stdin.end(`SPACENOTES_TOKEN=${token}\n`);
+    child.stdin.end(
+      `SPACENOTES_TOKEN=${token}\n`
+        + "SPACENOTES_INTERNAL_TOKEN={{SECRET_host_only}}\n",
+    );
     try {
       const ready = await waitForReady(child);
       const response = await fetch(
-        `http://127.0.0.1:${ready.port}/api/openVault`,
+        `http://127.0.0.1:${ready.port}/internal/openVault`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: "Bearer {{SECRET_host_only}}",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ args: [vaultRoot] }),
@@ -259,6 +264,7 @@ describe("sidecar process contract", () => {
       expect(environments).toContain("SPACENOTES_SETTINGS_PATH=");
       expect(environments).not.toContain(token);
       expect(environments).not.toContain("SPACENOTES_TOKEN=");
+      expect(environments).not.toContain("SPACENOTES_INTERNAL_TOKEN=");
     } finally {
       child.kill("SIGTERM");
       await waitForExit(child);
@@ -285,7 +291,7 @@ describe("sidecar process contract", () => {
       delete environment.SPACENOTES_TOKEN;
       const child = spawn(
         process.execPath,
-        [path.resolve("electron/sidecar-entry.cjs")],
+        [path.resolve("macos/sidecar/sidecar-entry.cjs")],
         {
           cwd: path.resolve("."),
           env: {
@@ -304,7 +310,8 @@ describe("sidecar process contract", () => {
         stderr += chunk;
       });
       child.stdin.end(
-        "SPACENOTES_TOKEN=process-token-0123456789abcdef0123456789abcdef\n",
+        "SPACENOTES_TOKEN=process-token-0123456789abcdef0123456789abcdef\n"
+          + "SPACENOTES_INTERNAL_TOKEN={{SECRET_host_only}}\n",
       );
 
       await expect(waitForExit(child)).resolves.toBe(1);

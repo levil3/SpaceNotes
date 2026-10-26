@@ -2,11 +2,21 @@ import CryptoKit
 import Foundation
 
 public enum LaunchTokenPayload {
-    public static func data(for token: String) throws -> Data {
-        guard !token.isEmpty, !token.contains(where: \.isNewline) else {
+    public static func data(
+        token: String,
+        internalToken: String
+    ) throws -> Data {
+        for value in [token, internalToken]
+        where value.isEmpty || value.contains(where: \.isNewline) {
             throw LaunchTokenError.invalid
         }
-        return Data("SPACENOTES_TOKEN=\(token)\n".utf8)
+        return Data(
+            """
+            SPACENOTES_TOKEN=\(token)
+            SPACENOTES_INTERNAL_TOKEN=\(internalToken)
+
+            """.utf8
+        )
     }
 
     public static func fingerprint(of token: String) -> String {

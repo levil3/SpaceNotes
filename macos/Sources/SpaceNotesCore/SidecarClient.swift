@@ -17,27 +17,38 @@ public enum SidecarClientError: LocalizedError {
 public struct SidecarClient: Sendable {
     public let baseURL: URL
     public let token: String
+    public let internalToken: String
     private let session: URLSession
 
     public init(
         baseURL: URL,
         token: String,
+        internalToken: String? = nil,
         session: URLSession = .shared
     ) {
         self.baseURL = baseURL
         self.token = token
+        self.internalToken = internalToken ?? token
         self.session = session
     }
 
     public func call(method: String, arguments: [Any] = []) async throws -> Any? {
-        try await post(path: "/api/\(method)", arguments: arguments)
+        try await post(
+            path: "/api/\(method)",
+            arguments: arguments,
+            token: token
+        )
     }
 
     public func internalCall(
         method: String,
         arguments: [Any] = []
     ) async throws -> Any? {
-        try await post(path: "/internal/\(method)", arguments: arguments)
+        try await post(
+            path: "/internal/\(method)",
+            arguments: arguments,
+            token: internalToken
+        )
     }
 
     public func snapshot() async throws -> [String: Any] {
@@ -49,7 +60,11 @@ public struct SidecarClient: Sendable {
         return snapshot
     }
 
-    private func post(path: String, arguments: [Any]) async throws -> Any? {
+    private func post(
+        path: String,
+        arguments: [Any],
+        token: String
+    ) async throws -> Any? {
         guard let endpoint = Self.endpointURL(baseURL: baseURL, path: path)
         else {
             throw SidecarClientError.invalidResponse

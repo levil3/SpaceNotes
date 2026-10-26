@@ -671,22 +671,95 @@ class GitService {
     }
 
     if (change.untracked) {
-      const absolute = this.vaultService.resolveInsideVault(filePath);
-      const content = await fs.readFile(absolute, "utf8");
-      return [
-        `diff --git a/${filePath} b/${filePath}`,
-        "new file mode 100644",
-        "--- /dev/null",
-        `+++ b/${filePath}`,
-        ...content.split(/\r?\n/).map((line) => `+${line}`),
-      ].join("\n");
+      return this.untrackedFileDiff(filePath);
     }
 
+    return (
+      (await this.trackedFileDiff([filePath])) ||
+      "该文件没有可显示的文本差异。"
+    );
+  }
+
+  /**
+   * An unborn repository has no HEAD yet, so indexed files must be compared via
+   * --cached. Once a commit exists, diffing against HEAD includes both staged
+   * and unstaged edits and therefore matches the content that will be committed.
+   */
+  async trackedFileDiff(paths) {
+    const head = await this.run(["rev-parse", "--verify", "HEAD"], {
+      allowCodes: [128],
+    });
     const result = await this.run(
-      ["diff", "HEAD", "--no-ext-diff", "--unified=3", "--", filePath],
+      [
+        "diff",
+        ...(head.code === 0 ? ["HEAD"] : ["--cached"]),
+        "--no-ext-diff",
+        "--unified=3",
+        "--",
+        ...paths,
+      ],
       { allowCodes: [1, 128] },
     );
-    return result.stdout || "该文件没有可显示的文本差异。";
+    return result.stdout;
+  }
+
+  /**
+   * Git normally omits untracked files from `git diff`. Running no-index diff
+   * against /dev/null produces a standard patch, including correct newline and
+   * binary-file handling, without writing to the index.
+   */
+  async untrackedFileDiff(filePath) {
+    const safePath = normalizeRelativeGitPath(filePath);
+    // Keep previews inside the opened vault even when Git's repository root is
+    // an ancestor directory.
+    this.vaultService.resolveInsideVault(safePath);
+    const result = await this.run(
+      [
+        "diff",
+        "--no-index",
+        "--no-ext-diff",
+        "--unified=3",
+        "--",
+        "/dev/null",
+        safePath,
+      ],
+      { allowCodes: [1] },
+    );
+    return result.stdout || "该文件没有可显示的文件差异。";
+  }
+
+  /**
+   * Builds a single diff for the files selected in the commit panel. Untracked
+   * files are represented as new-file patches because `git diff HEAD` ignores
+   * them until they have been staged.
+   */
+  async previewCommit(selectedPaths) {
+    const selectedSet = new Set(selectedPaths);
+    const current = await this.status();
+    const selected = current.changes.filter(
+      (change) => selectedSet.has(change.path) && !change.conflict,
+    );
+    if (!selected.length) {
+      throw new Error("请先选择要提交的文件。");
+    }
+
+    const trackedPaths = selected
+      .filter((change) => !change.untracked)
+      .map((change) => change.path);
+    const sections = [];
+
+    if (trackedPaths.length) {
+      const trackedDiff = await this.trackedFileDiff(trackedPaths);
+      if (trackedDiff.trim()) {
+        sections.push(trackedDiff.trimEnd());
+      }
+    }
+
+    for (const change of selected.filter((item) => item.untracked)) {
+      sections.push(await this.untrackedFileDiff(change.path));
+    }
+
+    return sections.join("\n\n") || "选中的更改没有可显示的文本差异。";
   }
 
   async stage(paths, staged) {

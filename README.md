@@ -19,10 +19,10 @@ Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS 通用 DMG
 
 - 实时 Markdown 编辑，默认阅读模式，可随时切换为编辑模式。
 - 文件树、标题/正文搜索、智能/精确匹配、标签、反链和可折叠大纲。
-- 多标签编辑、自动保存、阅读宽度和编辑器外观配置。
+- 多标签编辑、自动保存、当前笔记 `Ctrl+F` 查找和编辑器外观配置。
 - 兼容笔记库相对路径、笔记相对路径和旧笔记中的附件文件名。
 - 本地图片、表格和代码块渲染，支持明暗外观与常用主题切换。
-- IntelliJ IDEA 风格的 Git 状态颜色、差异查看、暂存、提交、拉取和推送。
+- IntelliJ IDEA 风格的 Git 状态颜色、提交差异预览、暂存、提交、拉取和推送。
 - 支持 `.gitignore`、隐藏目录显示开关和单目录/文件忽略操作。
 - Git 使用系统安装的 Git，现有凭据管理器、SSH、代理和 Hook 配置继续生效。
 
@@ -62,15 +62,15 @@ npm run build
 - 安装包输出目录：`release/`
 - 免安装调试版本：`release/win-unpacked/Levil Notes.exe`
 
-仓库包含 Windows 与 macOS 自动构建流程。推送 `v0.2.0` 这类标签时，Windows
-工作流上传 `.exe`，macOS 工作流在双架构验证通过后向同一个 GitHub Release 上传
-universal `.dmg` 及其 SHA-256、Mach-O 架构清单。
+仓库包含 Windows 与 macOS 自动构建流程。推送 `v0.2.0` 这类标签时，
+`Release Desktop` 会并行构建 Windows x64 和 macOS universal 产物；只有两端都
+通过构建与验证后，才一次性发布 `.exe`、`.dmg`、SHA-256 和 Mach-O 架构清单。
 
 macOS 使用 AppKit + WKWebView 薄壳并内置 Node sidecar。构建 universal DMG：
 
 ```bash
 npm ci
-bash scripts/build-macos-universal.sh
+bash macos/scripts/build-universal.sh
 ```
 
 产物位于 `build/macos/Levil Notes 0.2.0.dmg`，同目录包含 SHA-256 与全部 Mach-O
@@ -93,8 +93,7 @@ electron/main.cjs       Electron 生命周期、窗口、协议和 IPC
 electron/preload.cjs    受限 IPC API
 electron/vault.cjs      笔记库索引、搜索、附件和设置
 electron/git.cjs        系统 Git CLI 封装
-electron/sidecar.cjs    macOS sidecar HTTP/SSE 传输与认证
-macos/                  AppKit + WKWebView 宿主与 sidecar 监管
+macos/                  AppKit + WKWebView、sidecar、DMG 脚本和 macOS 测试
 src/App.tsx             应用状态、标签和工作区编排
 src/components/         UI 组件与左侧面板
 src/lib/markdown.ts     编辑器图片 URL 与原始 Markdown 往返

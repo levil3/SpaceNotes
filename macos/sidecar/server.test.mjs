@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const {
   createEventBroadcaster,
   createSidecarServer,
-} = require("./sidecar.cjs");
+} = require("./server.cjs");
 
 const temporaryDirectories = [];
 const runningServers = [];
@@ -73,6 +73,7 @@ async function createFixture() {
     vaultService,
     webRoot,
     token: "test-token",
+    internalToken: "internal-token",
     allowedOrigins: ["http://127.0.0.1:5173"],
     broadcaster,
     internalHandlers: internal,
@@ -97,6 +98,16 @@ function authorizedRequest(url, init = {}) {
     ...init,
     headers: {
       Authorization: "Bearer test-token",
+      ...init.headers,
+    },
+  });
+}
+
+function internalRequest(url, init = {}) {
+  return fetch(url, {
+    ...init,
+    headers: {
+      Authorization: "Bearer internal-token",
       ...init.headers,
     },
   });
@@ -202,7 +213,7 @@ describe("macOS sidecar HTTP contract", () => {
       headers: { "Content-Type": "application/json" },
       body: "null",
     });
-    const internalResponse = await authorizedRequest(
+    const internalResponse = await internalRequest(
       `${baseUrl}/internal/refresh`,
       {
         method: "POST",
@@ -219,6 +230,35 @@ describe("macOS sidecar HTTP contract", () => {
     await expect(internalResponse.json()).resolves.toEqual({
       error: "请求体必须是对象。",
     });
+  });
+
+  it("does not let the renderer token call host-only methods", async () => {
+    const { baseUrl } = await createFixture();
+
+    const response = await authorizedRequest(
+      `${baseUrl}/internal/refresh`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ args: [] }),
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "未授权。" });
+  });
+
+  it("does not let the host token call renderer API methods", async () => {
+    const { baseUrl } = await createFixture();
+
+    const response = await internalRequest(`${baseUrl}/api/readNote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["note.md"] }),
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "未授权。" });
   });
 
   it("supports the configured Vite development origin", async () => {

@@ -4,7 +4,7 @@ const path = require("node:path");
 if (process.platform === "darwin") {
   execFileSync(
     "bash",
-    [path.resolve("scripts/build-macos-fs-helper.sh")],
+    [path.resolve(__dirname, "../native/build-fs-helper.sh")],
     { stdio: "inherit" },
   );
 }

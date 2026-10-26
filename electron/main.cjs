@@ -13,9 +13,6 @@ const {
   createLevilNotesApi,
   registerIpcHandlers,
 } = require("./api.cjs");
-const {
-  requireNativeFileOperations,
-} = require("./file-operations.cjs");
 const { GitService } = require("./git.cjs");
 const { SettingsStore, VaultService } = require("./vault.cjs");
 
@@ -148,7 +145,7 @@ app.whenReady().then(async () => {
   await settingsStore.load();
   const fileOperations =
     process.platform === "darwin"
-      ? requireNativeFileOperations(
+      ? require("../macos/sidecar/file-operations.cjs").requireNativeFileOperations(
           process.env.SPACENOTES_FS_HELPER ||
             path.join(__dirname, "..", "build", "macos", "space-notes-fs"),
         )

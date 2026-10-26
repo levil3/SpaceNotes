@@ -99,12 +99,17 @@ final class SpaceNotesCoreTests: XCTestCase {
 
     func testLaunchTokenPayloadUsesAStdInLineAndStableFingerprint() throws {
         let token = "0123456789abcdef0123456789abcdef"
+        let internalToken = "{{SECRET_host_only}}"
         XCTAssertEqual(
             String(
-                data: try LaunchTokenPayload.data(for: token),
+                data: try LaunchTokenPayload.data(
+                    token: token,
+                    internalToken: internalToken
+                ),
                 encoding: .utf8
             ),
             "SPACENOTES_TOKEN=\(token)\n"
+                + "SPACENOTES_INTERNAL_TOKEN=\(internalToken)\n"
         )
         XCTAssertEqual(
             LaunchTokenPayload.fingerprint(of: token),
@@ -112,7 +117,16 @@ final class SpaceNotesCoreTests: XCTestCase {
                 + "2b5061b7f9"
         )
         XCTAssertThrowsError(
-            try LaunchTokenPayload.data(for: "token\ninjection")
+            try LaunchTokenPayload.data(
+                token: "token\ninjection",
+                internalToken: internalToken
+            )
+        )
+        XCTAssertThrowsError(
+            try LaunchTokenPayload.data(
+                token: token,
+                internalToken: "token\ninjection"
+            )
         )
     }
 

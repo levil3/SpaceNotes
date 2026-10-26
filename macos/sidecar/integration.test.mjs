@@ -5,13 +5,13 @@ import { createRequire } from "node:module";
 import { afterEach, describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
-const { createLevilNotesApi } = require("./api.cjs");
-const { GitService } = require("./git.cjs");
+const { createLevilNotesApi } = require("../../electron/api.cjs");
+const { GitService } = require("../../electron/git.cjs");
 const {
   createEventBroadcaster,
   createSidecarServer,
-} = require("./sidecar.cjs");
-const { SettingsStore, VaultService } = require("./vault.cjs");
+} = require("./server.cjs");
+const { SettingsStore, VaultService } = require("../../electron/vault.cjs");
 
 const temporaryDirectories = [];
 
@@ -23,11 +23,17 @@ afterEach(async () => {
   );
 });
 
-async function request(baseUrl, method, args = []) {
-  const response = await fetch(`${baseUrl}/api/${method}`, {
+async function request(
+  baseUrl,
+  method,
+  args = [],
+  token = "integration-token",
+  route = "api",
+) {
+  const response = await fetch(`${baseUrl}/${route}/${method}`, {
     method: "POST",
     headers: {
-      Authorization: "Bearer integration-token",
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ args }),
@@ -77,22 +83,28 @@ describe("sidecar with the real vault and Git services", () => {
       settingsStore: settings,
       hostActions: {},
     });
-    const api = {
-      ...sharedApi,
-      openVault: (rootPath) => vault.open(rootPath),
-    };
     sidecar = createSidecarServer({
-      api,
+      api: sharedApi,
       vaultService: vault,
       webRoot,
       token: "integration-token",
+      internalToken: "host-only-token",
+      internalHandlers: {
+        openVault: (rootPath) => vault.open(rootPath),
+      },
       broadcaster,
     });
 
     try {
       const address = await sidecar.listen();
       const baseUrl = `http://127.0.0.1:${address.port}`;
-      const opened = await request(baseUrl, "openVault", [vaultRoot]);
+      const opened = await request(
+        baseUrl,
+        "openVault",
+        [vaultRoot],
+        "host-only-token",
+        "internal",
+      );
       expect(opened.files.map((file) => file.path)).toEqual([
         "today.md",
       ]);

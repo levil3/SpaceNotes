@@ -160,12 +160,18 @@ function createSidecarServer({
   vaultService,
   webRoot,
   token,
+  internalToken = token,
   allowedOrigins = [],
   internalHandlers = {},
   broadcaster = createEventBroadcaster(),
   logger = () => {},
 }) {
-  if (!token || typeof token !== "string") {
+  if (
+    !token ||
+    typeof token !== "string" ||
+    !internalToken ||
+    typeof internalToken !== "string"
+  ) {
     throw new Error("sidecar 必须配置启动令牌。");
   }
   const originSet = new Set(
@@ -216,7 +222,10 @@ function createSidecarServer({
       return;
     }
 
-    if (!tokenMatches(token, requestToken(request, url))) {
+    const routeToken = url.pathname.startsWith("/internal/")
+      ? internalToken
+      : token;
+    if (!tokenMatches(routeToken, requestToken(request, url))) {
       sendJson(response, 401, { error: "未授权。" }, headers);
       return;
     }

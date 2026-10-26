@@ -16,6 +16,7 @@ const IPC_METHODS = Object.freeze({
   "git:diff": "gitDiff",
   "git:stage": "gitStage",
   "git:commit": "gitCommit",
+  "git:preview-commit": "gitPreviewCommit",
   "git:fetch": "gitFetch",
   "git:pull": "gitPull",
   "git:push": "gitPush",
@@ -86,6 +87,8 @@ function createLevilNotesApi({
     gitStage: (paths, staged) => gitService.stage(paths, staged),
     gitCommit: (message, selectedPaths) =>
       gitService.commit(message, selectedPaths),
+    gitPreviewCommit: (selectedPaths) =>
+      gitService.previewCommit(selectedPaths),
     gitFetch: () => gitService.fetch(),
     gitPull: () => gitService.pull(),
     gitPush: () => gitService.push(),

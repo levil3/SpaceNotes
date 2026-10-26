@@ -81,7 +81,7 @@ xcode-select --install
 git clone https://github.com/levil3/SpaceNotes.git
 cd SpaceNotes
 npm ci
-bash scripts/build-macos-universal.sh
+bash macos/scripts/build-universal.sh
 ```
 
 构建脚本固定使用 Node.js 24.22.1 的官方 arm64/x64 包，校验 SHA-256 后用 `lipo`
@@ -143,7 +143,7 @@ npm run build
 构建完成后可以在以下位置找到文件：
 
 ```text
-release/Levil Notes Setup 0.1.3.exe
+release/Levil Notes Setup 0.2.0.exe
 release/win-unpacked/Levil Notes.exe
 ```
 
@@ -151,18 +151,18 @@ release/win-unpacked/Levil Notes.exe
 
 ## 从 GitHub 自动生成安装包
 
-仓库中的 `.github/workflows/build-windows.yml` 提供 Windows 自动构建：
+仓库中的 `.github/workflows/release.yml` 提供双平台原子发布：
 
 - 在 Actions 页面手动运行 `Build Windows`，完成后下载 `windows-installer`。
-- 推送 `v0.2.0` 这类标签后，Windows 工作流会构建并上传 `.exe`。
-- `.github/workflows/build-macos.yml` 会在同一标签上构建 universal DMG，并在
-  arm64 与 Intel 验证通过后上传到同一个 GitHub Release。
+- 推送 `v0.2.0` 这类标签后，`Release Desktop` 会并行构建 Windows `.exe` 和
+  macOS universal `.dmg`。
+- 任一平台失败时不会创建残缺 Release；两端均成功后才会一次性上传全部产物。
 
 维护者发布新版本时执行：
 
 ```powershell
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 ## 笔记库兼容性

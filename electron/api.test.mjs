@@ -35,6 +35,7 @@ function createFixture() {
     diff: vi.fn(async () => "diff"),
     stage: vi.fn(async () => ({ repository: true })),
     commit: vi.fn(async () => ({ output: "committed" })),
+    previewCommit: vi.fn(async () => ({ output: "preview" })),
     fetch: vi.fn(async () => ({ output: "fetched" })),
     pull: vi.fn(async () => ({ output: "pulled" })),
     push: vi.fn(async () => ({ output: "pushed" })),
@@ -104,6 +105,7 @@ describe("shared LevilNotes API", () => {
 
     await api.gitStage(["notes/today.md"], true);
     await api.gitCommit("note update", ["notes/today.md"]);
+    await api.gitPreviewCommit(["notes/today.md"]);
     await api.gitRemoveIgnore("local", 4);
 
     expect(gitService.stage).toHaveBeenCalledWith(
@@ -111,6 +113,9 @@ describe("shared LevilNotes API", () => {
       true,
     );
     expect(gitService.commit).toHaveBeenCalledWith("note update", [
+      "notes/today.md",
+    ]);
+    expect(gitService.previewCommit).toHaveBeenCalledWith([
       "notes/today.md",
     ]);
     expect(gitService.removeIgnore).toHaveBeenCalledWith("local", 4);

@@ -161,7 +161,7 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
             }
             Task {
                 do {
-                    let snapshot = try await client.call(
+                    let snapshot = try await client.internalCall(
                         method: "openVault",
                         arguments: [url.path]
                     )

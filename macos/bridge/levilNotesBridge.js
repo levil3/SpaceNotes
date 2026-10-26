@@ -128,6 +128,8 @@
         invoke("gitStage", [paths, staged]),
       gitCommit: (message, selectedPaths) =>
         invoke("gitCommit", [message, selectedPaths]),
+      gitPreviewCommit: (selectedPaths) =>
+        invoke("gitPreviewCommit", [selectedPaths]),
       gitFetch: () => invoke("gitFetch"),
       gitPull: () => invoke("gitPull"),
       gitPush: () => invoke("gitPush"),

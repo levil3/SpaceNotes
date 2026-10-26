@@ -2,18 +2,17 @@ name: Build macOS Universal DMG
 
 on:
   workflow_dispatch:
+  workflow_call:
   push:
     branches:
       - main
       - feat/macos-adaptation
-    tags:
-      - "v*"
   pull_request:
     paths:
       - ".github/workflows/build-macos.yml"
+      - ".github/workflows/release.yml"
       - "electron/**"
       - "macos/**"
-      - "scripts/**"
       - "src/**"
       - "package.json"
       - "package-lock.json"
@@ -44,7 +43,7 @@ jobs:
         run: npm test
 
       - name: Check embedded E2E script
-        run: node scripts/macos/check-e2e-script.cjs
+        run: node macos/scripts/check-e2e-script.cjs
 
       - name: Audit production dependencies
         run: |
@@ -57,7 +56,7 @@ jobs:
       - name: Run bridge and sidecar usage model
         run: |
           mkdir -p docs/evidence/v0.2.0
-          node scripts/macos/usage-model.cjs \
+          node macos/scripts/usage-model.cjs \
             --iterations 3000 \
             --seed 20261023 \
             --report docs/evidence/v0.2.0/usage-model.json
@@ -69,7 +68,7 @@ jobs:
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             export SPACENOTES_VERSION="${GITHUB_REF_NAME#v}"
           fi
-          bash scripts/build-macos-universal.sh 2>&1 | tee build/macos/build.log
+          bash macos/scripts/build-universal.sh 2>&1 | tee build/macos/build.log
           dmg_path="$(find build/macos -maxdepth 1 -type f -name '*.dmg' -print -quit)"
           test -n "$dmg_path"
           printf 'MACOS_DMG_PATH=%s\n' "$dmg_path" >> "$GITHUB_ENV"
@@ -84,7 +83,7 @@ jobs:
 
       - name: Run real WKWebView E2E certification
         run: |
-          bash scripts/macos/run-wkwebview-e2e.sh \
+          bash macos/scripts/run-wkwebview-e2e.sh \
             "build/macos/Levil Notes.app" \
             docs/evidence/v0.2.0/e2e-wkwebview.json \
             "$MACOS_DMG_PATH" \
@@ -95,7 +94,7 @@ jobs:
           SPACENOTES_APP_BUNDLE: ${{ github.workspace }}/build/macos/Levil Notes.app
           SPACENOTES_ALLOW_INCONCLUSIVE_VISUAL: "1"
         run: |
-          bash scripts/macos/run-lifecycle-e2e.sh \
+          bash macos/scripts/run-lifecycle-e2e.sh \
             docs/evidence/v0.2.0/lifecycle.json
 
       - name: Upload macOS artifacts
@@ -193,12 +192,12 @@ jobs:
             "$dmg_path"
           test -d "$mount_point/Levil Notes.app"
           test -L "$mount_point/Applications"
-          bash scripts/verify-macos-bundle.sh \
+          bash macos/scripts/verify-bundle.sh \
             "$mount_point/Levil Notes.app" \
             "$RUNNER_TEMP/intel-macho-architectures.txt"
           codesign --verify --deep --strict "$mount_point/Levil Notes.app"
           "$mount_point/Levil Notes.app/Contents/MacOS/SpaceNotes" --smoke-test
-          bash scripts/macos/run-wkwebview-e2e.sh \
+          bash macos/scripts/run-wkwebview-e2e.sh \
             "$mount_point/Levil Notes.app" \
             "$RUNNER_TEMP/e2e-wkwebview-intel.json" \
             "$dmg_path" \
@@ -206,7 +205,7 @@ jobs:
           SPACENOTES_APP_BUNDLE="$mount_point/Levil Notes.app" \
           SPACENOTES_DMG_PATH="$dmg_path" \
           SPACENOTES_ALLOW_INCONCLUSIVE_VISUAL=1 \
-            bash scripts/macos/run-lifecycle-e2e.sh \
+            bash macos/scripts/run-lifecycle-e2e.sh \
               "$RUNNER_TEMP/lifecycle-intel.json"
 
       - name: Upload Intel evidence
@@ -220,31 +219,3 @@ jobs:
             ${{ runner.temp }}/e2e-wkwebview-intel-diagnostics.log
             ${{ runner.temp }}/lifecycle-intel.json
           if-no-files-found: warn
-
-  release:
-    name: Publish universal DMG
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - universal
-      - intel-smoke
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download certified macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-universal
-          path: release-artifact
-
-      - name: Attach DMG to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release-artifact/build/macos/*.dmg
-            release-artifact/build/macos/*.dmg.sha256
-            release-artifact/build/macos/macho-architectures.txt
-          overwrite_files: true
-          fail_on_unmatched_files: true
-          generate_release_notes: true

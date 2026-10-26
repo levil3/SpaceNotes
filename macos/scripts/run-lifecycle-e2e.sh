@@ -7,7 +7,7 @@ REPORT_PATH="${1:-$ROOT/docs/evidence/v0.2.0/lifecycle.json}"
 DMG_PATH="${SPACENOTES_DMG_PATH:-$ROOT/build/macos/Levil Notes 0.2.0.dmg}"
 DIAGNOSTICS="$HOME/Library/Application Support/Levil Notes/diagnostics.log"
 APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/SpaceNotes"
-SIDECAR_PATTERN="$APP_BUNDLE/Contents/Resources/node $APP_BUNDLE/Contents/Resources/sidecar/electron/sidecar-entry.cjs"
+SIDECAR_PATTERN="$APP_BUNDLE/Contents/Resources/node $APP_BUNDLE/Contents/Resources/sidecar/macos/sidecar/sidecar-entry.cjs"
 
 app_pid=""
 sidecar_pid=""
@@ -25,7 +25,7 @@ print_failure_context() {
   if [[ -f "$DIAGNOSTICS" ]]; then
     echo "last application diagnostics:" >&2
     tail -n 120 "$DIAGNOSTICS" \
-      | "$ROOT/scripts/macos/redact-log.sh" >&2 \
+      | "$ROOT/macos/scripts/redact-log.sh" >&2 \
       || true
   fi
 }
@@ -336,4 +336,4 @@ export NORMAL_QUIT_STATUS="PASS"
 export COMPUTER_USE_VISUAL_STATUS="${SPACENOTES_COMPUTER_USE_VISUAL_STATUS:-INCONCLUSIVE}"
 export COMPUTER_USE_VISUAL_REASON="${SPACENOTES_COMPUTER_USE_VISUAL_REASON:-The unified computer-use entry point was unavailable. Native menus and window state were validated through System Events; this report does not claim a visual screenshot pass.}"
 
-node "$ROOT/scripts/macos/lifecycle-report.cjs"
+node "$ROOT/macos/scripts/lifecycle-report.cjs"

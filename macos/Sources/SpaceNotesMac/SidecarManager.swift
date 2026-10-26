@@ -9,6 +9,7 @@ final class SidecarManager {
         let webRootURL: URL
         let settingsURL: URL
         let token: String
+        let internalToken: String
         let parentPID: Int32
         let allowedOrigins: [String]
     }
@@ -29,10 +30,10 @@ final class SidecarManager {
     }
 
     var diagnosticSummary: String {
-        var text = errorBuffer.replacingOccurrences(
-            of: configuration.token,
-            with: "[redacted]"
-        )
+        var text = errorBuffer
+        for token in [configuration.token, configuration.internalToken] {
+            text = text.replacingOccurrences(of: token, with: "[redacted]")
+        }
         text = text.replacingOccurrences(
             of: #"(?i)(token=)[^\s&]+"#,
             with: "$1[redacted]",
@@ -110,7 +111,10 @@ final class SidecarManager {
 
         let launchData: Data
         do {
-            launchData = try LaunchTokenPayload.data(for: configuration.token)
+            launchData = try LaunchTokenPayload.data(
+                token: configuration.token,
+                internalToken: configuration.internalToken
+            )
         } catch {
             reportExit(-1, onExit: onExit)
             return

@@ -96,6 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .appendingPathComponent("Levil Notes", isDirectory: true)
             .appendingPathComponent("settings.json")
         let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let internalToken = UUID().uuidString
+            .replacingOccurrences(of: "-", with: "")
         appendDiagnostic(
             "sidecar-token-fingerprint=\(LaunchTokenPayload.fingerprint(of: token))"
         )
@@ -103,11 +105,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             executableURL: resourceURL.appendingPathComponent("node"),
             scriptURL: resourceURL
                 .appendingPathComponent("sidecar", isDirectory: true)
-                .appendingPathComponent("electron", isDirectory: true)
+                .appendingPathComponent("macos", isDirectory: true)
+                .appendingPathComponent("sidecar", isDirectory: true)
                 .appendingPathComponent("sidecar-entry.cjs"),
             webRootURL: resourceURL.appendingPathComponent("web", isDirectory: true),
             settingsURL: settingsURL,
             token: token,
+            internalToken: internalToken,
             parentPID: ProcessInfo.processInfo.processIdentifier,
             allowedOrigins: developmentOrigin.map { [$0.absoluteString] } ?? []
         )
@@ -128,7 +132,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     NSApplication.shared.terminate(nil)
                     return
                 }
-                let client = SidecarClient(baseURL: baseURL, token: token)
+                let client = SidecarClient(
+                    baseURL: baseURL,
+                    token: token,
+                    internalToken: internalToken
+                )
                 self.client = client
                 if self.webView != nil {
                     self.reload(client: client)
@@ -390,11 +398,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let bridgeSource = bridgeURL.flatMap {
             try? String(contentsOf: $0, encoding: .utf8)
         } ?? ""
+        let stylesURL = Bundle.main.resourceURL?
+            .appendingPathComponent("macos.css")
+        let styles = stylesURL.flatMap {
+            try? String(contentsOf: $0, encoding: .utf8)
+        } ?? ""
+        let encodedStyles = JavaScriptLiteralEncoder.encode(styles) ?? "\"\""
         let configJSON = """
         {"baseUrl":"\(client.baseURL.absoluteString)","token":"\(client.token)"}
         """
         let userScript = """
-        document.documentElement?.setAttribute("data-host-platform", "macos");
+        (() => {
+          const applyMacOSStyles = () => {
+            document.documentElement?.setAttribute(
+              "data-host-platform",
+              "macos"
+            );
+            if (document.getElementById("spacenotes-macos-styles")) {
+              return;
+            }
+            const style = document.createElement("style");
+            style.id = "spacenotes-macos-styles";
+            style.textContent = \(encodedStyles);
+            (document.head || document.documentElement)?.appendChild(style);
+          };
+          applyMacOSStyles();
+          document.addEventListener(
+            "DOMContentLoaded",
+            applyMacOSStyles,
+            { once: true }
+          );
+        })();
         window.__SPACENOTES_BRIDGE_CONFIG__ = \(configJSON);
         \(bridgeSource)
         """

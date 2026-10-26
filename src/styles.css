@@ -35,6 +35,15 @@
   --git-conflict: #c73f49;
   --git-untracked: #a87424;
   --git-ignored: #8b929b;
+  --syntax-keyword: #a626a4;
+  --syntax-string: #2f8f56;
+  --syntax-number: #b76b01;
+  --syntax-comment: #8a9199;
+  --syntax-function: #4078c4;
+  --syntax-type: #b7791f;
+  --syntax-operator: #147d8d;
+  --syntax-tag: #c2415d;
+  --syntax-invalid: #d33f49;
   --shadow: 0 16px 52px rgb(20 28 38 / 18%);
   --ui-font: "Microsoft YaHei UI", "Microsoft YaHei",
     "Segoe UI Variable Text", "Segoe UI", sans-serif;
@@ -68,6 +77,15 @@
   --git-conflict: #f0737c;
   --git-untracked: #d4a75b;
   --git-ignored: #939aa4;
+  --syntax-keyword: #c678dd;
+  --syntax-string: #8fce87;
+  --syntax-number: #d19a66;
+  --syntax-comment: #7f8b99;
+  --syntax-function: #75a9f4;
+  --syntax-type: #e5c07b;
+  --syntax-operator: #56b6c2;
+  --syntax-tag: #e06c75;
+  --syntax-invalid: #ff7b86;
   --shadow: 0 20px 60px rgb(0 0 0 / 42%);
 }
 
@@ -332,21 +350,6 @@ pre {
   width: 9px;
   height: 9px;
   border: 1px solid currentColor;
-}
-
-:root[data-host-platform="macos"] .window-controls {
-  display: none;
-}
-
-:root[data-host-platform="macos"] .topbar-leading {
-  padding-left: 76px;
-}
-
-:root[data-host-platform="macos"]
-  .app-shell.sidebar-collapsed
-  .topbar-leading {
-  width: 144px;
-  flex-basis: 144px;
 }
 
 .app-body {
@@ -1756,6 +1759,36 @@ kbd {
   color: var(--faint);
 }
 
+.commit-preview-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 29px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--canvas) 98%, var(--accent) 2%);
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: left;
+}
+
+.commit-preview-trigger:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.commit-preview-trigger span {
+  flex: 1;
+}
+
+.commit-preview-trigger small {
+  color: var(--faint);
+  font-size: 9px;
+}
+
 .commit-actions {
   display: flex;
   gap: 6px;
@@ -2026,12 +2059,84 @@ kbd {
 }
 
 .editor-mount {
+  position: relative;
   height: 100%;
   overflow: auto;
   padding: 20px max(40px, calc((100% - var(--content-width)) / 2)) 56px;
   user-select: text;
   scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent;
   scrollbar-width: thin;
+}
+
+.note-find-layer {
+  position: sticky;
+  z-index: 40;
+  top: 0;
+  display: flex;
+  height: 0;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.note-find-bar {
+  display: flex;
+  width: min(390px, calc(100vw - 120px));
+  height: 36px;
+  align-items: center;
+  gap: 4px;
+  transform: translateY(3px);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--canvas) 94%, var(--text) 6%);
+  box-shadow: 0 5px 18px rgb(20 28 38 / 15%);
+  padding: 0 5px 0 9px;
+  color: var(--muted);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.note-find-bar > svg {
+  flex: 0 0 auto;
+  color: var(--faint);
+}
+
+.note-find-bar input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 0 4px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.note-find-bar input::placeholder {
+  color: var(--faint);
+}
+
+.note-find-count {
+  min-width: 46px;
+  color: var(--faint);
+  font-size: 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.note-find-bar .icon-button {
+  width: 25px;
+  height: 25px;
+  flex-basis: 25px;
+}
+
+::highlight(spacenotes-find-all) {
+  background-color: color-mix(in srgb, #e7b84b 42%, transparent);
+  color: inherit;
+}
+
+::highlight(spacenotes-find-active) {
+  background-color: #f1c453;
+  color: #1f2328;
 }
 
 .editor-content {
@@ -2116,12 +2221,28 @@ kbd {
   line-height: var(--editor-line-height);
 }
 
-.editor-mount .milkdown ol {
-  padding-left: 1.75em;
+/*
+ * Crepe renders list markers as flex siblings instead of native outside
+ * markers. Match Obsidian's indentation by reserving one compact marker slot:
+ * top-level text starts at 3ch, and every nested level adds 2.25em.
+ */
+.editor-mount .milkdown {
+  --list-marker-slot: 1.5em;
 }
 
+.editor-mount .milkdown ol,
 .editor-mount .milkdown ul {
-  padding-left: 7px;
+  padding-left: 0;
+}
+
+.editor-mount .milkdown .ProseMirror > ol,
+.editor-mount .milkdown .ProseMirror > ul {
+  padding-left: calc(3ch - var(--list-marker-slot));
+}
+
+.editor-mount .milkdown .content-dom > ol,
+.editor-mount .milkdown .content-dom > ul {
+  padding-left: calc(2.25em - var(--list-marker-slot));
 }
 
 .editor-mount .milkdown li {
@@ -2133,12 +2254,6 @@ kbd {
    with the first text line so numbers, bullets, and content share a baseline. */
 .editor-mount .milkdown .milkdown-list-item-block > .list-item {
   align-items: flex-start;
-}
-
-.editor-mount
-  .milkdown
-  .milkdown-list-item-block
-  > .list-item:has(> .label-wrapper > .label.bullet) {
   gap: 0;
 }
 
@@ -2147,6 +2262,7 @@ kbd {
   .milkdown-list-item-block
   > .list-item
   > .label-wrapper {
+  width: var(--list-marker-slot);
   height: calc(var(--editor-font-size) * var(--editor-line-height));
   min-height: 0;
   align-items: flex-start;
@@ -2275,9 +2391,59 @@ kbd {
   line-height: 0;
 }
 
-.editor-mount .milkdown .milkdown-code-block .tools,
 .editor-mount .milkdown .milkdown-code-block .cm-gutters {
   display: none;
+}
+
+.editor-mount .milkdown .milkdown-code-block .tools {
+  display: flex;
+  min-height: 22px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: -2px 0 4px;
+}
+
+.editor-mount .milkdown .milkdown-code-block .language-button {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 3px;
+  padding: 0 5px;
+  color: var(--muted);
+  font-family: var(--ui-font);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 1;
+}
+
+.editor-mount .milkdown .milkdown-code-block .language-button:hover {
+  background: var(--accent-soft);
+  color: var(--muted);
+}
+
+.editor-mount .milkdown .milkdown-code-block .tools-button-group {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-code-block:hover
+  .tools-button-group,
+.editor-mount
+  .milkdown
+  .milkdown-code-block:focus-within
+  .tools-button-group,
+.editor-mount
+  .milkdown
+  .milkdown-code-block.selected
+  .tools-button-group {
+  opacity: 1;
 }
 
 .editor-mount .milkdown .milkdown-code-block-placeholder,
@@ -2300,11 +2466,8 @@ kbd {
 }
 
 .editor-mount .milkdown .milkdown-code-block-placeholder code,
-.editor-mount .milkdown .milkdown-code-block .cm-content,
-.editor-mount .milkdown .milkdown-code-block .cm-content * {
+.editor-mount .milkdown .milkdown-code-block .cm-content {
   color: var(--text) !important;
-  font-style: normal !important;
-  font-weight: 400 !important;
 }
 
 .editor-mount .milkdown .milkdown-code-block .cm-content {

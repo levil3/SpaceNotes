@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUTPUT="${1:-$ROOT/build/macos/space-notes-fs}"
 SOURCE="$ROOT/macos/native/space-notes-fs.c"
 SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
