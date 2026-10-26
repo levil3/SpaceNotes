@@ -27,10 +27,15 @@ export function ModalDialog({
 }: ModalDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Modal callbacks are inline functions, so the keyboard listener effect
+  // reruns after every controlled-input update. Initial text selection must be
+  // mount-only or each keystroke replaces the user's new value.
   useEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
+  }, []);
 
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onCancel();
