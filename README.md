@@ -1,5 +1,7 @@
 # SpaceNotes
 
+[简体中文](README.md) | [English](README.en.md)
+
 SpaceNotes 是一款本地优先 Markdown 笔记应用，支持 Windows 与 macOS。它可以直接
 打开普通 Markdown 文件夹，也可以使用已有的 Obsidian 笔记库，并将编辑、搜索、
 大纲、反链和 Git 工作流集中在一个桌面界面中。
@@ -35,6 +37,13 @@ Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS 通用 DMG
 
 ## 从源码运行
 
+以下命令适用于 Windows 与 macOS。请先安装 Node.js 18+、npm 和 Git；构建 macOS
+原生外壳还需要 Xcode Command Line Tools。
+
+### 共用前端与业务开发模式
+
+Windows PowerShell：
+
 ```powershell
 git clone https://github.com/levil3/SpaceNotes.git
 cd SpaceNotes
@@ -42,41 +51,87 @@ npm ci
 npm run dev
 ```
 
-国内网络下载 Electron 较慢时，可以先切换镜像：
+macOS Terminal：
+
+```bash
+git clone https://github.com/levil3/SpaceNotes.git
+cd SpaceNotes
+npm ci
+npm run dev
+```
+
+`npm run dev` 会启动 Vite 和 Electron 共用开发宿主。macOS 上还会自动构建原生文件
+helper，但它不是正式的 AppKit + WKWebView 外壳。
+
+国内网络下载 Electron 较慢时，可以在安装依赖前切换镜像。
+
+Windows PowerShell：
 
 ```powershell
 $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 npm ci
 ```
 
+macOS Terminal：
+
+```bash
+export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+npm ci
+```
+
+### macOS 原生外壳
+
+验证 Swift 代码并构建可运行的 `.app`：
+
+```bash
+cd macos
+swift test
+cd ..
+bash macos/scripts/build-universal.sh
+open "build/macos/Levil Notes.app"
+```
+
+首次构建会下载并校验 arm64/x64 两套 Node.js。完整 DMG 位于
+`build/macos/Levil Notes <package.json version>.dmg`。
+
 ## 验证与构建
 
-```powershell
+通用验证命令：
+
+```bash
 npm test
 npm run build:web
+```
+
+### Windows 安装包
+
+```powershell
 npm run build
 ```
 
-- `npm run build:web`：执行 TypeScript 检查并构建前端资源。
 - `npm run build`：构建 Windows x64 NSIS 安装包。
 - 安装包输出目录：`release/`
 - 免安装调试版本：`release/win-unpacked/Levil Notes.exe`
 
-仓库包含 Windows 与 macOS 自动构建流程。应用版本唯一取自根目录
-`package.json`；只有与它完全一致的 `v*` 标签才能触发
-`Release Desktop`。工作流会并行构建 Windows x64 和 macOS universal 产物，
-两端都通过验证后才一次性发布 `.exe`、`.dmg`、SHA-256 和 Mach-O 架构清单。
-
-macOS 使用 AppKit + WKWebView 薄壳并内置 Node sidecar。构建 universal DMG：
+### macOS 通用 DMG
 
 ```bash
 npm ci
 bash macos/scripts/build-universal.sh
 ```
 
-产物位于 `build/macos/Levil Notes <package.json version>.dmg`，同目录包含
-SHA-256 与全部 Mach-O 架构清单。`Build macOS Universal DMG` 工作流会在 arm64
-runner 构建，并在 Intel runner 挂载 DMG、校验架构并启动 x86_64 切片。
+- `npm run build:web`：执行 TypeScript 检查并构建前端资源。
+- `build-universal.sh`：构建同时支持 Intel 与 Apple Silicon 的 `.app` 和 DMG。
+- 产物目录：`build/macos/`
+
+仓库包含 Windows 与 macOS 自动构建流程。应用版本唯一取自根目录
+`package.json`；只有与它完全一致的 `v*` 标签才能触发
+`Release Desktop`。工作流会并行构建 Windows x64 和 macOS universal 产物，
+两端都通过验证后才一次性发布 `.exe`、`.dmg`、SHA-256 和 Mach-O 架构清单。
+
+macOS 使用 AppKit + WKWebView 薄壳并内置 Node sidecar。DMG 同目录包含 SHA-256
+与全部 Mach-O 架构清单。`Build macOS Universal DMG` 工作流会在 arm64 runner
+构建，并在 Intel runner 挂载 DMG、校验架构并启动 x86_64 切片。
 
 ## 数据与权限
 
