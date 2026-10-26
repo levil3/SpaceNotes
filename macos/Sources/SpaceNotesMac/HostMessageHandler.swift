@@ -237,16 +237,7 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
     }
 
     private func resolve(_ request: BridgeRequest, value: Any) {
-        let object: Any
-        if JSONSerialization.isValidJSONObject(value) {
-            object = value
-        } else {
-            object = NSNull()
-        }
-        guard
-            let data = try? JSONSerialization.data(withJSONObject: object),
-            let json = String(data: data, encoding: .utf8)
-        else {
+        guard let json = JavaScriptLiteralEncoder.encode(value) else {
             reject(request, message: "宿主返回了无效结果。")
             return
         }
@@ -256,10 +247,7 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
     }
 
     private func reject(_ request: BridgeRequest, message: String) {
-        guard
-            let data = try? JSONSerialization.data(withJSONObject: message),
-            let json = String(data: data, encoding: .utf8)
-        else {
+        guard let json = JavaScriptLiteralEncoder.encode(message) else {
             return
         }
         evaluate(

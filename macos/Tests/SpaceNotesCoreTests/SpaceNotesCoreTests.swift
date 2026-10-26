@@ -444,6 +444,18 @@ final class SpaceNotesCoreTests: XCTestCase {
         )
         XCTAssertNil(BridgeRequest(body: ["id": 7, "args": []]))
     }
+
+    func testJavaScriptLiteralEncoderSupportsHostActionResponses() {
+        XCTAssertEqual(JavaScriptLiteralEncoder.encode(NSNull()), "null")
+        XCTAssertEqual(JavaScriptLiteralEncoder.encode("失败"), #""失败""#)
+        XCTAssertEqual(JavaScriptLiteralEncoder.encode(true), "true")
+        XCTAssertEqual(JavaScriptLiteralEncoder.encode(42), "42")
+        XCTAssertEqual(
+            JavaScriptLiteralEncoder.encode(["status": "ok"]),
+            #"{"status":"ok"}"#
+        )
+        XCTAssertNil(JavaScriptLiteralEncoder.encode(URL(fileURLWithPath: "/tmp")))
+    }
 }
 
 private extension BridgeRequest {
