@@ -238,6 +238,9 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         features: {
           // Formatting is opened intentionally with the editor context menu.
           [CrepeFeature.Toolbar]: false,
+          // Keep blank paragraphs free of Crepe's English placeholder so the
+          // editing rhythm matches Obsidian.
+          [CrepeFeature.Placeholder]: false,
         },
         featureConfigs: {
           [CrepeFeature.CodeMirror]: {

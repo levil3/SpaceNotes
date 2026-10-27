@@ -2253,7 +2253,9 @@ kbd {
 }
 
 .editor-mount .milkdown p {
-  margin: 0.65em 0;
+  /* Obsidian separates Markdown paragraphs with a 1rem block gap. */
+  margin: 1rem 0;
+  padding: 0;
   color: var(--text);
   line-height: var(--editor-line-height);
 }
@@ -2283,7 +2285,9 @@ kbd {
 }
 
 .editor-mount .milkdown li {
-  margin: 4px 0;
+  /* Obsidian reserves 0.075em above and below each list item. */
+  margin: 0;
+  padding: 0.075em 0;
   line-height: var(--editor-line-height);
 }
 
@@ -2326,6 +2330,19 @@ kbd {
   > .label-wrapper
   > .label.ordered {
   justify-content: flex-end;
+  color: var(--text);
+  font-size: 1em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Crepe supplies only the number; add the native dot Obsidian renders. */
+.editor-mount
+  .milkdown
+  .milkdown-list-item-block
+  > .list-item
+  > .label-wrapper
+  > .label.ordered::after {
+  content: ".";
 }
 
 .editor-mount
@@ -2420,12 +2437,13 @@ kbd {
   .milkdown
   .ProseMirror
   > p:has(> br.ProseMirror-trailingBreak:only-child) {
-  height: 8px;
-  min-height: 0;
-  overflow: hidden;
+  /* An empty source line still occupies one full text line in Obsidian. */
+  height: auto;
+  min-height: calc(var(--editor-font-size) * var(--editor-line-height));
+  overflow: visible;
   margin: 0;
   padding: 0;
-  line-height: 0;
+  line-height: var(--editor-line-height);
 }
 
 .editor-mount .milkdown .milkdown-code-block .cm-gutters {
