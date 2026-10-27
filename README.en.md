@@ -11,7 +11,8 @@ search, outlines, backlinks, and Git workflows into one desktop interface.
 ## Download and install
 
 Download the latest Windows installer `Levil Notes Setup x.y.z.exe` or the
-universal macOS DMG `Levil Notes x.y.z.dmg` from
+macOS DMG for your Mac — `Levil Notes x.y.z-arm64.dmg` on Apple Silicon,
+`Levil Notes x.y.z-x64.dmg` on Intel — from
 [Releases](https://github.com/levil3/SpaceNotes/releases). See the
 [installation guide (Simplified Chinese)](docs/INSTALL.md) for additional setup
 and troubleshooting notes.
@@ -98,13 +99,16 @@ Test the Swift code and build a runnable `.app`:
 cd macos
 swift test
 cd ..
-bash macos/scripts/build-universal.sh
+bash macos/scripts/build-macos.sh --arch arm64
 open "build/macos/Levil Notes.app"
 ```
 
-The first build downloads and verifies separate arm64 and x64 Node.js runtimes.
-The complete DMG is written to
-`build/macos/Levil Notes <package.json version>.dmg`.
+`build-macos.sh --arch` accepts `arm64`, `x64`, or `universal` (a
+dual-architecture package) and defaults to the host architecture. The first
+build downloads and verifies the official Node.js runtime for the selected
+architecture. The DMG is written to
+`build/macos/Levil Notes <package.json version>-<arch>.dmg` (unsuffixed for
+`universal`).
 
 ## Verify and build
 
@@ -125,28 +129,28 @@ npm run build
 - Installer output: `release/`
 - Portable debug build: `release/win-unpacked/Levil Notes.exe`
 
-### Universal macOS DMG
+### macOS DMG
 
 ```bash
 npm ci
-bash macos/scripts/build-universal.sh
+bash macos/scripts/build-macos.sh --arch arm64   # or --arch x64 / --arch universal
 ```
 
 - `npm run build:web` runs the TypeScript check and builds the frontend assets.
-- `build-universal.sh` builds the Intel and Apple Silicon `.app` and DMG.
+- `build-macos.sh` builds the `arm64`, `x64`, or `universal` `.app` and DMG.
 - Output directory: `build/macos/`
 
 The repository includes automated Windows and macOS builds. The root
 `package.json` is the only application version source. A `v*` tag must exactly
 match that version to trigger `Release Desktop`, which builds the Windows x64
-and macOS universal products in parallel and publishes them atomically after
+and macOS arm64/x64 products in parallel and publishes them atomically after
 both platforms pass verification.
 
 The macOS application uses a thin AppKit + WKWebView shell with an embedded Node
-sidecar. Its DMG directory also contains the SHA-256 checksum and a complete
-Mach-O architecture manifest. The `Build macOS Universal DMG` workflow builds on
-an arm64 runner, then mounts the same DMG on an Intel runner to verify every
-machine architecture and start the x86_64 slice.
+sidecar. Each DMG ships with a SHA-256 checksum and a Mach-O architecture
+manifest for its own architecture. The `Build macOS DMG` workflow builds the
+arm64 and x64 DMGs on an arm64 runner, then mounts the x64 DMG on an Intel
+runner to verify the architecture and start the slice.
 
 ## Data and permissions
 

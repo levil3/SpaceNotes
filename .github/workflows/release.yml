@@ -54,7 +54,7 @@ jobs:
       - name: Download macOS DMG
         uses: actions/download-artifact@v4
         with:
-          name: macos-universal
+          name: macos
           path: release-assets/macos
 
       - name: Publish complete desktop release
@@ -64,7 +64,7 @@ jobs:
             release-assets/windows/*.exe
             release-assets/macos/build/macos/*.dmg
             release-assets/macos/build/macos/*.dmg.sha256
-            release-assets/macos/build/macos/macho-architectures.txt
+            release-assets/macos/build/macos/macho-architectures-*.txt
           overwrite_files: true
           fail_on_unmatched_files: true
           generate_release_notes: true

@@ -1,4 +1,4 @@
-name: Build macOS Universal DMG
+name: Build macOS DMG
 
 on:
   workflow_dispatch:
@@ -21,8 +21,8 @@ permissions:
   contents: read
 
 jobs:
-  universal:
-    name: Build universal DMG
+  build:
+    name: Build arm64 and x64 DMGs
     runs-on: macos-15
     timeout-minutes: 45
 
@@ -66,21 +66,20 @@ jobs:
             --seed 20261023 \
             --report "docs/evidence/v${APP_VERSION}/usage-model.json"
 
-      - name: Build and verify universal artifacts
+      - name: Build arm64 DMG
         run: |
           set -o pipefail
           mkdir -p build/macos
-          bash macos/scripts/build-universal.sh 2>&1 | tee build/macos/build.log
-          dmg_path="$(find build/macos -maxdepth 1 -type f -name '*.dmg' -print -quit)"
-          test -n "$dmg_path"
-          printf 'MACOS_DMG_PATH=%s\n' "$dmg_path" >> "$GITHUB_ENV"
+          bash macos/scripts/build-macos.sh --arch arm64 2>&1 | tee build/macos/build-arm64.log
+          printf 'MACOS_ARM64_DMG_PATH=build/macos/Levil Notes %s-arm64.dmg\n' \
+            "$APP_VERSION" >> "$GITHUB_ENV"
 
-      - name: Verify ad-hoc signature and DMG checksum
+      - name: Verify ad-hoc signature and DMG checksum (arm64)
         run: |
           codesign --verify --deep --strict "build/macos/Levil Notes.app"
           (
-            cd "$(dirname "$MACOS_DMG_PATH")"
-            shasum -a 256 -c "$(basename "$MACOS_DMG_PATH").sha256"
+            cd "$(dirname "$MACOS_ARM64_DMG_PATH")"
+            shasum -a 256 -c "$(basename "$MACOS_ARM64_DMG_PATH").sha256"
           )
 
       - name: Run real WKWebView E2E certification
@@ -88,7 +87,7 @@ jobs:
           bash macos/scripts/run-wkwebview-e2e.sh \
             "build/macos/Levil Notes.app" \
             "docs/evidence/v${APP_VERSION}/e2e-wkwebview.json" \
-            "$MACOS_DMG_PATH" \
+            "$MACOS_ARM64_DMG_PATH" \
             "docs/evidence/v${APP_VERSION}/diagnostics.log"
 
       - name: Run native lifecycle regression
@@ -99,16 +98,31 @@ jobs:
           bash macos/scripts/run-lifecycle-e2e.sh \
             "docs/evidence/v${APP_VERSION}/lifecycle.json"
 
+      - name: Build x64 DMG
+        run: |
+          set -o pipefail
+          bash macos/scripts/build-macos.sh --arch x64 2>&1 | tee build/macos/build-x64.log
+          printf 'MACOS_X64_DMG_PATH=build/macos/Levil Notes %s-x64.dmg\n' \
+            "$APP_VERSION" >> "$GITHUB_ENV"
+
+      - name: Verify ad-hoc signature and DMG checksum (x64)
+        run: |
+          codesign --verify --deep --strict "build/macos/Levil Notes.app"
+          (
+            cd "$(dirname "$MACOS_X64_DMG_PATH")"
+            shasum -a 256 -c "$(basename "$MACOS_X64_DMG_PATH").sha256"
+          )
+
       - name: Upload macOS artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-universal
+          name: macos
           path: |
             build/macos/*.dmg
             build/macos/*.dmg.sha256
-            build/macos/macho-architectures.txt
-            build/macos/build.log
+            build/macos/macho-architectures-*.txt
+            build/macos/build-*.log
             docs/evidence/v${{ env.APP_VERSION }}/e2e-wkwebview.json
             docs/evidence/v${{ env.APP_VERSION }}/diagnostics.log
             docs/evidence/v${{ env.APP_VERSION }}/lifecycle.json
@@ -116,8 +130,8 @@ jobs:
           if-no-files-found: warn
 
   intel-smoke:
-    name: Verify x86_64 slice on Intel
-    needs: universal
+    name: Verify x64 DMG on Intel
+    needs: build
     runs-on: macos-15-intel
     timeout-minutes: 20
 
@@ -125,17 +139,17 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
-      - name: Download universal artifacts
+      - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-universal
+          name: macos
           path: artifact
 
       - name: Verify checksum and architectures
         run: |
           test "$(uname -m)" = "x86_64"
           dmg_path="$(find "$PWD/artifact/build/macos" \
-            -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+            -maxdepth 1 -type f -name '*-x64.dmg' -print -quit)"
           test -n "$dmg_path"
           (
             cd "$(dirname "$dmg_path")"
@@ -147,7 +161,7 @@ jobs:
         run: |
           set -euo pipefail
           dmg_path="$(find "$PWD/artifact/build/macos" \
-            -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+            -maxdepth 1 -type f -name '*-x64.dmg' -print -quit)"
           test -n "$dmg_path"
           detach_dmg_mount() {
             local target="$1"
@@ -164,7 +178,7 @@ jobs:
               fi
               if hdiutil detach "$target" -quiet; then
                 if ! current_info="$(hdiutil info)"; then
-                  echo "failed to confirm disk image detach" >&2
+                  echo "failed to confirm mounted disk images" >&2
                   return 1
                 fi
                 if ! grep -Fq "$target" <<<"$current_info"; then
@@ -196,7 +210,8 @@ jobs:
           test -L "$mount_point/Applications"
           bash macos/scripts/verify-bundle.sh \
             "$mount_point/Levil Notes.app" \
-            "$RUNNER_TEMP/intel-macho-architectures.txt"
+            "$RUNNER_TEMP/intel-macho-architectures.txt" \
+            x64
           codesign --verify --deep --strict "$mount_point/Levil Notes.app"
           "$mount_point/Levil Notes.app/Contents/MacOS/SpaceNotes" --smoke-test
           bash macos/scripts/run-wkwebview-e2e.sh \
