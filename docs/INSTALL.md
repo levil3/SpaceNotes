@@ -40,15 +40,17 @@ git -C D:\path\to\notes remote -v
 如果命令行可以正常拉取和推送，但 SpaceNotes 中提示 Git 不可用，请完全退出应用后
 重新启动，并从开始菜单启动新版本。
 
-## 方式二：安装 macOS 通用 DMG
+## 方式二：安装 macOS DMG
 
-macOS 13.5 及以上版本可使用同一个 DMG，应用同时包含 Intel（x86_64）和
-Apple Silicon（arm64）切片。
+macOS 13.5 及以上版本：Apple Silicon（arm64）下载
+`Levil Notes <version>-arm64.dmg`，Intel（x86_64）下载
+`Levil Notes <version>-x64.dmg`。
 
-CI 构建的 `macos-universal` artifact 包含 universal DMG。DMG 版本严格取自
+CI 构建的 `macos` artifact 包含两枚架构专属 DMG。DMG 版本严格取自
 主分支根目录的 `package.json`。下载并解压后：
 
-1. 双击 `Levil Notes <version>.dmg`，把 `Levil Notes` 拖入 `Applications`。
+1. 双击下载的 `Levil Notes <version>-<arch>.dmg`，把 `Levil Notes` 拖入
+   `Applications`。
 2. 在“应用程序”中双击 `Levil Notes`。
 3. 首次启动时选择已有笔记文件夹，或新建一个空文件夹作为笔记库。
 
@@ -64,8 +66,8 @@ DMG。
 可在终端核对下载文件：
 
 ```bash
-shasum -a 256 "Levil Notes <version>.dmg"
-cat "Levil Notes <version>.dmg.sha256"
+shasum -a 256 "Levil Notes <version>-<arch>.dmg"
+cat "Levil Notes <version>-<arch>.dmg.sha256"
 ```
 
 macOS 版复用同一份 React/TypeScript 前端和 Node 业务核心。Swift 只承载窗口、
@@ -80,24 +82,25 @@ xcode-select --install
 git clone https://github.com/levil3/SpaceNotes.git
 cd SpaceNotes
 npm ci
-bash macos/scripts/build-universal.sh
+bash macos/scripts/build-macos.sh --arch arm64   # 或 --arch x64 / --arch universal
 ```
 
-构建脚本固定使用 Node.js 24.22.1 的官方 arm64/x64 包，校验 SHA-256 后用 `lipo`
-生成 universal Node，并检查 `.app` 内所有 Mach-O 都同时包含两种架构。
+构建脚本固定使用 Node.js 24.22.1 的官方包，校验 SHA-256 后按 `--arch`
+生成对应架构的 Node（`universal` 模式用 `lipo` 合成双架构），并检查 `.app`
+内 Mach-O 架构与期望一致。
 
-产物：
+产物（`universal` 模式的文件名不带 `-<arch>` 后缀）：
 
 ```text
 build/macos/Levil Notes.app
-build/macos/Levil Notes <version>.dmg
-build/macos/Levil Notes <version>.dmg.sha256
-build/macos/macho-architectures.txt
+build/macos/Levil Notes <version>-<arch>.dmg
+build/macos/Levil Notes <version>-<arch>.dmg.sha256
+build/macos/macho-architectures-<arch>.txt
 ```
 
 `.github/workflows/build-macos.yml` 可在 Actions 页面手动运行
-`Build macOS Universal DMG`。arm64 任务构建 DMG；Intel 任务下载同一产物，挂载、
-校验全部 Mach-O，并实际启动 x86_64 切片和 sidecar。
+`Build macOS DMG`。arm64 任务构建 arm64 与 x64 两枚 DMG；Intel 任务下载
+x64 DMG，挂载、校验 Mach-O 架构，并实际启动切片和 sidecar。
 
 ### macOS 设置与卸载
 
@@ -154,7 +157,7 @@ release/win-unpacked/Levil Notes.exe
 
 - 在 Actions 页面手动运行 `Build Windows`，完成后下载 `windows-installer`。
 - 推送与 `package.json` 版本一致的 `v*` 标签后，`Release Desktop` 会并行构建
-  Windows `.exe` 和 macOS universal `.dmg`。标签不一致时发布会直接失败。
+  Windows `.exe` 和 macOS arm64/x64 `.dmg`。标签不一致时发布会直接失败。
 - 任一平台失败时不会创建残缺 Release；两端均成功后才会一次性上传全部产物。
 
 维护者发布新版本时执行：

@@ -11,8 +11,9 @@ SpaceNotes 是一款本地优先 Markdown 笔记应用，支持 Windows 与 macO
 ## 下载与安装
 
 普通用户可从 [Releases](https://github.com/levil3/SpaceNotes/releases) 下载
-Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS 通用 DMG
-`Levil Notes x.y.z.dmg`，按照 [安装文档](docs/INSTALL.md) 完成安装。
+Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS DMG：Apple Silicon 下载
+`Levil Notes x.y.z-arm64.dmg`，Intel 下载 `Levil Notes x.y.z-x64.dmg`，按照
+[安装文档](docs/INSTALL.md) 完成安装。
 
 首次启动后，可以直接选择自己的笔记文件夹。笔记库只是普通目录，不会被锁定或导入；
 现有的 Obsidian 仓库、Markdown 文件和 Git 历史都可以继续使用。
@@ -88,12 +89,14 @@ npm ci
 cd macos
 swift test
 cd ..
-bash macos/scripts/build-universal.sh
+bash macos/scripts/build-macos.sh --arch arm64
 open "build/macos/Levil Notes.app"
 ```
 
-首次构建会下载并校验 arm64/x64 两套 Node.js。完整 DMG 位于
-`build/macos/Levil Notes <package.json version>.dmg`。
+`build-macos.sh --arch` 接受 `arm64`、`x64` 或 `universal`（双架构通用包），
+不带参数时默认构建当前机器架构。首次构建会下载并校验对应架构的官方 Node.js。
+DMG 位于 `build/macos/Levil Notes <package.json version>-<arch>.dmg`
+（`universal` 模式不带架构后缀）。
 
 ## 验证与构建
 
@@ -114,25 +117,26 @@ npm run build
 - 安装包输出目录：`release/`
 - 免安装调试版本：`release/win-unpacked/Levil Notes.exe`
 
-### macOS 通用 DMG
+### macOS DMG
 
 ```bash
 npm ci
-bash macos/scripts/build-universal.sh
+bash macos/scripts/build-macos.sh --arch arm64   # 或 --arch x64 / --arch universal
 ```
 
 - `npm run build:web`：执行 TypeScript 检查并构建前端资源。
-- `build-universal.sh`：构建同时支持 Intel 与 Apple Silicon 的 `.app` 和 DMG。
+- `build-macos.sh`：按 `--arch` 构建 arm64、x64 或 universal 的 `.app` 和 DMG。
 - 产物目录：`build/macos/`
 
 仓库包含 Windows 与 macOS 自动构建流程。应用版本唯一取自根目录
 `package.json`；只有与它完全一致的 `v*` 标签才能触发
-`Release Desktop`。工作流会并行构建 Windows x64 和 macOS universal 产物，
+`Release Desktop`。工作流会并行构建 Windows x64 和 macOS arm64/x64 产物，
 两端都通过验证后才一次性发布 `.exe`、`.dmg`、SHA-256 和 Mach-O 架构清单。
 
-macOS 使用 AppKit + WKWebView 薄壳并内置 Node sidecar。DMG 同目录包含 SHA-256
-与全部 Mach-O 架构清单。`Build macOS Universal DMG` 工作流会在 arm64 runner
-构建，并在 Intel runner 挂载 DMG、校验架构并启动 x86_64 切片。
+macOS 使用 AppKit + WKWebView 薄壳并内置 Node sidecar。每枚 DMG 同目录包含
+SHA-256 与对应架构的 Mach-O 清单。`Build macOS DMG` 工作流在 arm64 runner
+构建 arm64 与 x64 两枚 DMG，并在 Intel runner 挂载 x64 DMG、校验架构并实际
+启动切片。
 
 ## 数据与权限
 

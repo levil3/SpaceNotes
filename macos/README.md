@@ -6,7 +6,7 @@ macOS-specific implementation belongs in this directory:
 - `bridge/`: the authenticated `window.levilNotes` bridge.
 - `sidecar/`: Node sidecar transport and macOS file operations.
 - `native/`: the native file helper.
-- `scripts/`: universal build, DMG verification and background E2E tooling.
+- `scripts/`: per-arch macOS build, DMG verification and background E2E tooling.
 - `web/macos.css`: platform-only presentation overrides.
 
 The React application, `electron/api.cjs`, `electron/vault.cjs`,
@@ -28,7 +28,7 @@ requires them:
 npm test
 npm run build:web
 cd macos && swift test
-cd .. && bash macos/scripts/build-universal.sh
+cd .. && bash macos/scripts/build-macos.sh --arch arm64
 ```
 
 For UI automation that must not interrupt the active desktop:
@@ -38,7 +38,7 @@ version="$(node -p 'require("./package.json").version')"
 bash macos/scripts/run-wkwebview-e2e.sh \
   "build/macos/Levil Notes.app" \
   "docs/evidence/v${version}/e2e-wkwebview.json" \
-  "build/macos/Levil Notes ${version}.dmg" \
+  "build/macos/Levil Notes ${version}-arm64.dmg" \
   "docs/evidence/v${version}/diagnostics.log"
 ```
 

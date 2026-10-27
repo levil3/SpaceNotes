@@ -248,7 +248,7 @@ describeMac("macOS E2E contract", () => {
     const sidecarPackage = readJson("macos/sidecar/package.json");
     const sidecarLock = readJson("macos/sidecar/package-lock.json");
     const buildScript = fs.readFileSync(
-      path.join(root, "macos/scripts/build-universal.sh"),
+      path.join(root, "macos/scripts/build-macos.sh"),
       "utf8",
     );
     const wkwebviewScript = fs.readFileSync(
@@ -460,7 +460,7 @@ printf 'app=%s sidecar=%s\\n' "$app_pid" "$sidecar_pid"
   it("exercises DMG retry recovery and exhaustion without real hdiutil", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
-      path.join(root, "macos/scripts/build-universal.sh"),
+      path.join(root, "macos/scripts/build-macos.sh"),
       "utf8",
     );
     const retryFunction = loadShellFunction(script, "retry_hdiutil");
@@ -495,7 +495,7 @@ printf 'count=%s result=%s\\n' "$count" "$?"
   it("detaches a partial mount before retrying DMG attachment", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
-      path.join(root, "macos/scripts/build-universal.sh"),
+      path.join(root, "macos/scripts/build-macos.sh"),
       "utf8",
     );
     const activeFunction = loadShellFunction(script, "mount_point_is_active");
@@ -544,7 +544,7 @@ printf 'attach=%s detach=%s result=%s events=%s\\n' \
   it("fails closed when a partial mount cannot be detached", () => {
     const root = path.resolve(directory, "../..");
     const script = fs.readFileSync(
-      path.join(root, "macos/scripts/build-universal.sh"),
+      path.join(root, "macos/scripts/build-macos.sh"),
       "utf8",
     );
     const activeFunction = loadShellFunction(script, "mount_point_is_active");
