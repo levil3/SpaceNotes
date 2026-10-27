@@ -444,7 +444,16 @@ export default function App() {
         return;
       }
 
+      const editorOwnsBoldShortcut =
+        event.target instanceof Element &&
+        Boolean(event.target.closest(".editor-mount .ProseMirror"));
+
       if (event.key.toLowerCase() === "b") {
+        // Let Milkdown's Mod-b command format the note instead of toggling
+        // the workspace sidebar while the editor owns keyboard focus.
+        if (editorOwnsBoldShortcut) {
+          return;
+        }
         event.preventDefault();
         setSettings((current) => ({
           ...current,
