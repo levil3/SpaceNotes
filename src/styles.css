@@ -2335,16 +2335,6 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
-/* Crepe supplies only the number; add the native dot Obsidian renders. */
-.editor-mount
-  .milkdown
-  .milkdown-list-item-block
-  > .list-item
-  > .label-wrapper
-  > .label.ordered::after {
-  content: ".";
-}
-
 .editor-mount
   .milkdown
   .milkdown-list-item-block
