@@ -95,8 +95,9 @@ jobs:
           SPACENOTES_APP_BUNDLE: ${{ github.workspace }}/build/macos/Levil Notes.app
           SPACENOTES_ALLOW_INCONCLUSIVE_VISUAL: "1"
         run: |
-          bash macos/scripts/run-lifecycle-e2e.sh \
-            "docs/evidence/v${APP_VERSION}/lifecycle.json"
+          SPACENOTES_DMG_PATH="$MACOS_ARM64_DMG_PATH" \
+            bash macos/scripts/run-lifecycle-e2e.sh \
+              "docs/evidence/v${APP_VERSION}/lifecycle.json"
 
       - name: Build x64 DMG
         run: |

@@ -343,6 +343,9 @@ describeMac("macOS E2E contract", () => {
     const intelJob = jobs.slice(intelStart);
 
     expect(universalJob).toContain("macos/scripts/run-lifecycle-e2e.sh");
+    expect(universalJob).toContain(
+      'SPACENOTES_DMG_PATH="$MACOS_ARM64_DMG_PATH"',
+    );
     expect(intelJob).toContain("macos/scripts/run-lifecycle-e2e.sh");
     expect(intelJob).toContain("lifecycle-intel.json");
   });
