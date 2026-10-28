@@ -1,6 +1,6 @@
 {
   "name": "levil-notes",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "author": "levil",
   "description": "A local-first Markdown notes application with native Git workflows.",
