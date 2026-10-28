@@ -614,6 +614,11 @@ kbd {
   color: var(--nav-text);
 }
 
+.tree-row.is-multi-selected,
+.tree-row.is-multi-selected:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
 .tree-row > svg {
   position: absolute;
   top: 50%;
@@ -2975,6 +2980,13 @@ kbd {
   border-top: 1px solid var(--border);
   margin-top: 4px;
   padding-top: 4px;
+}
+
+.context-menu-caption {
+  padding: 3px 9px 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .context-menu button {

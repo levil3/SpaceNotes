@@ -47,6 +47,7 @@ import {
   parentFolder,
   remapPathAfterDirectoryRename,
 } from "./lib/paths";
+import type { FileTreeSelectionItem } from "./lib/fileSelection";
 import type {
   AppSettings,
   BacklinkResult,
@@ -141,6 +142,7 @@ export default function App() {
     y: number;
     path: string;
     kind: "file" | "folder";
+    selection: FileTreeSelectionItem[];
   } | null>(null);
   const [editorMenuOpen, setEditorMenuOpen] = useState(false);
   const [ignoreDialog, setIgnoreDialog] = useState<{
@@ -1005,6 +1007,10 @@ export default function App() {
     contextGitChange &&
     !contextGitChange.conflict &&
     ["modified", "deleted"].includes(contextGitChange.kind);
+  const multiSelectionCount = contextMenu?.selection.length || 0;
+  const isMultiSelection = multiSelectionCount > 1;
+  const contextSelectionPaths =
+    contextMenu?.selection.map((item) => item.path) || [];
 
   if (!booted) {
     return (
@@ -1083,13 +1089,14 @@ export default function App() {
                 gitStatus={gitStatus}
                 onCreateNote={startNewNote}
                 onOpenNote={(path) => void openNote(path)}
-                onContextMenu={(path, kind, event) => {
+                onContextMenu={(path, kind, event, selection) => {
                   event.preventDefault();
                   setContextMenu({
                     x: event.clientX,
                     y: event.clientY,
                     path,
                     kind,
+                    selection,
                   });
                 }}
               />
@@ -1432,15 +1439,23 @@ export default function App() {
           x={contextMenu.x}
           y={contextMenu.y}
           label={
-            contextMenu.kind === "folder"
-              ? "文件夹操作"
-              : "文件操作"
+            isMultiSelection
+              ? "多项操作"
+              : contextMenu.kind === "folder"
+                ? "文件夹操作"
+                : "文件操作"
+          }
+          caption={
+            isMultiSelection
+              ? `已选择 ${multiSelectionCount} 个项目`
+              : undefined
           }
           groups={
             [
               {
-                items:
-                  contextMenu.kind === "file"
+                items: isMultiSelection
+                  ? []
+                  : contextMenu.kind === "file"
                     ? [
                         {
                           id: "open",
@@ -1465,66 +1480,95 @@ export default function App() {
                       ],
               },
               {
-                items: [
-                  {
-                    id: "rename",
-                    label:
-                      contextMenu.kind === "folder"
-                        ? "重命名文件夹"
-                        : "重命名",
-                    Icon: Pencil,
-                    onSelect: () => {
-                      setDialog(
-                        contextMenu.kind === "folder"
-                          ? {
-                              kind: "rename-folder",
-                              path: contextMenu.path,
-                              value: entryName(contextMenu.path),
-                            }
-                          : {
-                              kind: "rename",
-                              path: contextMenu.path,
-                              value: basename(contextMenu.path),
-                            },
-                      );
-                      setContextMenu(null);
-                    },
-                  },
-                  {
-                    id: "show-in-folder",
-                    label: "在资源管理器中显示",
-                    Icon: FolderOpen,
-                    onSelect: () => {
-                      void window.levilNotes.showInFolder(
-                        contextMenu.path,
-                      );
-                      setContextMenu(null);
-                    },
-                  },
-                  {
-                    id: "copy-path",
-                    label: "复制路径",
-                    Icon: Copy,
-                    onSelect: () => {
-                      void window.levilNotes
-                        .writeClipboardText(contextMenu.path)
-                        .then(() => showToast("路径已复制"))
-                        .catch((error) =>
-                          showToast(
-                            String(
-                              error instanceof Error
-                                ? error.message
-                                : error,
-                            ),
-                          ),
-                        );
-                      setContextMenu(null);
-                    },
-                  },
-                ],
+                items: isMultiSelection
+                  ? [
+                      {
+                        id: "copy-selected-paths",
+                        label: "复制所选路径",
+                        Icon: Copy,
+                        onSelect: () => {
+                          void window.levilNotes
+                            .writeClipboardText(
+                              contextSelectionPaths.join("\n"),
+                            )
+                            .then(() =>
+                              showToast(
+                                `已复制 ${multiSelectionCount} 个路径`,
+                              ),
+                            )
+                            .catch((error) =>
+                              showToast(
+                                String(
+                                  error instanceof Error
+                                    ? error.message
+                                    : error,
+                                ),
+                              ),
+                            );
+                          setContextMenu(null);
+                        },
+                      },
+                    ]
+                  : [
+                      {
+                        id: "rename",
+                        label:
+                          contextMenu.kind === "folder"
+                            ? "重命名文件夹"
+                            : "重命名",
+                        Icon: Pencil,
+                        onSelect: () => {
+                          setDialog(
+                            contextMenu.kind === "folder"
+                              ? {
+                                  kind: "rename-folder",
+                                  path: contextMenu.path,
+                                  value: entryName(contextMenu.path),
+                                }
+                              : {
+                                  kind: "rename",
+                                  path: contextMenu.path,
+                                  value: basename(contextMenu.path),
+                                },
+                          );
+                          setContextMenu(null);
+                        },
+                      },
+                      {
+                        id: "show-in-folder",
+                        label: "在资源管理器中显示",
+                        Icon: FolderOpen,
+                        onSelect: () => {
+                          void window.levilNotes.showInFolder(
+                            contextMenu.path,
+                          );
+                          setContextMenu(null);
+                        },
+                      },
+                      {
+                        id: "copy-path",
+                        label: "复制路径",
+                        Icon: Copy,
+                        onSelect: () => {
+                          void window.levilNotes
+                            .writeClipboardText(contextMenu.path)
+                            .then(() => showToast("路径已复制"))
+                            .catch((error) =>
+                              showToast(
+                                String(
+                                  error instanceof Error
+                                    ? error.message
+                                    : error,
+                                ),
+                              ),
+                            );
+                          setContextMenu(null);
+                        },
+                      },
+                    ],
               },
               {
-                items: [
+                items: isMultiSelection ? [] : [
                   ...(canDiscardContextChange
                     ? [
                         {
@@ -1567,7 +1611,7 @@ export default function App() {
                 ],
               },
               {
-                items: [
+                items: isMultiSelection ? [] : [
                   {
                     id: "delete",
                     label:

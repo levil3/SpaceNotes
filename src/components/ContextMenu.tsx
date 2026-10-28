@@ -19,6 +19,7 @@ interface ContextMenuProps {
   y: number;
   groups: ContextMenuGroup[];
   label: string;
+  caption?: string;
 }
 
 /**
@@ -31,6 +32,7 @@ export function ContextMenu({
   y,
   groups,
   label,
+  caption,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
@@ -66,6 +68,9 @@ export function ContextMenu({
       onPointerDown={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
     >
+      {caption ? (
+        <div className="context-menu-caption">{caption}</div>
+      ) : null}
       {groups
         .filter((group) => group.items.length > 0)
         .map((group, groupIndex) => (
