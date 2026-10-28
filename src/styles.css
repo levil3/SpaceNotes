@@ -641,6 +641,7 @@ kbd {
 .outline-row {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 5px;
   min-width: 0;
   align-items: center;
   margin-bottom: 2px;
