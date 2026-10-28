@@ -2456,6 +2456,7 @@ kbd {
  */
 .editor-mount .milkdown {
   --list-marker-slot: 1.5em;
+  --list-line-height: 2.5;
 }
 
 .editor-mount .milkdown ol,
@@ -2474,10 +2475,10 @@ kbd {
 }
 
 .editor-mount .milkdown li {
-  /* Obsidian reserves 0.075em above and below each list item. */
+  /* The enabled Typora snippet uses 2.5 line spacing for list rows. */
   margin: 0;
-  padding: 0.075em 0;
-  line-height: var(--editor-line-height);
+  padding: 0;
+  line-height: var(--list-line-height);
 }
 
 /* Crepe vertically centers list glyphs in a fixed 32px box. Align that box
@@ -2493,7 +2494,7 @@ kbd {
   > .list-item
   > .label-wrapper {
   width: var(--list-marker-slot);
-  height: calc(var(--editor-font-size) * var(--editor-line-height));
+  height: calc(var(--editor-font-size) * var(--list-line-height));
   min-height: 0;
   align-items: flex-start;
 }
@@ -2553,6 +2554,14 @@ kbd {
   > p {
   margin: 0;
   padding: 0;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-list-item-block
+  > .list-item:has(> .label-wrapper > .label.ordered)
+  > .children {
+  padding-left: 0.3em;
 }
 
 .editor-mount .milkdown a {

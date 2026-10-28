@@ -84,10 +84,32 @@ interface ProseMirrorNodeViewElement extends HTMLElement {
         language?: unknown;
       };
     };
+    spec?: {
+      initialized?: boolean;
+      update?: (node: unknown) => boolean;
+    };
   };
 }
 
 const CALLOUT_MARKER = "[!note]";
+
+/**
+ * Crepe stores editability inside each code block's nested CodeMirror
+ * compartment. ProseMirror does not update those node views when only the
+ * outer editor switches between reading and editing, so explicitly ask every
+ * initialized block to synchronize with the current editor mode.
+ */
+function syncCodeBlockEditability(root: HTMLElement | null) {
+  root
+    ?.querySelectorAll<ProseMirrorNodeViewElement>(".milkdown-code-block")
+    .forEach((block) => {
+      const viewDesc = block.pmViewDesc;
+      if (!viewDesc?.node || !viewDesc.spec?.initialized) {
+        return;
+      }
+      viewDesc.spec.update?.(viewDesc.node);
+    });
+}
 
 /**
  * Milkdown keeps the file format as Markdown while presenting a live rich
@@ -800,6 +822,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
           // Apply the latest mode after async initialization so a fast toggle
           // cannot leave the Markdown view in the wrong editability state.
           crepe.setReadonly(readOnlyRef.current);
+          syncCodeBlockEditability(root);
           scheduleBlockClassification();
           root.setAttribute("spellcheck", "false");
           root
@@ -852,7 +875,12 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
     }, [path]);
 
     useEffect(() => {
-      crepeRef.current?.setReadonly(readOnly);
+      const crepe = crepeRef.current;
+      if (!crepe) {
+        return;
+      }
+      crepe.setReadonly(readOnly);
+      syncCodeBlockEditability(rootRef.current);
     }, [readOnly]);
 
     return (
