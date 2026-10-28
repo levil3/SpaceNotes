@@ -110,8 +110,16 @@ export function toVaultMarkdown(markdown: string) {
   );
 
   // Keep compatibility with drafts and images created by the first prototype.
-  return restored.replace(
-    /notes-asset:\/\/vault\/([^)\s?]+)/g,
-    (_match: string, encodedPath: string) => decodeURIComponent(encodedPath),
-  );
+  return restored
+    .replace(
+      /notes-asset:\/\/vault\/([^)\s?]+)/g,
+      (_match: string, encodedPath: string) =>
+        decodeURIComponent(encodedPath),
+    )
+    // ProseMirror escapes the bracket after ">" even though Obsidian callout
+    // markers must remain unescaped to be recognized when the note is reopened.
+    .replace(
+      /^(\s*(?:>\s*)+)\\\[(![^\]\n]+)\]/gm,
+      "$1[$2]",
+    );
 }

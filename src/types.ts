@@ -214,6 +214,8 @@ export interface LevilNotesApi {
   saveSettings(
     updates: Partial<AppSettings>,
   ): Promise<AppSettings>;
+  readClipboardText(): Promise<string>;
+  writeClipboardText(text: string): Promise<void>;
   showInFolder(path: string): Promise<void>;
 
   minimizeWindow(): Promise<void>;

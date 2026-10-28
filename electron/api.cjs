@@ -33,6 +33,8 @@ const IPC_METHODS = Object.freeze({
   "git:show": "gitShow",
   "settings:get": "getSettings",
   "settings:save": "saveSettings",
+  "clipboard:read-text": "readClipboardText",
+  "clipboard:write-text": "writeClipboardText",
   "app:show-in-folder": "showInFolder",
   "window:minimize": "minimizeWindow",
   "window:toggle-maximize": "toggleMaximizeWindow",
@@ -121,6 +123,10 @@ function createLevilNotesApi({
       }
       return nextSettings;
     },
+    readClipboardText: () =>
+      hostAction(hostActions, "readClipboardText")(),
+    writeClipboardText: (text) =>
+      hostAction(hostActions, "writeClipboardText")(text),
     showInFolder: (relativePath) => {
       if (relativePath) {
         hostAction(hostActions, "showInFolder")(relativePath);

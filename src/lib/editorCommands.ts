@@ -12,6 +12,8 @@ interface HeadingShortcutEvent {
   shiftKey: boolean;
 }
 
+export type EditorLinkTargetKind = "internal" | "external";
+
 /**
  * Uses the physical digit key as the primary signal because keyboard layouts
  * can report shifted punctuation through event.key even for Ctrl+1.
@@ -65,4 +67,36 @@ export function insertTitleHeadingMarkdown(
     markdown: `${frontmatter || ""}${heading}${body}`,
     inserted: true,
   };
+}
+
+/**
+ * Converts the value entered in the editor link popover into a browser-safe
+ * Markdown href. Internal note links receive the .md extension that SpaceNotes
+ * uses for backlink discovery, while external links gain an explicit scheme so
+ * Electron does not treat them as relative document paths.
+ */
+export function normalizeEditorLinkTarget(
+  value: string,
+  kind: EditorLinkTargetKind,
+) {
+  const target = value
+    .trim()
+    .replace(/^\[\[|\]\]$/g, "")
+    .replace(/\\/g, "/");
+  if (!target) {
+    return "";
+  }
+
+  if (kind === "external") {
+    return /^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("//")
+      ? target
+      : `https://${target}`;
+  }
+
+  const [rawPath, ...hashParts] = target.split("#");
+  const hash = hashParts.length ? `#${hashParts.join("#")}` : "";
+  if (!rawPath || /\.[a-z0-9]+$/i.test(rawPath)) {
+    return `${rawPath}${hash}`;
+  }
+  return `${rawPath}.md${hash}`;
 }

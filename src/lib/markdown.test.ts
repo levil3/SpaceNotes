@@ -60,4 +60,11 @@ describe("Markdown asset URLs", () => {
     const source = ["```text", "a | b", "--- | ---", "```"].join("\n");
     expect(normalizeTableBoundaries(source)).toBe(source);
   });
+
+  it("restores Obsidian callout markers escaped by Milkdown", () => {
+    const source = ["> \\[!note]", ">", "> 正文"].join("\n");
+    expect(toVaultMarkdown(source)).toBe(
+      ["> [!note]", ">", "> 正文"].join("\n"),
+    );
+  });
 });

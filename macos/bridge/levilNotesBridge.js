@@ -152,6 +152,9 @@
       gitShow: (hash) => invoke("gitShow", [hash]),
       getSettings: () => invoke("getSettings"),
       saveSettings: (updates) => invoke("saveSettings", [updates]),
+      readClipboardText: () => requestHost("readClipboardText"),
+      writeClipboardText: (text) =>
+        requestHost("writeClipboardText", [text]),
       showInFolder: (relativePath) =>
         requestHost("showInFolder", [relativePath]),
       minimizeWindow: () => requestHost("minimizeWindow"),

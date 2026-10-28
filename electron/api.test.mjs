@@ -65,6 +65,8 @@ function createFixture() {
   const hostActions = {
     chooseVaultFolder: vi.fn(async () => "/selected"),
     showInFolder: vi.fn(),
+    readClipboardText: vi.fn(() => "clipboard text"),
+    writeClipboardText: vi.fn(),
     minimizeWindow: vi.fn(),
     toggleMaximizeWindow: vi.fn(),
     closeWindow: vi.fn(),
@@ -164,11 +166,17 @@ describe("shared LevilNotes API", () => {
     const { api, hostActions, vaultService, gitService } = createFixture();
 
     api.showInFolder("notes/today.md");
+    expect(api.readClipboardText()).toBe("clipboard text");
+    api.writeClipboardText("copied note");
     api.minimizeWindow();
     api.toggleMaximizeWindow();
     api.closeWindow();
 
     expect(hostActions.showInFolder).toHaveBeenCalledWith("notes/today.md");
+    expect(hostActions.readClipboardText).toHaveBeenCalledOnce();
+    expect(hostActions.writeClipboardText).toHaveBeenCalledWith(
+      "copied note",
+    );
     expect(hostActions.minimizeWindow).toHaveBeenCalledOnce();
     expect(hostActions.toggleMaximizeWindow).toHaveBeenCalledOnce();
     expect(hostActions.closeWindow).toHaveBeenCalledOnce();

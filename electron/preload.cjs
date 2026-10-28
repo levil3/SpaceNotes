@@ -57,6 +57,9 @@ contextBridge.exposeInMainWorld("levilNotes", {
 
   getSettings: () => ipcRenderer.invoke("settings:get"),
   saveSettings: (updates) => ipcRenderer.invoke("settings:save", updates),
+  readClipboardText: () => ipcRenderer.invoke("clipboard:read-text"),
+  writeClipboardText: (text) =>
+    ipcRenderer.invoke("clipboard:write-text", text),
   showInFolder: (relativePath) =>
     ipcRenderer.invoke("app:show-in-folder", relativePath),
 

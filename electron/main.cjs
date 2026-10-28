@@ -3,6 +3,7 @@ const { pathToFileURL } = require("node:url");
 const {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   net,
@@ -112,6 +113,8 @@ function createDesktopApi() {
     showInFolder: (relativePath) => {
       shell.showItemInFolder(vaultService.resolveInsideVault(relativePath));
     },
+    readClipboardText: () => clipboard.readText(),
+    writeClipboardText: (text) => clipboard.writeText(text),
     minimizeWindow: () => mainWindow?.minimize(),
     toggleMaximizeWindow: () => {
       if (!mainWindow) {

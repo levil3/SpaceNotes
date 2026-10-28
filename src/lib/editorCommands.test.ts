@@ -3,6 +3,7 @@ import {
   hasLeadingHeading,
   headingLevelFromShortcut,
   insertTitleHeadingMarkdown,
+  normalizeEditorLinkTarget,
 } from "./editorCommands";
 
 describe("editor title commands", () => {
@@ -90,5 +91,32 @@ describe("editor title commands", () => {
         ctrlKey: false,
       }),
     ).toBeNull();
+  });
+});
+
+describe("editor link commands", () => {
+  it("normalizes internal note targets for Markdown", () => {
+    expect(normalizeEditorLinkTarget("项目/设计方案", "internal")).toBe(
+      "项目/设计方案.md",
+    );
+    expect(normalizeEditorLinkTarget("[[项目/设计方案#背景]]", "internal")).toBe(
+      "项目/设计方案.md#背景",
+    );
+    expect(normalizeEditorLinkTarget("image.png", "internal")).toBe(
+      "image.png",
+    );
+    expect(normalizeEditorLinkTarget("#当前标题", "internal")).toBe(
+      "#当前标题",
+    );
+  });
+
+  it("adds a protocol to external links only when needed", () => {
+    expect(normalizeEditorLinkTarget("example.com/docs", "external")).toBe(
+      "https://example.com/docs",
+    );
+    expect(normalizeEditorLinkTarget("mailto:hello@example.com", "external")).toBe(
+      "mailto:hello@example.com",
+    );
+    expect(normalizeEditorLinkTarget("", "external")).toBe("");
   });
 });
