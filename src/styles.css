@@ -2481,11 +2481,13 @@ kbd {
   line-height: var(--list-line-height);
 }
 
-/* Crepe vertically centers list glyphs in a fixed 32px box. Align that box
-   with the first text line so numbers, bullets, and content share a baseline. */
+/* Crepe vertically centers list glyphs in the full list row. Constrain the
+   marker box to the first text line so numbers, bullets, and content share a
+   baseline even when rows use expanded Obsidian line spacing. */
 .editor-mount .milkdown .milkdown-list-item-block > .list-item {
   align-items: flex-start;
   gap: 0;
+  min-height: calc(var(--editor-font-size) * var(--list-line-height));
 }
 
 .editor-mount
@@ -2494,9 +2496,11 @@ kbd {
   > .list-item
   > .label-wrapper {
   width: var(--list-marker-slot);
-  height: calc(var(--editor-font-size) * var(--list-line-height));
+  box-sizing: border-box;
+  height: calc(var(--editor-font-size) * var(--editor-line-height));
   min-height: 0;
   align-items: flex-start;
+  padding-top: 2px;
 }
 
 .editor-mount
@@ -2520,6 +2524,7 @@ kbd {
   > .label-wrapper
   > .label.ordered {
   justify-content: flex-end;
+  padding-right: 0.45em;
   color: var(--text);
   font-size: 1em;
   font-variant-numeric: tabular-nums;
@@ -2561,7 +2566,7 @@ kbd {
   .milkdown-list-item-block
   > .list-item:has(> .label-wrapper > .label.ordered)
   > .children {
-  padding-left: 0.3em;
+  padding-left: 0;
 }
 
 .editor-mount .milkdown a {

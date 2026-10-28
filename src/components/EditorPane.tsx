@@ -86,6 +86,7 @@ interface ProseMirrorNodeViewElement extends HTMLElement {
     };
     spec?: {
       initialized?: boolean;
+      initializeCodeMirror?: () => void;
       update?: (node: unknown) => boolean;
     };
   };
@@ -720,6 +721,22 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
           classifyPreviewBlocks();
         }, 50);
       };
+      /**
+       * Code blocks are initialized lazily when they enter the viewport.
+       * Initializing on pointer entry as well keeps the language and copy
+       * toolbar available even when the pointer lands on an empty line.
+       */
+      const initializeHoveredCodeBlock = (event: PointerEvent) => {
+        const block = (event.target as HTMLElement).closest<
+          ProseMirrorNodeViewElement
+        >(".milkdown-code-block");
+        const spec = block?.pmViewDesc?.spec;
+        if (!block || !spec?.initializeCodeMirror || spec.initialized) {
+          return;
+        }
+        spec.initializeCodeMirror();
+        scheduleBlockClassification();
+      };
       const blockObserver = new MutationObserver(
         scheduleBlockClassification,
       );
@@ -787,6 +804,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       };
       root.addEventListener("pointerdown", revealPreviewSource, true);
       root.addEventListener("focusout", hidePreviewSource, true);
+      root.addEventListener("pointerover", initializeHoveredCodeBlock, true);
 
       const crepe = new Crepe({
         root,
@@ -865,6 +883,11 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         root.removeEventListener(
           "focusout",
           hidePreviewSource,
+          true,
+        );
+        root.removeEventListener(
+          "pointerover",
+          initializeHoveredCodeBlock,
           true,
         );
         if (crepeRef.current === crepe) {
