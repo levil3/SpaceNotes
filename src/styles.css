@@ -19,10 +19,8 @@
   --nav-hover: rgba(0, 0, 0, 0.067);
   --nav-font-size: 14.55px;
   --nav-line-height: 1.3;
-  /* Outline typography follows Obsidian's interface stack and text hierarchy. */
-  --outline-font: ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui,
-    "Segoe UI", "Google Sans Flex", Roboto, "Inter Variable", "Inter",
-    "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  /* Match the user's Obsidian Typora-based navigation typography. */
+  --outline-font: var(--ui-font);
   --outline-text: #000000;
   --outline-text-hover: #000000;
   --table-text: #222222;
@@ -69,7 +67,7 @@
   --nav-icon: #999999;
   --nav-icon-collapsed: #f0f0f0;
   --nav-hover: rgba(255, 255, 255, 0.15);
-  --outline-text: #d7d7d7;
+  --outline-text: #dadada;
   --outline-text-hover: #f1f1f1;
   --table-text: #dadada;
   --border: color-mix(in srgb, var(--text) 18%, var(--canvas));
@@ -690,15 +688,15 @@ kbd {
   grid-template-columns: 16px minmax(0, 1fr);
   column-gap: 5px;
   min-width: 0;
-  align-items: center;
+  align-items: start;
   margin-bottom: 2px;
   border-radius: 4px;
   padding: 0 8px 0 4px;
   color: var(--outline-text);
   font-family: var(--outline-font);
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 19.5px;
+  font-size: var(--nav-font-size);
+  font-weight: 500;
+  line-height: var(--nav-line-height);
 }
 
 .outline-row:hover {
@@ -710,7 +708,7 @@ kbd {
 .outline-leaf-marker {
   display: grid;
   width: 16px;
-  height: 22px;
+  height: calc(var(--nav-font-size) * var(--nav-line-height) + 8px);
   place-items: center;
 }
 
@@ -720,9 +718,9 @@ kbd {
 }
 
 .outline-toggle svg {
-  width: 12px;
-  height: 12px;
-  stroke-width: 2.4;
+  width: 10px;
+  height: 10px;
+  stroke-width: 4;
 }
 
 .outline-toggle:hover {
@@ -743,7 +741,7 @@ kbd {
 .outline-entry {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   padding: 4px 0;
   color: inherit;
   font-size: inherit;
