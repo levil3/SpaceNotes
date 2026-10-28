@@ -334,7 +334,10 @@ export function FormatContextToolbar({
     );
   }, [openSubmenu, submenuSide]);
 
-  const renderEntry = (entry: MenuEntry): JSX.Element => {
+  const renderEntry = (
+    entry: MenuEntry,
+    isSubmenuEntry = false,
+  ): JSX.Element => {
     const hasChildren = Boolean(entry.children?.length);
     const isOpen = openSubmenu === entry.action;
 
@@ -342,13 +345,19 @@ export function FormatContextToolbar({
       <div
         key={entry.action}
         className={`format-context-menu-entry ${isOpen ? "is-open" : ""}`}
-        onPointerEnter={() => {
-          if (hasChildren) {
-            setOpenSubmenu(entry.action);
-          } else {
-            setOpenSubmenu(null);
-          }
-        }}
+        onPointerEnter={
+          isSubmenuEntry
+            ? undefined
+            : () => {
+                // Leaf entries inside a submenu must not clear the parent
+                // submenu while the pointer travels toward the command.
+                if (hasChildren) {
+                  setOpenSubmenu(entry.action);
+                } else {
+                  setOpenSubmenu(null);
+                }
+              }
+        }
       >
         <button
           type="button"
@@ -382,7 +391,9 @@ export function FormatContextToolbar({
             aria-label={entry.label}
             style={{ top: submenuOffsetTop }}
           >
-            {entry.children?.map(renderEntry)}
+            {entry.children?.map((child) =>
+              renderEntry(child, true),
+            )}
           </div>
         ) : null}
       </div>
@@ -405,7 +416,7 @@ export function FormatContextToolbar({
           role="group"
           key={groupIndex}
         >
-          {group.map(renderEntry)}
+          {group.map((entry) => renderEntry(entry))}
         </div>
       ))}
     </div>
