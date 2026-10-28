@@ -1,6 +1,15 @@
-import { ChevronDown, ChevronRight, ListTree } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ListCollapse,
+  ListTree,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import { buildOutlineTree, type OutlineNode } from "../../lib/outline";
+import {
+  buildOutlineTree,
+  collectCollapsibleOutlineIds,
+  type OutlineNode,
+} from "../../lib/outline";
 import type { OutlineEntry } from "../../types";
 
 interface OutlinePanelProps {
@@ -16,6 +25,7 @@ export function OutlinePanel({
 }: OutlinePanelProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const tree = buildOutlineTree(entries);
+  const collapsibleIds = collectCollapsibleOutlineIds(tree);
 
   useEffect(() => {
     setCollapsed(new Set());
@@ -84,6 +94,20 @@ export function OutlinePanel({
 
   return (
     <div className="side-panel-content">
+      <div className="outline-toolbar">
+        <button
+          type="button"
+          className="outline-collapse-all"
+          title="收起全部"
+          aria-label="收起全部大纲"
+          disabled={collapsibleIds.size === 0}
+          onClick={() => {
+            setCollapsed(new Set(collapsibleIds));
+          }}
+        >
+          <ListCollapse size={14} />
+        </button>
+      </div>
       <div className="panel-list outline-list">
         {tree.length ? (
           tree.map((node) => renderNode(node))

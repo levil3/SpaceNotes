@@ -39,3 +39,25 @@ export function buildOutlineTree(entries: OutlineEntry[]): OutlineNode[] {
 
   return roots;
 }
+
+/**
+ * Collects only nodes that actually have children. The outline "collapse all"
+ * action uses this set so top-level headings remain visible as entry points.
+ */
+export function collectCollapsibleOutlineIds(
+  nodes: OutlineNode[],
+): Set<string> {
+  const ids = new Set<string>();
+
+  const visit = (children: OutlineNode[]) => {
+    for (const node of children) {
+      if (node.children.length) {
+        ids.add(node.id);
+        visit(node.children);
+      }
+    }
+  };
+
+  visit(nodes);
+  return ids;
+}

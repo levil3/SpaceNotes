@@ -47,6 +47,7 @@ import {
   parentFolder,
   remapPathAfterDirectoryRename,
 } from "./lib/paths";
+import { adjustEditorFontSize } from "./lib/editorZoom";
 import type { FileTreeSelectionItem } from "./lib/fileSelection";
 import type {
   AppSettings,
@@ -84,11 +85,11 @@ type DialogState =
   | null;
 
 const DEFAULT_SETTINGS: AppSettings = {
-  appearanceRevision: 4,
+  appearanceRevision: 5,
   themeMode: "light",
   accent: "#4b708b",
   background: "#ffffff",
-  textColor: "#333333",
+  textColor: "#222222",
   editorFontSize: 15,
   editorLineHeight: 1.8,
   contentWidth: 1200,
@@ -1373,6 +1374,19 @@ export default function App() {
                   handleEditorChange(activePath, markdown)
                 }
                 readOnly={activeEditorMode === "read"}
+                onZoom={(step) =>
+                  setSettings((current) => {
+                    // Ctrl+wheel is a document-level zoom gesture and shares
+                    // the persisted font-size setting with the settings panel.
+                    const editorFontSize = adjustEditorFontSize(
+                      current.editorFontSize,
+                      step,
+                    );
+                    return editorFontSize === current.editorFontSize
+                      ? current
+                      : { ...current, editorFontSize };
+                  })
+                }
               />
             ) : (
               <div className="empty-note-state">

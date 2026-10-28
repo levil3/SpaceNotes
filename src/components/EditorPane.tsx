@@ -65,6 +65,7 @@ interface EditorPaneProps {
   content: string;
   readOnly: boolean;
   onChange(markdown: string): void;
+  onZoom(step: -1 | 1): void;
 }
 
 interface LinkDialogState {
@@ -76,6 +77,16 @@ interface LinkDialogState {
   selectedText: string;
 }
 
+interface ProseMirrorNodeViewElement extends HTMLElement {
+  pmViewDesc?: {
+    node?: {
+      attrs?: {
+        language?: unknown;
+      };
+    };
+  };
+}
+
 const CALLOUT_MARKER = "[!note]";
 
 /**
@@ -84,13 +95,15 @@ const CALLOUT_MARKER = "[!note]";
  */
 export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
   function EditorPane(
-    { path, title, content, readOnly, onChange },
+    { path, title, content, readOnly, onChange, onZoom },
     ref,
   ) {
     const rootRef = useRef<HTMLDivElement>(null);
     const crepeRef = useRef<Crepe | null>(null);
     const onChangeRef = useRef(onChange);
+    const onZoomRef = useRef(onZoom);
     const readOnlyRef = useRef(readOnly);
+    const lastZoomAtRef = useRef(0);
     const [formatMenu, setFormatMenu] = useState<{
       x: number;
       y: number;
@@ -102,6 +115,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
     const [linkValue, setLinkValue] = useState("");
     const showInlineTitle = !hasLeadingHeading(content);
     onChangeRef.current = onChange;
+    onZoomRef.current = onZoom;
     readOnlyRef.current = readOnly;
 
     const setHeading = (level: number | null) => {
@@ -630,6 +644,85 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       }
 
       root.innerHTML = "";
+      // Crepe's read-only node view removes the language picker entirely, so
+      // the document model is the reliable source for classifying LaTeX blocks.
+      let classifyTimer: number | null = null;
+      const classifyPreviewBlocks = () => {
+        let modelLanguages: string[] = [];
+        try {
+          modelLanguages =
+            crepeRef.current?.editor.action((ctx) => {
+              const languages: string[] = [];
+              ctx
+                .get(editorViewCtx)
+                .state.doc.descendants((node) => {
+                  if (node.type.name === "code_block") {
+                    languages.push(String(node.attrs.language ?? ""));
+                  }
+                });
+              return languages;
+            }) ?? [];
+        } catch {
+          // The editor can be mid-teardown while a queued frame is running.
+        }
+
+        root
+          .querySelectorAll<HTMLElement>(".milkdown-code-block")
+          .forEach((block, index) => {
+            const viewLanguage = String(
+              (block as ProseMirrorNodeViewElement).pmViewDesc?.node?.attrs
+                ?.language ?? "",
+            );
+            const pickerLanguage =
+              block
+                .querySelector(".language-button")
+                ?.textContent?.trim() || "";
+            const language = (
+              viewLanguage || modelLanguages[index] || pickerLanguage
+            ).toLocaleLowerCase();
+            block.classList.toggle(
+              "is-latex-block",
+              language === "latex" || language === "math",
+            );
+          });
+      };
+      const scheduleBlockClassification = () => {
+        if (classifyTimer !== null) {
+          return;
+        }
+        // ProseMirror attaches its node view metadata after inserting the DOM.
+        // A task-level delay also keeps classification working when the window
+        // is backgrounded and animation frames are throttled.
+        classifyTimer = window.setTimeout(() => {
+          classifyTimer = null;
+          classifyPreviewBlocks();
+        }, 50);
+      };
+      const blockObserver = new MutationObserver(
+        scheduleBlockClassification,
+      );
+      blockObserver.observe(root, {
+        childList: true,
+        subtree: true,
+      });
+
+      const handleEditorWheel = (event: WheelEvent) => {
+        if (!event.ctrlKey && !event.metaKey) {
+          return;
+        }
+        event.preventDefault();
+        const now = performance.now();
+        if (now - lastZoomAtRef.current < 80) {
+          return;
+        }
+        lastZoomAtRef.current = now;
+        onZoomRef.current(event.deltaY < 0 ? 1 : -1);
+      };
+      root.addEventListener("wheel", handleEditorWheel, {
+        passive: false,
+        capture: true,
+      });
+
       // Preview-backed code blocks (LaTeX and Mermaid) show one clear
       // representation at a time. Clicking the preview opens its source.
       const revealPreviewSource = (event: PointerEvent) => {
@@ -707,6 +800,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
           // Apply the latest mode after async initialization so a fast toggle
           // cannot leave the Markdown view in the wrong editability state.
           crepe.setReadonly(readOnlyRef.current);
+          scheduleBlockClassification();
           root.setAttribute("spellcheck", "false");
           root
             .querySelectorAll('[contenteditable="true"]')
@@ -735,6 +829,11 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         });
 
       return () => {
+        blockObserver.disconnect();
+        if (classifyTimer !== null) {
+          window.clearTimeout(classifyTimer);
+        }
+        root.removeEventListener("wheel", handleEditorWheel, true);
         root.removeEventListener(
           "pointerdown",
           revealPreviewSource,

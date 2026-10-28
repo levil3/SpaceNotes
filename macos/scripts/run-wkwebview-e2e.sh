@@ -109,11 +109,11 @@ git -C "$FIXTURE_ROOT" commit -m "test: seed macOS E2E vault" >/dev/null
 node -e '
   const fs = require("node:fs");
   const settings = {
-    appearanceRevision: 4,
+    appearanceRevision: 5,
     themeMode: "light",
     accent: "#4b708b",
     background: "#ffffff",
-    textColor: "#333333",
+    textColor: "#222222",
     editorFontSize: 15,
     editorLineHeight: 1.8,
     contentWidth: 1200,

@@ -1,6 +1,6 @@
 :root {
   --canvas: #ffffff;
-  --user-text: #333333;
+  --user-text: #222222;
   --accent: #4b708b;
   --editor-font-size: 15px;
   --editor-line-height: 1.8;
@@ -641,6 +641,35 @@ kbd {
 
 .panel-list.outline-list {
   padding: 4px 12px 24px;
+}
+
+.outline-toolbar {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 2px 12px 0;
+}
+
+.outline-collapse-all {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--nav-icon);
+}
+
+.outline-collapse-all:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--nav-hover);
+  color: var(--nav-icon-collapsed);
+}
+
+.outline-collapse-all:disabled {
+  cursor: default;
+  opacity: 0.35;
 }
 
 .outline-row {
@@ -2375,20 +2404,41 @@ kbd {
 
 .editor-mount .milkdown h1 {
   margin: 0 0 20px;
-  font-size: 28px;
-  line-height: 1.4;
+  font-size: 1.618em;
+  line-height: 1.2;
 }
 
 .editor-mount .milkdown h2 {
   margin: 25px 0 10px;
-  font-size: 22px;
-  line-height: 1.5;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--text) 8%, var(--canvas));
+  padding-bottom: 0.35rem;
+  font-size: 1.462em;
+  line-height: 1.3;
 }
 
 .editor-mount .milkdown h3 {
   margin: 22px 0 8px;
-  font-size: 19px;
-  line-height: 1.55;
+  font-size: 1.318em;
+  line-height: 1.35;
+}
+
+.editor-mount .milkdown h4 {
+  margin: 18px 0 6px;
+  font-size: 1.188em;
+  line-height: 1.4;
+}
+
+.editor-mount .milkdown h5 {
+  margin: 16px 0 5px;
+  font-size: 1.076em;
+  line-height: 1.45;
+}
+
+.editor-mount .milkdown h6 {
+  margin: 14px 0 4px;
+  font-size: 1em;
+  line-height: 1.5;
 }
 
 .editor-mount .milkdown p {
@@ -2539,6 +2589,7 @@ kbd {
 
 /* Keep fenced code blocks flat and distraction-free, matching Typora. */
 .editor-mount .milkdown .milkdown-code-block {
+  position: relative;
   display: block;
   overflow: hidden;
   margin: 14px 0;
@@ -2546,7 +2597,7 @@ kbd {
   border-radius: 3px;
   outline: 0;
   background: color-mix(in srgb, var(--canvas) 96.5%, var(--text) 3.5%);
-  padding: 9px 12px;
+  padding: 8px 12px 9px;
   color: var(--text);
   box-shadow: none;
 }
@@ -2554,6 +2605,26 @@ kbd {
 .editor-mount .milkdown .milkdown-code-block.selected {
   border-color: color-mix(in srgb, var(--canvas) 89%, var(--text) 11%);
   outline: 0;
+}
+
+/* Rendered formulas stay borderless like Typora; editing affordances appear
+   only while the pointer or keyboard focus is inside the block. */
+.editor-mount .milkdown .milkdown-code-block.is-latex-block {
+  border-color: transparent;
+  background: transparent;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-code-block.is-latex-block:hover,
+.editor-mount
+  .milkdown
+  .milkdown-code-block.is-latex-block:focus-within,
+.editor-mount
+  .milkdown
+  .milkdown-code-block.is-latex-block.selected {
+  border-color: color-mix(in srgb, var(--canvas) 89%, var(--text) 11%);
+  background: color-mix(in srgb, var(--canvas) 96.5%, var(--text) 3.5%);
 }
 
 /* Crepe's floating block controls overlap text selections in a document-first
@@ -2580,12 +2651,32 @@ kbd {
 }
 
 .editor-mount .milkdown .milkdown-code-block .tools {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  right: 7px;
   display: flex;
-  min-height: 22px;
+  min-height: 20px;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  margin: -2px 0 4px;
+  gap: 6px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-code-block:hover
+  .tools,
+.editor-mount
+  .milkdown
+  .milkdown-code-block:focus-within
+  .tools,
+.editor-mount
+  .milkdown
+  .milkdown-code-block.selected
+  .tools {
+  pointer-events: auto;
 }
 
 .editor-mount .milkdown .milkdown-code-block .language-button {
@@ -2600,6 +2691,23 @@ kbd {
   font-size: 12px;
   font-weight: 500;
   line-height: 1;
+  margin: 0;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-code-block:hover
+  .language-button,
+.editor-mount
+  .milkdown
+  .milkdown-code-block:focus-within
+  .language-button,
+.editor-mount
+  .milkdown
+  .milkdown-code-block.selected
+  .language-button {
   opacity: 1;
 }
 
@@ -2655,7 +2763,20 @@ kbd {
 }
 
 .editor-mount .milkdown .milkdown-code-block .cm-content {
-  padding: 0;
+  padding: 0 !important;
+  caret-color: var(--accent) !important;
+}
+
+.editor-mount .milkdown .milkdown-code-block .cm-scroller {
+  padding: 0 !important;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-code-block:focus-within
+  .cm-cursor {
+  display: block !important;
+  border-left-color: var(--accent) !important;
 }
 
 .editor-mount .milkdown .milkdown-code-block .preview-panel {
@@ -2770,22 +2891,41 @@ kbd {
   margin: 0;
 }
 
-.editor-mount .milkdown table {
-  width: 100%;
+/*
+ * Obsidian lets a table shrink-wrap its contents instead of stretching across
+ * the note. The nested wrappers must also use intrinsic sizing because Crepe
+ * inserts a Vue table block around the native table element.
+ */
+.editor-mount .milkdown .milkdown-table-block,
+.editor-mount .milkdown .milkdown-table-block > div,
+.editor-mount .milkdown .milkdown-table-block .table-wrapper {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.editor-mount .milkdown .milkdown-table-block {
   margin: 14px 0;
+}
+
+.editor-mount .milkdown table {
+  width: auto;
+  max-width: 100%;
+  margin: 0;
   border-collapse: collapse;
   table-layout: auto;
   color: var(--table-text);
+  font-weight: 400;
   font-size: 1em;
 }
 
 .editor-mount .milkdown th,
 .editor-mount .milkdown td {
+  min-width: 6ch;
   border: 1px solid var(--border);
   padding: 4px 8px;
   color: var(--table-text);
   text-align: left;
-  vertical-align: middle;
+  vertical-align: top;
   line-height: 1.5;
 }
 
@@ -2798,8 +2938,65 @@ kbd {
 }
 
 .editor-mount .milkdown th {
-  background: color-mix(in srgb, var(--canvas) 94%, var(--text) 3%);
+  background: transparent;
   font-weight: 600;
+}
+
+/* Obsidian uses one subtle alternate row color from the active snippet/theme. */
+.editor-mount .milkdown tbody tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--canvas) 97.5%, var(--text) 2.5%);
+}
+
+/*
+ * Crepe otherwise reveals row/column drag handles whenever the table is
+ * selected. Obsidian keeps them transparent until the pointer reaches the
+ * narrow edge handle, leaving the table itself visually quiet.
+ */
+.editor-mount .milkdown .milkdown-table-block .handle[data-show="true"] {
+  opacity: 0 !important;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-table-block
+  .cell-handle:hover,
+.editor-mount
+  .milkdown
+  .milkdown-table-block
+  .cell-handle:focus-within,
+.editor-mount
+  .milkdown
+  .milkdown-table-block
+  .cell-handle:has(.button-group:hover),
+.editor-mount
+  .milkdown
+  .milkdown-table-block
+  .line-handle:hover,
+.editor-mount
+  .milkdown
+  .milkdown-table-block
+  .line-handle:focus-within {
+  opacity: 1 !important;
+}
+
+.editor-mount .milkdown .milkdown-table-block .cell-handle {
+  border: 1px solid var(--border);
+  background: var(--canvas);
+  box-shadow: none;
+}
+
+.editor-mount .milkdown .milkdown-table-block .line-handle {
+  background: color-mix(in srgb, var(--accent) 42%, var(--canvas));
+}
+
+.editor-mount .milkdown .milkdown-table-block .line-handle .add-button {
+  border: 1px solid var(--border-strong);
+  background: var(--canvas);
+  box-shadow: none;
+}
+
+.editor-mount .milkdown .milkdown-table-block .line-handle .add-button svg {
+  fill: var(--nav-icon);
 }
 
 .editor-mount .milkdown img {

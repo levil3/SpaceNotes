@@ -767,7 +767,7 @@ describe("SettingsStore appearance migration", () => {
     const settings = await store.load();
 
     expect(settings).toMatchObject({
-      appearanceRevision: 4,
+      appearanceRevision: 5,
       editorLineHeight: 1.8,
       contentWidth: 1200,
       sidebarWidth: 320,
@@ -792,7 +792,7 @@ describe("SettingsStore appearance migration", () => {
     const settings = await store.load();
 
     expect(settings).toMatchObject({
-      appearanceRevision: 4,
+      appearanceRevision: 5,
       editorLineHeight: 2,
       contentWidth: 940,
       sidebarWidth: 300,
@@ -818,10 +818,10 @@ describe("SettingsStore appearance migration", () => {
     const settings = await store.load();
 
     expect(settings).toMatchObject({
-      appearanceRevision: 4,
+      appearanceRevision: 5,
       accent: "#4b708b",
       background: "#ffffff",
-      textColor: "#333333",
+      textColor: "#222222",
     });
   });
 
@@ -844,7 +844,7 @@ describe("SettingsStore appearance migration", () => {
     const settings = await store.load();
 
     expect(settings).toMatchObject({
-      appearanceRevision: 4,
+      appearanceRevision: 5,
       accent: "#187a68",
       background: "#fbfcfa",
       textColor: "#28312d",
@@ -868,8 +868,34 @@ describe("SettingsStore appearance migration", () => {
     const settings = await store.load();
 
     expect(settings).toMatchObject({
-      appearanceRevision: 4,
+      appearanceRevision: 5,
       contentWidth: 1200,
+    });
+  });
+
+  it("deepens the previous default text color without changing custom themes", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "space-notes-settings-"));
+    temporaryDirectories.push(root);
+    const settingsPath = path.join(root, "settings.json");
+    await fs.writeFile(
+      settingsPath,
+      JSON.stringify({
+        appearanceRevision: 4,
+        accent: "#4b708b",
+        background: "#ffffff",
+        textColor: "#333333",
+      }),
+      "utf8",
+    );
+
+    const store = new SettingsStore(settingsPath);
+    const settings = await store.load();
+
+    expect(settings).toMatchObject({
+      appearanceRevision: 5,
+      accent: "#4b708b",
+      background: "#ffffff",
+      textColor: "#222222",
     });
   });
 });

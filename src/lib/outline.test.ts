@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildOutlineTree } from "./outline";
+import {
+  buildOutlineTree,
+  collectCollapsibleOutlineIds,
+} from "./outline";
 
 describe("buildOutlineTree", () => {
   it("nests headings beneath the closest lower-level heading", () => {
@@ -24,5 +27,15 @@ describe("buildOutlineTree", () => {
     ]);
 
     expect(tree[0].children[0].entry.text).toBe("跳级子项");
+  });
+
+  it("collects only branches that can be collapsed", () => {
+    const tree = buildOutlineTree([
+      { level: 1, text: "根节点", line: 1 },
+      { level: 2, text: "叶子节点", line: 3 },
+      { level: 1, text: "另一个根节点", line: 5 },
+    ]);
+
+    expect([...collectCollapsibleOutlineIds(tree)]).toEqual([tree[0].id]);
   });
 });

@@ -1,4 +1,8 @@
 import { Check, RotateCcw } from "lucide-react";
+import {
+  EDITOR_FONT_SIZE_MAX,
+  EDITOR_FONT_SIZE_MIN,
+} from "../../lib/editorZoom";
 import type { AppSettings, ThemeMode } from "../../types";
 
 // Presets only change document colors; layout and saved notes remain untouched.
@@ -8,7 +12,7 @@ const themePresets = [
     values: {
       themeMode: "light" as const,
       background: "#ffffff",
-      textColor: "#333333",
+      textColor: "#222222",
       accent: "#4b708b",
     },
   },
@@ -123,11 +127,11 @@ const themePresets = [
 ];
 
 const defaults: AppSettings = {
-  appearanceRevision: 4,
+  appearanceRevision: 5,
   themeMode: "light",
   accent: "#4b708b",
   background: "#ffffff",
-  textColor: "#333333",
+  textColor: "#222222",
   editorFontSize: 15,
   editorLineHeight: 1.8,
   contentWidth: 1200,
@@ -316,8 +320,8 @@ export function SettingsPanel({
           <span>{settings.editorFontSize}px</span>
           <input
             type="range"
-            min="13"
-            max="21"
+            min={EDITOR_FONT_SIZE_MIN}
+            max={EDITOR_FONT_SIZE_MAX}
             step="1"
             value={settings.editorFontSize}
             onChange={(event) =>

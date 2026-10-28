@@ -6,11 +6,11 @@ const chokidar = require("chokidar");
 const O_NOFOLLOW = fsConstants.O_NOFOLLOW || 0;
 
 const DEFAULT_SETTINGS = {
-  appearanceRevision: 4,
+  appearanceRevision: 5,
   themeMode: "light",
   accent: "#4b708b",
   background: "#ffffff",
-  textColor: "#333333",
+  textColor: "#222222",
   editorFontSize: 15,
   editorLineHeight: 1.8,
   contentWidth: 1200,
@@ -93,6 +93,19 @@ class SettingsStore {
           this.settings.contentWidth = 1200;
         }
         this.settings.appearanceRevision = 4;
+      }
+
+      // Revision 5 deepens the old default text color to Obsidian's #222222.
+      // Keep custom palettes intact by migrating only the untouched default.
+      if (Number(saved.appearanceRevision || 0) < 5) {
+        const usesOldDefaultText =
+          this.settings.background === "#ffffff" &&
+          this.settings.textColor === "#333333" &&
+          this.settings.accent === "#4b708b";
+        if (usesOldDefaultText) {
+          this.settings.textColor = "#222222";
+        }
+        this.settings.appearanceRevision = 5;
       }
     } catch {
       this.settings = { ...DEFAULT_SETTINGS };
