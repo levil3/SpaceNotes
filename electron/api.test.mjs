@@ -22,6 +22,10 @@ function createFixture() {
     })),
     trashNote: vi.fn(async () => {}),
     renameNote: vi.fn(async (_path, title) => ({ path: `${title}.md` })),
+    renameDirectory: vi.fn(async (_path, name) => ({
+      path: `notes/${name}`,
+    })),
+    trashDirectory: vi.fn(async () => {}),
     search: vi.fn(() => []),
     outline: vi.fn(() => []),
     backlinks: vi.fn(() => []),
@@ -93,11 +97,20 @@ describe("shared LevilNotes API", () => {
       content: "# Note",
     });
     await api.createNote("notes", "Today");
+    await api.renameDirectory("notes/previous", "next");
+    await api.trashDirectory("notes/obsolete");
 
     expect(hostActions.chooseVaultFolder).toHaveBeenCalledOnce();
     expect(vaultService.open).toHaveBeenCalledWith("/selected");
     expect(vaultService.readNote).toHaveBeenCalledWith("notes/today.md");
     expect(vaultService.createNote).toHaveBeenCalledWith("notes", "Today");
+    expect(vaultService.renameDirectory).toHaveBeenCalledWith(
+      "notes/previous",
+      "next",
+    );
+    expect(vaultService.trashDirectory).toHaveBeenCalledWith(
+      "notes/obsolete",
+    );
   });
 
   it("preserves Git request arguments and return values", async () => {

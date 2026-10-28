@@ -113,6 +113,10 @@
         requestHost("trashNote", [relativePath]),
       renameNote: (relativePath, title) =>
         invoke("renameNote", [relativePath, title]),
+      renameDirectory: (relativePath, name) =>
+        invoke("renameDirectory", [relativePath, name]),
+      trashDirectory: (relativePath) =>
+        requestHost("trashDirectory", [relativePath]),
       getNoteHistory: (relativePath) =>
         invoke("getNoteHistory", [relativePath]),
       search: (query, scope, mode) =>

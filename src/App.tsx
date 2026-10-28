@@ -33,7 +33,11 @@ import { OutlinePanel } from "./components/panels/OutlinePanel";
 import { SearchPanel } from "./components/panels/SearchPanel";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { TagsPanel } from "./components/panels/TagsPanel";
-import { buildFileTree, parentFolder } from "./lib/paths";
+import {
+  buildFileTree,
+  parentFolder,
+  remapPathAfterDirectoryRename,
+} from "./lib/paths";
 import type {
   AppSettings,
   BacklinkResult,
@@ -55,14 +59,17 @@ type ActiveView =
 
 type EditorMode = "edit" | "read";
 
-// New and reopened notes start in a non-editable reading view. A tab remembers
-// its switched mode until it is closed.
+// Existing and reopened notes start in a non-editable reading view. Newly
+// created notes explicitly switch to edit mode, and each tab remembers its
+// selected mode until it is closed.
 const DEFAULT_EDITOR_MODE: EditorMode = "read";
 
 type DialogState =
   | { kind: "create"; parent: string; value: string }
   | { kind: "rename"; path: string; value: string }
+  | { kind: "rename-folder"; path: string; value: string }
   | { kind: "delete"; path: string }
+  | { kind: "delete-folder"; path: string }
   | { kind: "git-discard"; path: string }
   | null;
 
@@ -81,8 +88,19 @@ const DEFAULT_SETTINGS: AppSettings = {
   recentVault: "",
 };
 
+function entryName(relativePath: string) {
+  return relativePath.split("/").pop() || relativePath;
+}
+
 function basename(relativePath: string) {
-  return relativePath.split("/").pop()?.replace(/\.md$/i, "") || relativePath;
+  return entryName(relativePath).replace(/\.md$/i, "");
+}
+
+function belongsToDirectory(relativePath: string, directory: string) {
+  return (
+    relativePath === directory ||
+    relativePath.startsWith(`${directory}/`)
+  );
 }
 
 export default function App() {
@@ -132,6 +150,12 @@ export default function App() {
   const editorMenuRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
   const pendingSaveRef = useRef<{ path: string; content: string } | null>(null);
+  // Directory mutations emit index events before their IPC calls resolve.
+  // This guard prevents those intermediate snapshots from closing open tabs.
+  const directoryTransitionRef = useRef<{
+    kind: "rename" | "trash";
+    path: string;
+  } | null>(null);
   // Tracks the newest note request so a slower, stale read cannot replace it.
   const openRequestRef = useRef(0);
   const settingsLoadedRef = useRef(false);
@@ -325,8 +349,14 @@ export default function App() {
       setVault(snapshot);
       await refreshTags();
       await refreshGit();
+      const transition = directoryTransitionRef.current;
+      const activePathInTransition =
+        transition &&
+        activePathRef.current &&
+        belongsToDirectory(activePathRef.current, transition.path);
       if (
         activePathRef.current &&
+        !activePathInTransition &&
         !snapshot.files.some((file) => file.path === activePathRef.current)
       ) {
         setTabs((current) =>
@@ -336,7 +366,7 @@ export default function App() {
         setActiveContent("");
         setActiveView({ kind: "note" });
       }
-      if (activePathRef.current) {
+      if (activePathRef.current && !activePathInTransition) {
         await refreshVaultMetadata(activePathRef.current);
       }
     });
@@ -387,6 +417,14 @@ export default function App() {
       showToast(String(error instanceof Error ? error.message : error));
     }
   }, [refreshGit, showToast]);
+
+  const cancelPendingSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
+  }, []);
 
   const handleEditorChange = useCallback(
     (path: string, markdown: string) => {
@@ -560,6 +598,10 @@ export default function App() {
         if (snapshot) {
           setVault(snapshot);
         }
+        setEditorModes((current) => ({
+          ...current,
+          [created.path]: "edit",
+        }));
         await openNote(created.path);
       } else if (dialog.kind === "rename") {
         const result = await window.levilNotes.renameNote(
@@ -590,6 +632,44 @@ export default function App() {
         if (snapshot) {
           setVault(snapshot);
         }
+      } else if (dialog.kind === "rename-folder") {
+        await flushPendingSave();
+        directoryTransitionRef.current = {
+          kind: "rename",
+          path: dialog.path,
+        };
+        const result = await window.levilNotes.renameDirectory(
+          dialog.path,
+          dialog.value,
+        );
+        const remapPath = (path: string) =>
+          remapPathAfterDirectoryRename(
+            path,
+            dialog.path,
+            result.path,
+          );
+        setTabs((current) =>
+          current.map((tab) => ({ ...tab, path: remapPath(tab.path) })),
+        );
+        setEditorModes((current) => {
+          const next: Record<string, EditorMode> = {};
+          Object.entries(current).forEach(([path, mode]) => {
+            next[remapPath(path)] = mode;
+          });
+          return next;
+        });
+        setHistoryTrail((current) => current.map(remapPath));
+        const nextActivePath = remapPath(activePath);
+        cancelPendingSave();
+        activePathRef.current = nextActivePath;
+        if (nextActivePath !== activePath) {
+          setActivePath(nextActivePath);
+        }
+        const snapshot = await window.levilNotes.getVaultSnapshot();
+        if (snapshot) {
+          setVault(snapshot);
+        }
+        directoryTransitionRef.current = null;
       } else if (dialog.kind === "delete") {
         await window.levilNotes.trashNote(dialog.path);
         setTabs((current) =>
@@ -609,6 +689,45 @@ export default function App() {
         if (snapshot) {
           setVault(snapshot);
         }
+      } else if (dialog.kind === "delete-folder") {
+        await flushPendingSave();
+        directoryTransitionRef.current = {
+          kind: "trash",
+          path: dialog.path,
+        };
+        await window.levilNotes.trashDirectory(dialog.path);
+        cancelPendingSave();
+        const removedPrefix = `${dialog.path}/`;
+        const belongsToDeletedFolder = (path: string) =>
+          path === dialog.path || path.startsWith(removedPrefix);
+        setTabs((current) =>
+          current.filter((tab) => !belongsToDeletedFolder(tab.path)),
+        );
+        setEditorModes((current) =>
+          Object.fromEntries(
+            Object.entries(current).filter(
+              ([path]) => !belongsToDeletedFolder(path),
+            ),
+          ),
+        );
+        const remainingHistory = historyTrail.filter(
+          (path) => !belongsToDeletedFolder(path),
+        );
+        setHistoryTrail(remainingHistory);
+        setHistoryIndex((current) =>
+          Math.min(current, remainingHistory.length - 1),
+        );
+        if (belongsToDeletedFolder(activePath)) {
+          setActivePath("");
+          activePathRef.current = "";
+          setActiveContent("");
+          setActiveView({ kind: "note" });
+        }
+        const snapshot = await window.levilNotes.getVaultSnapshot();
+        if (snapshot) {
+          setVault(snapshot);
+        }
+        directoryTransitionRef.current = null;
       } else if (dialog.kind === "git-discard") {
         await flushPendingSave();
         const status = await window.levilNotes.gitDiscard([dialog.path]);
@@ -625,6 +744,7 @@ export default function App() {
       }
       setDialog(null);
     } catch (error) {
+      directoryTransitionRef.current = null;
       showToast(String(error instanceof Error ? error.message : error));
     }
   };
@@ -1316,15 +1436,30 @@ export default function App() {
             </button>
           ) : null}
           {contextMenu.kind === "folder" ? (
-            <button
-              type="button"
-              onClick={() => {
-                startNewNoteInFolder(contextMenu.path);
-                setContextMenu(null);
-              }}
-            >
-              在此文件夹中新建笔记
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  startNewNoteInFolder(contextMenu.path);
+                  setContextMenu(null);
+                }}
+              >
+                在此文件夹中新建笔记
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDialog({
+                    kind: "rename-folder",
+                    path: contextMenu.path,
+                    value: entryName(contextMenu.path),
+                  });
+                  setContextMenu(null);
+                }}
+              >
+                重命名文件夹
+              </button>
+            </>
           ) : null}
           <button
             type="button"
@@ -1392,6 +1527,21 @@ export default function App() {
               </button>
             </>
           ) : null}
+          {contextMenu.kind === "folder" ? (
+            <button
+              type="button"
+              className="danger"
+              onClick={() => {
+                setDialog({
+                  kind: "delete-folder",
+                  path: contextMenu.path,
+                });
+                setContextMenu(null);
+              }}
+            >
+              删除文件夹
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -1402,42 +1552,60 @@ export default function App() {
               ? "新建笔记"
               : dialog.kind === "rename"
                 ? "重命名笔记"
-                : dialog.kind === "git-discard"
-                  ? "撤销未提交修改"
-                  : "移到回收站"
+                : dialog.kind === "rename-folder"
+                  ? "重命名文件夹"
+                  : dialog.kind === "delete-folder"
+                    ? "删除文件夹"
+                    : dialog.kind === "git-discard"
+                      ? "撤销未提交修改"
+                      : "移到回收站"
           }
           description={
             dialog.kind === "delete"
               ? `确定要将“${basename(dialog.path)}”移到回收站吗？`
-              : dialog.kind === "git-discard"
-                ? `将丢弃“${dialog.path}”的暂存和工作区修改，并恢复到最近一次提交。此操作无法撤销。`
-                : undefined
+              : dialog.kind === "delete-folder"
+                ? `确定要将“${entryName(dialog.path)}”文件夹及其中的全部内容移到回收站吗？`
+                : dialog.kind === "git-discard"
+                  ? `将丢弃“${dialog.path}”的暂存和工作区修改，并恢复到最近一次提交。此操作无法撤销。`
+                  : undefined
           }
           inputLabel={
-            dialog.kind === "create" || dialog.kind === "rename"
-              ? "笔记名称"
-              : undefined
+            dialog.kind === "rename-folder"
+              ? "文件夹名称"
+              : dialog.kind === "create" || dialog.kind === "rename"
+                ? "笔记名称"
+                : undefined
           }
           value={
-            dialog.kind === "create" || dialog.kind === "rename"
+            dialog.kind === "create" ||
+            dialog.kind === "rename" ||
+            dialog.kind === "rename-folder"
               ? dialog.value
               : undefined
           }
-          placeholder="输入 Markdown 笔记名称"
+          placeholder={
+            dialog.kind === "rename-folder"
+              ? "输入文件夹名称"
+              : "输入 Markdown 笔记名称"
+          }
           confirmText={
-            dialog.kind === "delete"
+            dialog.kind === "delete" || dialog.kind === "delete-folder"
               ? "移到回收站"
               : dialog.kind === "git-discard"
                 ? "撤销修改"
                 : "确定"
           }
           danger={
-            dialog.kind === "delete" || dialog.kind === "git-discard"
+            dialog.kind === "delete" ||
+            dialog.kind === "delete-folder" ||
+            dialog.kind === "git-discard"
           }
           onValueChange={(value) =>
             setDialog((current) =>
               current &&
-              (current.kind === "create" || current.kind === "rename")
+              (current.kind === "create" ||
+                current.kind === "rename" ||
+                current.kind === "rename-folder")
                 ? { ...current, value }
                 : current,
             )

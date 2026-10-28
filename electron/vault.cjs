@@ -833,6 +833,23 @@ class VaultService {
     }
   }
 
+  /**
+   * Windows does not allow watched directories to be renamed or moved to the
+   * trash while Chokidar holds their handles. Pause the watcher only around the
+   * directory mutation, then restore it even when the mutation fails.
+   */
+  async withDirectoryWatcherPaused(action) {
+    const restartWatcher = Boolean(this.watcher);
+    await this.closeWatcher();
+    try {
+      return await action();
+    } finally {
+      if (restartWatcher && this.vaultPath) {
+        await this.startWatcher();
+      }
+    }
+  }
+
   snapshot(reason = "updated") {
     if (!this.vaultPath) {
       return null;
@@ -914,6 +931,70 @@ class VaultService {
     return { path: relativePath, content };
   }
 
+  /**
+   * Renames one directory without moving it across parents. The source must be
+   * a real directory inside the vault, and the index is rebuilt immediately so
+   * every note below the folder gets its new path before the renderer updates.
+   */
+  async renameDirectory(relativePath, nextName) {
+    const safeName = nextName.trim().replace(/[<>:"/\\|?*]/g, "-");
+    if (!safeName || safeName === "." || safeName === "..") {
+      throw new Error("文件夹名称不能为空。");
+    }
+    if (!relativePath || relativePath === ".") {
+      throw new Error("不能重命名笔记库根目录。");
+    }
+
+    const source = await this.resolveExistingEntryInsideVault(relativePath);
+    const sourceStatus = await fs.lstat(source);
+    if (!sourceStatus.isDirectory()) {
+      throw new Error("只能重命名文件夹。");
+    }
+
+    const nextRelative = toPosixPath(
+      path.join(path.dirname(relativePath), safeName),
+    );
+    const destination =
+      await this.resolveMutationDestinationInsideVault(nextRelative);
+    if (source === destination) {
+      return { path: relativePath };
+    }
+
+    const destinationStatus = await fs
+      .lstat(destination)
+      .catch((error) => {
+        if (error.code === "ENOENT") {
+          return null;
+        }
+        throw error;
+      });
+    if (destinationStatus) {
+      if (
+        sourceStatus.dev !== destinationStatus.dev ||
+        sourceStatus.ino !== destinationStatus.ino
+      ) {
+        throw new Error("同名文件夹已存在。");
+      }
+    }
+
+    await this.withDirectoryWatcherPaused(async () => {
+      if (this.fileOperations) {
+        await this.fileOperations.rename(
+          this.vaultPath,
+          this.relativePathForFileOperations(source),
+          this.relativePathForFileOperations(destination),
+        );
+      } else {
+        await fs.rename(source, destination);
+      }
+
+      await this.resolveExistingEntryInsideVault(nextRelative);
+      await this.rebuildIndex();
+    });
+    this.onVaultChanged?.(this.snapshot("renamed"));
+    return { path: nextRelative };
+  }
+
   async trashNote(relativePath) {
     if (typeof this.trashItem !== "function") {
       throw new Error("当前宿主不支持将笔记移入废纸篓。");
@@ -921,6 +1002,27 @@ class VaultService {
     const absolute = await this.resolveExistingEntryInsideVault(relativePath);
     await this.trashItem(absolute);
     this.documents.delete(relativePath);
+    this.onVaultChanged?.(this.snapshot("trashed"));
+  }
+
+  async trashDirectory(relativePath) {
+    if (typeof this.trashItem !== "function") {
+      throw new Error("当前宿主不支持将文件夹移入废纸篓。");
+    }
+    if (!relativePath || relativePath === ".") {
+      throw new Error("不能删除笔记库根目录。");
+    }
+
+    const absolute = await this.resolveExistingEntryInsideVault(relativePath);
+    const status = await fs.lstat(absolute);
+    if (!status.isDirectory()) {
+      throw new Error("只能删除文件夹。");
+    }
+
+    await this.withDirectoryWatcherPaused(async () => {
+      await this.trashItem(absolute);
+      await this.rebuildIndex();
+    });
     this.onVaultChanged?.(this.snapshot("trashed"));
   }
 

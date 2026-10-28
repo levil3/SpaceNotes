@@ -161,6 +161,8 @@ export interface LevilNotesApi {
   ): Promise<{ path: string; content: string }>;
   trashNote(path: string): Promise<void>;
   renameNote(path: string, title: string): Promise<{ path: string }>;
+  renameDirectory(path: string, name: string): Promise<{ path: string }>;
+  trashDirectory(path: string): Promise<void>;
   getNoteHistory(path: string): Promise<GitCommit[]>;
 
   search(

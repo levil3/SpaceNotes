@@ -122,6 +122,12 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
                 return
             }
             trash(path, request: request)
+        case "trashDirectory":
+            guard let path = request.arguments.first as? String else {
+                reject(request, message: "文件夹路径无效。")
+                return
+            }
+            trash(path, request: request, requiresDirectory: true)
         case "showInFolder":
             guard let path = request.arguments.first as? String else {
                 reject(request, message: "文件路径无效。")
@@ -173,7 +179,11 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
         }
     }
 
-    private func trash(_ relativePath: String, request: BridgeRequest) {
+    private func trash(
+        _ relativePath: String,
+        request: BridgeRequest,
+        requiresDirectory: Bool = false
+    ) {
         guard let client = clientProvider() else {
             reject(request, message: "后台服务不可用。")
             return
@@ -191,6 +201,22 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
                     fileURLWithPath: rootPath,
                     isDirectory: true
                 )
+                if requiresDirectory {
+                    let target = try VaultPathGuard.resolve(
+                        relativePath: relativePath,
+                        in: root
+                    )
+                    var isDirectory: ObjCBool = false
+                    guard
+                        FileManager.default.fileExists(
+                            atPath: target.path,
+                            isDirectory: &isDirectory
+                        ),
+                        isDirectory.boolValue
+                    else {
+                        throw SidecarClientError.server("只能删除文件夹。")
+                    }
+                }
                 appendDiagnostic("host-trash=move:start")
                 try VaultPathGuard.moveToTrash(
                     relativePath: relativePath,

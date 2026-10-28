@@ -210,7 +210,7 @@ async function createBridge(baseUrl, token, postToSidecar) {
       messageHandlers: {
         levilNotesHost: {
           postMessage(message) {
-            if (message.name !== "trashNote") {
+            if (!["trashNote", "trashDirectory"].includes(message.name)) {
               window.__levilNotesHostReject(
                 message.id,
                 `usage model does not support host action ${message.name}`,
@@ -218,7 +218,7 @@ async function createBridge(baseUrl, token, postToSidecar) {
               return;
             }
             postToSidecar(
-              "trashNote",
+              message.name,
               Array.isArray(message.args) ? message.args : [],
             ).then(
               (result) => window.__levilNotesHostResolve(message.id, result),

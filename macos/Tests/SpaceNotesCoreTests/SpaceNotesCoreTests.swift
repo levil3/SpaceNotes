@@ -615,6 +615,16 @@ final class SpaceNotesCoreTests: XCTestCase {
             ),
             BridgeRequest(id: 7, name: "trashNote", arguments: ["a.md"])
         )
+        XCTAssertEqual(
+            BridgeRequest(
+                body: ["id": 8, "name": "trashDirectory", "args": ["notes"]]
+            ),
+            BridgeRequest(
+                id: 8,
+                name: "trashDirectory",
+                arguments: ["notes"]
+            )
+        )
         XCTAssertNil(BridgeRequest(body: ["id": 7, "args": []]))
     }
 

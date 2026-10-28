@@ -110,3 +110,20 @@ export function parentFolder(relativePath: string) {
   const index = relativePath.lastIndexOf("/");
   return index === -1 ? "" : relativePath.slice(0, index);
 }
+
+/**
+ * Keeps open tabs and navigation history valid after a directory rename.
+ */
+export function remapPathAfterDirectoryRename(
+  relativePath: string,
+  previousDirectory: string,
+  nextDirectory: string,
+) {
+  if (relativePath === previousDirectory) {
+    return nextDirectory;
+  }
+  const prefix = `${previousDirectory}/`;
+  return relativePath.startsWith(prefix)
+    ? `${nextDirectory}/${relativePath.slice(prefix.length)}`
+    : relativePath;
+}

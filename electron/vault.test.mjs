@@ -22,7 +22,12 @@ afterEach(async () => {
   vi.restoreAllMocks();
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) =>
-      fs.rm(directory, { recursive: true, force: true }),
+      fs.rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 50,
+      }),
     ),
   );
 });
@@ -508,6 +513,100 @@ describe("VaultService overwrite protection", () => {
       await expect(
         fs.readFile(path.join(root, destination.path), "utf8"),
       ).resolves.toBe("DESTINATION\n");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+});
+
+describe("VaultService directory management", () => {
+  it("renames a directory and rebuilds every index path below it", async () => {
+    const { root, vault } = await createFixture();
+    try {
+      const closeWatcher = vi.spyOn(vault, "closeWatcher");
+      const startWatcher = vi.spyOn(vault, "startWatcher");
+      await expect(
+        vault.renameDirectory("notes/Java Base", "Java Advanced"),
+      ).resolves.toEqual({ path: "notes/Java Advanced" });
+
+      expect(closeWatcher).toHaveBeenCalled();
+      expect(startWatcher).toHaveBeenCalled();
+      expect(vault.watcher).not.toBeNull();
+      await expect(
+        fs.readFile(
+          path.join(root, "notes", "Java Advanced", "example.md"),
+          "utf8",
+        ),
+      ).resolves.toContain("# Example");
+      await expect(
+        fs.access(path.join(root, "notes", "Java Base")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+
+      const snapshot = vault.snapshot();
+      expect(snapshot.files.map((file) => file.path)).toContain(
+        "notes/Java Advanced/example.md",
+      );
+      expect(snapshot.directories).toEqual(
+        expect.arrayContaining([
+          "notes/Java Advanced",
+          "notes/Java Advanced/images",
+        ]),
+      );
+      expect(snapshot.directories).not.toContain("notes/Java Base");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects renaming a directory over an existing directory", async () => {
+    const { root, vault } = await createFixture();
+    await fs.mkdir(path.join(root, "notes", "Existing"), {
+      recursive: true,
+    });
+    try {
+      await expect(
+        vault.renameDirectory("notes/Java Base", "Existing"),
+      ).rejects.toThrow("同名文件夹已存在");
+      await expect(
+        fs.access(path.join(root, "notes", "Java Base", "example.md")),
+      ).resolves.toBeUndefined();
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("moves a directory to trash and removes its indexed notes", async () => {
+    const trashItem = vi.fn(async (absolutePath) => {
+      await fs.rm(absolutePath, { recursive: true, force: true });
+    });
+    const { vault } = await createFixture({ trashItem });
+    try {
+      const closeWatcher = vi.spyOn(vault, "closeWatcher");
+      const startWatcher = vi.spyOn(vault, "startWatcher");
+      await vault.trashDirectory("notes/Java Base");
+
+      expect(closeWatcher).toHaveBeenCalled();
+      expect(startWatcher).toHaveBeenCalled();
+      expect(vault.watcher).not.toBeNull();
+      expect(trashItem).toHaveBeenCalledWith(
+        path.join(vault.getVaultPath(), "notes", "Java Base"),
+      );
+      const snapshot = vault.snapshot();
+      expect(snapshot.files).toEqual([]);
+      expect(snapshot.directories).not.toContain("notes/Java Base");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects using directory deletion for a note", async () => {
+    const trashItem = vi.fn(async () => {});
+    const { vault } = await createFixture({ trashItem });
+    try {
+      await expect(
+        vault.trashDirectory("notes/Java Base/example.md"),
+      ).rejects.toThrow("只能删除文件夹");
+      expect(trashItem).not.toHaveBeenCalled();
     } finally {
       await vault.closeWatcher();
     }

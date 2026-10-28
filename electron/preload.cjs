@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld("levilNotes", {
     ipcRenderer.invoke("note:trash", relativePath),
   renameNote: (relativePath, title) =>
     ipcRenderer.invoke("note:rename", relativePath, title),
+  renameDirectory: (relativePath, name) =>
+    ipcRenderer.invoke("directory:rename", relativePath, name),
+  trashDirectory: (relativePath) =>
+    ipcRenderer.invoke("directory:trash", relativePath),
   getNoteHistory: (relativePath) =>
     ipcRenderer.invoke("note:history", relativePath),
 

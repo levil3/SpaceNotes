@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { NoteFile } from "../types";
-import { buildFileTree, isHiddenPath } from "./paths";
+import {
+  buildFileTree,
+  isHiddenPath,
+  remapPathAfterDirectoryRename,
+} from "./paths";
 
 const note: NoteFile = {
   path: ".drafts/secret.md",
@@ -32,5 +36,22 @@ describe("file tree paths", () => {
         : null,
     ).toMatchObject({ type: "folder" });
     expect(empty).toMatchObject({ type: "folder", name: "empty" });
+  });
+
+  it("remaps only paths inside a renamed directory", () => {
+    const rename = (path: string) =>
+      remapPathAfterDirectoryRename(
+        path,
+        "notes/archive",
+        "notes/history",
+      );
+
+    expect(rename("notes/archive/2026/today.md")).toBe(
+      "notes/history/2026/today.md",
+    );
+    expect(rename("notes/archive-old/today.md")).toBe(
+      "notes/archive-old/today.md",
+    );
+    expect(rename("other/today.md")).toBe("other/today.md");
   });
 });

@@ -7,6 +7,8 @@ const IPC_METHODS = Object.freeze({
   "note:create": "createNote",
   "note:trash": "trashNote",
   "note:rename": "renameNote",
+  "directory:rename": "renameDirectory",
+  "directory:trash": "trashDirectory",
   "note:history": "getNoteHistory",
   "search:run": "search",
   "note:outline": "getOutline",
@@ -74,6 +76,10 @@ function createLevilNotesApi({
     trashNote: (relativePath) => vaultService.trashNote(relativePath),
     renameNote: (relativePath, title) =>
       vaultService.renameNote(relativePath, title),
+    renameDirectory: (relativePath, name) =>
+      vaultService.renameDirectory(relativePath, name),
+    trashDirectory: (relativePath) =>
+      vaultService.trashDirectory(relativePath),
     getNoteHistory: (relativePath) => gitService.log(relativePath),
 
     search: (query, scope, mode) =>
