@@ -85,6 +85,16 @@ interface ProseMirrorNodeViewElement extends HTMLElement {
       };
     };
     spec?: {
+      cm?: {
+        dispatch: (transaction: {
+          selection: { anchor: number };
+        }) => void;
+        focus: () => void;
+        posAtCoords: (coords: {
+          x: number;
+          y: number;
+        }) => number | null;
+      };
       initialized?: boolean;
       initializeCodeMirror?: () => void;
       update?: (node: unknown) => boolean;
@@ -737,6 +747,45 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         spec.initializeCodeMirror();
         scheduleBlockClassification();
       };
+      /**
+       * When the first click initializes a placeholder code block, the browser
+       * can keep focus on the outer ProseMirror editor. Focus CodeMirror after
+       * creation and restore the caret at the clicked empty-line position.
+       */
+      const placeCodeBlockCaretOnFirstClick = (event: PointerEvent) => {
+        if (event.button !== 0) {
+          return;
+        }
+        const target = event.target as HTMLElement;
+        if (
+          !target.closest(
+            ".cm-line, .milkdown-code-block-placeholder, .preview-panel",
+          )
+        ) {
+          return;
+        }
+        const block = target.closest<ProseMirrorNodeViewElement>(
+          ".milkdown-code-block",
+        );
+        const spec = block?.pmViewDesc?.spec;
+        if (!block || !spec?.initializeCodeMirror || spec.initialized) {
+          return;
+        }
+        spec.initializeCodeMirror();
+        scheduleBlockClassification();
+        const { clientX, clientY } = event;
+        requestAnimationFrame(() => {
+          const cm = spec.cm;
+          if (!cm) {
+            return;
+          }
+          cm.focus();
+          const position = cm.posAtCoords({ x: clientX, y: clientY });
+          if (position !== null && position >= 0) {
+            cm.dispatch({ selection: { anchor: position } });
+          }
+        });
+      };
       const blockObserver = new MutationObserver(
         scheduleBlockClassification,
       );
@@ -803,6 +852,11 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         });
       };
       root.addEventListener("pointerdown", revealPreviewSource, true);
+      root.addEventListener(
+        "pointerdown",
+        placeCodeBlockCaretOnFirstClick,
+        true,
+      );
       root.addEventListener("focusout", hidePreviewSource, true);
       root.addEventListener("pointerover", initializeHoveredCodeBlock, true);
 
@@ -878,6 +932,11 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         root.removeEventListener(
           "pointerdown",
           revealPreviewSource,
+          true,
+        );
+        root.removeEventListener(
+          "pointerdown",
+          placeCodeBlockCaretOnFirstClick,
           true,
         );
         root.removeEventListener(

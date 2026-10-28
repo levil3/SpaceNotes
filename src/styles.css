@@ -2790,6 +2790,7 @@ kbd {
   .milkdown-code-block:focus-within
   .cm-cursor {
   display: block !important;
+  border-left-width: 2px !important;
   border-left-color: var(--accent) !important;
 }
 
