@@ -3,6 +3,35 @@ export interface InsertTitleResult {
   inserted: boolean;
 }
 
+interface HeadingShortcutEvent {
+  key: string;
+  code: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}
+
+/**
+ * Uses the physical digit key as the primary signal because keyboard layouts
+ * can report shifted punctuation through event.key even for Ctrl+1.
+ */
+export function headingLevelFromShortcut(
+  event: HeadingShortcutEvent,
+): number | null {
+  if (
+    (!event.ctrlKey && !event.metaKey) ||
+    event.altKey ||
+    event.shiftKey
+  ) {
+    return null;
+  }
+  const physicalMatch = /^(?:Digit|Numpad)([0-6])$/.exec(event.code);
+  const keyMatch = /^[0-6]$/.test(event.key) ? event.key : null;
+  const value = physicalMatch?.[1] ?? keyMatch;
+  return value === null ? null : Number(value);
+}
+
 function withoutFrontmatter(markdown: string) {
   return markdown.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
 }

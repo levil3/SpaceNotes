@@ -1,9 +1,10 @@
 import { Crepe, CrepeFeature } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/frame.css";
-import { commandsCtx } from "@milkdown/kit/core";
+import { commandsCtx, editorViewCtx } from "@milkdown/kit/core";
 import {
   headingSchema,
+  liftListItemCommand,
   paragraphSchema,
   setBlockTypeCommand,
   toggleEmphasisCommand,
@@ -25,6 +26,7 @@ import {
 import { codeBlockTheme } from "../lib/codeTheme";
 import {
   hasLeadingHeading,
+  headingLevelFromShortcut,
   insertTitleHeadingMarkdown,
 } from "../lib/editorCommands";
 import { toEditorMarkdown, toVaultMarkdown } from "../lib/markdown";
@@ -77,14 +79,48 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
 
       return crepe.editor.action((ctx) => {
         const commands = ctx.get(commandsCtx);
-        return level
-          ? commands.call(setBlockTypeCommand.key, {
-              nodeType: headingSchema.type(ctx),
-              attrs: { level },
-            })
-          : commands.call(setBlockTypeCommand.key, {
-              nodeType: paragraphSchema.type(ctx),
-            });
+        const view = ctx.get(editorViewCtx);
+        const applyBlockType = () =>
+          level
+            ? commands.call(setBlockTypeCommand.key, {
+                nodeType: headingSchema.type(ctx),
+                attrs: { level },
+              })
+            : commands.call(setBlockTypeCommand.key, {
+                nodeType: paragraphSchema.type(ctx),
+              });
+
+        const beforeBlockChange = view.state.doc;
+        if (applyBlockType() && view.state.doc !== beforeBlockChange) {
+          return true;
+        }
+
+        // A list item must begin with a paragraph, so ProseMirror cannot turn
+        // that paragraph into a heading in place. Lift nested list items until
+        // the selected text becomes a top-level block, then retry the shortcut.
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          const { $from } = view.state.selection;
+          let insideList = false;
+          for (let depth = $from.depth; depth > 0; depth -= 1) {
+            if ($from.node(depth).type.name === "list_item") {
+              insideList = true;
+              break;
+            }
+          }
+          const beforeLift = view.state.doc;
+          if (
+            !insideList ||
+            !commands.call(liftListItemCommand.key) ||
+            view.state.doc === beforeLift
+          ) {
+            return false;
+          }
+          const beforeHeading = view.state.doc;
+          if (applyBlockType() && view.state.doc !== beforeHeading) {
+            return true;
+          }
+        }
+        return false;
       });
     };
 
@@ -131,15 +167,18 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       if (
         !command ||
         event.altKey ||
-        (event.target as HTMLElement).closest(".milkdown-code-block")
+        (event.target as HTMLElement).closest(
+          ".milkdown-code-block, .cm-editor",
+        )
       ) {
         return;
       }
 
-      if (/^[0-6]$/.test(event.key)) {
+      const headingLevel = headingLevelFromShortcut(event);
+      if (headingLevel !== null) {
         event.preventDefault();
         event.stopPropagation();
-        setHeading(event.key === "0" ? null : Number(event.key));
+        setHeading(headingLevel === 0 ? null : headingLevel);
       } else if (event.shiftKey && event.key.toLowerCase() === "t") {
         event.preventDefault();
         event.stopPropagation();
@@ -312,7 +351,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
           ref={rootRef}
           spellCheck={false}
           onContextMenu={showFormatMenu}
-          onKeyDown={handleEditorKeyDown}
+          onKeyDownCapture={handleEditorKeyDown}
           onPointerDown={() => setFormatMenu(null)}
           onWheel={() => setFormatMenu(null)}
         />
