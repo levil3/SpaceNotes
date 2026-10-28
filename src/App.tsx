@@ -4,12 +4,17 @@ import {
   BookOpen,
   ChevronRight,
   Copy,
+  EyeOff,
+  FilePlus2,
   FilePenLine,
+  FileText,
   FolderOpen,
   MoreHorizontal,
   PanelLeftClose,
   Pencil,
+  RotateCcw,
   RotateCw,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -20,6 +25,10 @@ import {
   useState,
 } from "react";
 import { ActivityRail } from "./components/ActivityRail";
+import {
+  ContextMenu,
+  type ContextMenuGroup,
+} from "./components/ContextMenu";
 import { DiffViewer } from "./components/DiffViewer";
 import { EditorPane, type EditorHandle } from "./components/EditorPane";
 import dogMark from "../resources/icon.svg";
@@ -1419,130 +1428,174 @@ export default function App() {
       {toast ? <div className="toast">{toast}</div> : null}
 
       {contextMenu ? (
-        <div
-          className="context-menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          {contextMenu.kind === "file" ? (
-            <button
-              type="button"
-              onClick={() => {
-                void openNote(contextMenu.path);
-                setContextMenu(null);
-              }}
-            >
-              打开
-            </button>
-          ) : null}
-          {contextMenu.kind === "folder" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  startNewNoteInFolder(contextMenu.path);
-                  setContextMenu(null);
-                }}
-              >
-                在此文件夹中新建笔记
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDialog({
-                    kind: "rename-folder",
-                    path: contextMenu.path,
-                    value: entryName(contextMenu.path),
-                  });
-                  setContextMenu(null);
-                }}
-              >
-                重命名文件夹
-              </button>
-            </>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              void window.levilNotes.showInFolder(contextMenu.path);
-              setContextMenu(null);
-            }}
-          >
-            在资源管理器中显示
-          </button>
-          {canDiscardContextChange ? (
-            <button
-              type="button"
-              className="warning"
-              onClick={() => {
-                setDialog({
-                  kind: "git-discard",
-                  path: contextMenu.path,
-                });
-                setContextMenu(null);
-              }}
-            >
-              撤销未提交修改
-            </button>
-          ) : null}
-          {gitStatus?.repository ? (
-            <button
-              type="button"
-              onClick={() => {
-                setIgnoreDialog({
-                  path: contextMenu.path,
-                  isDirectory: contextMenu.kind === "folder",
-                  scope: "project",
-                });
-                setContextMenu(null);
-              }}
-            >
-              忽略此{contextMenu.kind === "folder" ? "文件夹" : "文件"}...
-            </button>
-          ) : null}
-          {contextMenu.kind === "file" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setDialog({
-                    kind: "rename",
-                    path: contextMenu.path,
-                    value: basename(contextMenu.path),
-                  });
-                  setContextMenu(null);
-                }}
-              >
-                重命名
-              </button>
-              <button
-                type="button"
-                className="danger"
-                onClick={() => {
-                  setDialog({ kind: "delete", path: contextMenu.path });
-                  setContextMenu(null);
-                }}
-              >
-                移到回收站
-              </button>
-            </>
-          ) : null}
-          {contextMenu.kind === "folder" ? (
-            <button
-              type="button"
-              className="danger"
-              onClick={() => {
-                setDialog({
-                  kind: "delete-folder",
-                  path: contextMenu.path,
-                });
-                setContextMenu(null);
-              }}
-            >
-              删除文件夹
-            </button>
-          ) : null}
-        </div>
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          label={
+            contextMenu.kind === "folder"
+              ? "文件夹操作"
+              : "文件操作"
+          }
+          groups={
+            [
+              {
+                items:
+                  contextMenu.kind === "file"
+                    ? [
+                        {
+                          id: "open",
+                          label: "打开",
+                          Icon: FileText,
+                          onSelect: () => {
+                            void openNote(contextMenu.path);
+                            setContextMenu(null);
+                          },
+                        },
+                      ]
+                    : [
+                        {
+                          id: "create-note",
+                          label: "在此文件夹中新建笔记",
+                          Icon: FilePlus2,
+                          onSelect: () => {
+                            startNewNoteInFolder(contextMenu.path);
+                            setContextMenu(null);
+                          },
+                        },
+                      ],
+              },
+              {
+                items: [
+                  {
+                    id: "rename",
+                    label:
+                      contextMenu.kind === "folder"
+                        ? "重命名文件夹"
+                        : "重命名",
+                    Icon: Pencil,
+                    onSelect: () => {
+                      setDialog(
+                        contextMenu.kind === "folder"
+                          ? {
+                              kind: "rename-folder",
+                              path: contextMenu.path,
+                              value: entryName(contextMenu.path),
+                            }
+                          : {
+                              kind: "rename",
+                              path: contextMenu.path,
+                              value: basename(contextMenu.path),
+                            },
+                      );
+                      setContextMenu(null);
+                    },
+                  },
+                  {
+                    id: "show-in-folder",
+                    label: "在资源管理器中显示",
+                    Icon: FolderOpen,
+                    onSelect: () => {
+                      void window.levilNotes.showInFolder(
+                        contextMenu.path,
+                      );
+                      setContextMenu(null);
+                    },
+                  },
+                  {
+                    id: "copy-path",
+                    label: "复制路径",
+                    Icon: Copy,
+                    onSelect: () => {
+                      void window.levilNotes
+                        .writeClipboardText(contextMenu.path)
+                        .then(() => showToast("路径已复制"))
+                        .catch((error) =>
+                          showToast(
+                            String(
+                              error instanceof Error
+                                ? error.message
+                                : error,
+                            ),
+                          ),
+                        );
+                      setContextMenu(null);
+                    },
+                  },
+                ],
+              },
+              {
+                items: [
+                  ...(canDiscardContextChange
+                    ? [
+                        {
+                          id: "discard",
+                          label: "撤销未提交修改",
+                          Icon: RotateCcw,
+                          warning: true,
+                          onSelect: () => {
+                            setDialog({
+                              kind: "git-discard" as const,
+                              path: contextMenu.path,
+                            });
+                            setContextMenu(null);
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(gitStatus?.repository
+                    ? [
+                        {
+                          id: "ignore",
+                          label: `忽略此${
+                            contextMenu.kind === "folder"
+                              ? "文件夹"
+                              : "文件"
+                          }...`,
+                          Icon: EyeOff,
+                          onSelect: () => {
+                            setIgnoreDialog({
+                              path: contextMenu.path,
+                              isDirectory:
+                                contextMenu.kind === "folder",
+                              scope: "project" as const,
+                            });
+                            setContextMenu(null);
+                          },
+                        },
+                      ]
+                    : []),
+                ],
+              },
+              {
+                items: [
+                  {
+                    id: "delete",
+                    label:
+                      contextMenu.kind === "folder"
+                        ? "删除文件夹"
+                        : "移到回收站",
+                    Icon: Trash2,
+                    danger: true,
+                    onSelect: () => {
+                      setDialog(
+                        contextMenu.kind === "folder"
+                          ? {
+                              kind: "delete-folder",
+                              path: contextMenu.path,
+                            }
+                          : {
+                              kind: "delete",
+                              path: contextMenu.path,
+                            },
+                      );
+                      setContextMenu(null);
+                    },
+                  },
+                ],
+              },
+            ] satisfies ContextMenuGroup[]
+          }
+        />
       ) : null}
 
       {dialog ? (

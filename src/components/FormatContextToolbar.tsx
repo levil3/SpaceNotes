@@ -364,7 +364,7 @@ export function FormatContextToolbar({
             onAction(entry.action);
           }}
         >
-          <entry.Icon size={15} strokeWidth={1.8} aria-hidden="true" />
+          <entry.Icon size={16} strokeWidth={1.7} aria-hidden="true" />
           <span>{entry.label}</span>
           {hasChildren ? (
             <ChevronRight
