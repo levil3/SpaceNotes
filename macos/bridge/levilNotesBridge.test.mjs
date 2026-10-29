@@ -77,6 +77,27 @@ describe("WKWebView levilNotes bridge", () => {
     expect(Object.keys(window.levilNotes).sort()).toEqual(preloadMethods);
   });
 
+  it("queues host open-file requests until the app subscribes", async () => {
+    const { window } = await loadBridge({
+      fetchImpl: async () => response(null),
+      EventSourceImpl: FakeEventSource,
+    });
+
+    window.__levilNotesOpenFileFromHost("notes/raft.md");
+    const opened = [];
+    const unsubscribe = window.__levilNotesHostEvents.onOpenFile((path) => {
+      opened.push(path);
+    });
+    expect(opened).toEqual(["notes/raft.md"]);
+
+    window.__levilNotesOpenFileFromHost("notes/second.md");
+    expect(opened).toEqual(["notes/raft.md", "notes/second.md"]);
+
+    unsubscribe();
+    window.__levilNotesOpenFileFromHost("notes/ignored.md");
+    expect(opened).toEqual(["notes/raft.md", "notes/second.md"]);
+  });
+
   it("maps business calls to authenticated sidecar requests", async () => {
     const fetchImpl = vi.fn(async () =>
       response({ path: "note.md", content: "# Note" }),

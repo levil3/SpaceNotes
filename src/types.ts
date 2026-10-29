@@ -229,5 +229,10 @@ export interface LevilNotesApi {
 declare global {
   interface Window {
     levilNotes: LevilNotesApi;
+    __levilNotesHostEvents?: {
+      onOpenFile(
+        callback: (relativePath: string) => void,
+      ): () => void;
+    };
   }
 }

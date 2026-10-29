@@ -25,6 +25,15 @@ if [[ "$local_networking" != "true" ]]; then
   echo "Info.plist 未允许本地网络访问。" >&2
   exit 1
 fi
+document_types="$(
+  /usr/libexec/PlistBuddy \
+    -c "Print :CFBundleDocumentTypes" \
+    "$info_plist" 2>/dev/null || true
+)"
+if [[ "$document_types" != *"net.daringfireball.markdown"* ]]; then
+  echo "Info.plist 未声明 Markdown 文档类型。" >&2
+  exit 1
+fi
 
 : > "$MANIFEST_PATH"
 failures=0

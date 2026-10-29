@@ -357,6 +357,16 @@ export default function App() {
   }, [vault]);
 
   useEffect(() => {
+    const hostEvents = window.__levilNotesHostEvents;
+    if (!hostEvents) {
+      return undefined;
+    }
+    return hostEvents.onOpenFile((path) => {
+      void openNote(path, false);
+    });
+  }, [openNote]);
+
+  useEffect(() => {
     const unsubscribe = window.levilNotes.onVaultChanged(async (snapshot) => {
       setVault(snapshot);
       await refreshTags();

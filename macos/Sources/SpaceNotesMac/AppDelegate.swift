@@ -25,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var assetHandler: NotesAssetSchemeHandler?
     private var retryPolicy = SidecarRetryPolicy()
     private var e2eStarted = false
+    private var pageReady = false
+    private var pendingOpenURLs: [URL] = []
     private var isTerminating = false
     private var developmentOrigin: URL? {
         guard
@@ -52,6 +54,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ sender: NSApplication
     ) -> Bool {
         false
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let markdownURLs = urls.filter(NoteOpenRoute.isMarkdownFile)
+        guard !markdownURLs.isEmpty else {
+            return
+        }
+        pendingOpenURLs.append(contentsOf: markdownURLs)
+        appendDiagnostic("open-file-request=\(markdownURLs.count)")
+        flushPendingOpenURLs()
     }
 
     func applicationShouldSaveSecureApplicationState(
@@ -328,6 +340,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showWindow(client: client)
             return
         }
+        pageReady = false
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
         controller.removeScriptMessageHandler(forName: "levilNotesHost")
@@ -347,6 +360,73 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appendDiagnostic("webview-reload-after-sidecar-restart")
         window.makeKeyAndOrderFront(nil)
         load(client: client, webView: webView)
+    }
+
+    private func flushPendingOpenURLs() {
+        guard
+            pageReady,
+            let client,
+            let webView,
+            !pendingOpenURLs.isEmpty
+        else {
+            return
+        }
+        let urls = pendingOpenURLs
+        pendingOpenURLs.removeAll()
+        for url in urls {
+            openFile(url, client: client, webView: webView)
+        }
+    }
+
+    private func openFile(
+        _ url: URL,
+        client: SidecarClient,
+        webView: WKWebView
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            var currentVaultPath: String?
+            if let snapshot = try? await client.snapshot() {
+                currentVaultPath = snapshot["path"] as? String
+            }
+            let destination = NoteOpenRoute.resolve(
+                fileURL: url,
+                currentVaultPath: currentVaultPath
+            )
+            if destination.needsVaultSwitch {
+                do {
+                    _ = try await client.internalCall(
+                        method: "openVault",
+                        arguments: [destination.vaultRoot.path]
+                    )
+                    self.appendDiagnostic("open-file-vault-switched")
+                } catch {
+                    self.appendDiagnostic(
+                        "open-file-vault-failed=\(error.localizedDescription)"
+                    )
+                    return
+                }
+            }
+            guard
+                let pathLiteral = JavaScriptLiteralEncoder.encode(
+                    destination.relativePath
+                )
+            else {
+                return
+            }
+            if !self.backgroundE2E {
+                self.window?.makeKeyAndOrderFront(nil)
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
+            webView.evaluateJavaScript(
+                "window.__levilNotesOpenFileFromHost?.(\(pathLiteral));"
+            ) { [weak self] _, error in
+                guard let error else { return }
+                self?.appendDiagnostic(
+                    "open-file-evaluate-failed=\(error.localizedDescription)"
+                )
+            }
+        }
     }
 
     private func configureNavigation(
@@ -372,6 +452,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             },
             onFinish: { [weak self, weak webView] in
+                self?.pageReady = true
+                self?.flushPendingOpenURLs()
                 self?.schedulePageChecks(webView: webView)
             }
         )

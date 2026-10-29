@@ -694,7 +694,7 @@ describeMac("macOS E2E runner behavior", () => {
       source,
     ]);
 
-    const writeInfoPlist = (allowsLocalNetworking) => {
+    const writeInfoPlist = (allowsLocalNetworking, declaresMarkdown = true) => {
       fs.writeFileSync(
         infoPlist,
         `<?xml version="1.0" encoding="UTF-8"?>
@@ -706,6 +706,19 @@ describeMac("macOS E2E runner behavior", () => {
     <key>NSAllowsLocalNetworking</key>
     <${allowsLocalNetworking ? "true" : "false"}/>
   </dict>
+  ${
+    declaresMarkdown
+      ? `<key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>net.daringfireball.markdown</string>
+      </array>
+    </dict>
+  </array>`
+      : ""
+  }
 </dict>
 </plist>
 `,
@@ -725,6 +738,11 @@ describeMac("macOS E2E runner behavior", () => {
     const rejected = verify();
     expect(rejected.status).toBe(1);
     expect(rejected.stderr).toContain("未允许本地网络访问");
+
+    writeInfoPlist(true, false);
+    const rejectedTypes = verify();
+    expect(rejectedTypes.status).toBe(1);
+    expect(rejectedTypes.stderr).toContain("未声明 Markdown 文档类型");
   });
 
   it("redacts mixed-case tokens and complex Bearer credentials", () => {

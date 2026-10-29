@@ -6,6 +6,8 @@
     const baseUrl = config.baseUrl.replace(/\/+$/, "");
     const pendingHostRequests = new Map();
     const subscribers = new Set();
+    const openFileSubscribers = new Set();
+    const pendingOpenFiles = [];
     let nextHostRequestId = 1;
     let eventSource = null;
 
@@ -179,9 +181,50 @@
       },
     };
 
+    // Host-only events stay outside `levilNotes` so the renderer surface
+    // shared with the Electron shell keeps the exact same shape.
+    const hostEvents = {
+      onOpenFile: (callback) => {
+        if (typeof callback !== "function") {
+          throw new TypeError("open file callback must be a function");
+        }
+        openFileSubscribers.add(callback);
+        while (pendingOpenFiles.length > 0) {
+          const relativePath = pendingOpenFiles.shift();
+          try {
+            callback(relativePath);
+          } catch {
+            // A subscriber must not block delivery to later listeners.
+          }
+        }
+        return () => {
+          openFileSubscribers.delete(callback);
+        };
+      },
+    };
+
+    function deliverOpenFile(relativePath) {
+      if (typeof relativePath !== "string" || relativePath.length === 0) {
+        return;
+      }
+      if (openFileSubscribers.size === 0) {
+        pendingOpenFiles.push(relativePath);
+        return;
+      }
+      for (const callback of [...openFileSubscribers]) {
+        try {
+          callback(relativePath);
+        } catch {
+          // One failing listener must not skip the remaining listeners.
+        }
+      }
+    }
+
     return {
       api: Object.freeze(api),
+      hostEvents: Object.freeze(hostEvents),
       settleHostRequest,
+      deliverOpenFile,
     };
   }
 
@@ -195,11 +238,15 @@
     EventSource: window.EventSource,
   });
   window.levilNotes = bridge.api;
+  window.__levilNotesHostEvents = bridge.hostEvents;
   window.__levilNotesHostResolve = (id, result) => {
     bridge.settleHostRequest(id, result, null);
   };
   window.__levilNotesHostReject = (id, message) => {
     bridge.settleHostRequest(id, null, message);
+  };
+  window.__levilNotesOpenFileFromHost = (relativePath) => {
+    bridge.deliverOpenFile(relativePath);
   };
 
   function reportDiagnostic(message) {
