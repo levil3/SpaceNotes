@@ -35,6 +35,7 @@ Markdown files, and Git history can continue to be used in place.
   appearances, and common editor themes.
 - IntelliJ IDEA-style Git status colors, diff preview, staging, commit, pull, and
   push.
+- Double-click a Markdown file in Finder to open it directly (macOS).
 - `.gitignore` support, a hidden-file toggle, and ignore actions for individual
   folders or files.
 - SpaceNotes uses the system Git installation, so existing credential helpers,

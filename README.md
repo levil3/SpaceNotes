@@ -28,6 +28,7 @@ Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS DMG：Apple Silicon 
 - 本地图片、表格和代码块渲染，支持明暗外观与常用主题切换。
 - IntelliJ IDEA 风格的 Git 状态颜色、提交差异预览、暂存、提交、拉取和推送。
 - 支持 `.gitignore`、隐藏目录显示开关和单目录/文件忽略操作。
+- 支持在访达中双击 Markdown 文件直接打开（macOS）。
 - Git 使用系统安装的 Git，现有凭据管理器、SSH、代理和 Hook 配置继续生效。
 
 ## 系统要求
