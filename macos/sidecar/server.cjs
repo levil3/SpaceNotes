@@ -7,6 +7,8 @@ const path = require("node:path");
 const SESSION_COOKIE = "spacenotes_session";
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
 const CONTENT_TYPES = new Map([
+  [".avif", "image/avif"],
+  [".bmp", "image/bmp"],
   [".css", "text/css; charset=utf-8"],
   [".gif", "image/gif"],
   [".html", "text/html; charset=utf-8"],

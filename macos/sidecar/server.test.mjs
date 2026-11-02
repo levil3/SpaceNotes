@@ -316,6 +316,32 @@ describe("macOS sidecar HTTP contract", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("serves AVIF and BMP attachments with image MIME types", async () => {
+    const { baseUrl, noteRoot } = await createFixture();
+    await fs.writeFile(
+      path.join(noteRoot, "note-photo.avif"),
+      "avif",
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(noteRoot, "note-photo.bmp"),
+      "bmp",
+      "utf8",
+    );
+
+    const avif = await authorizedRequest(
+      `${baseUrl}/assets?target=photo.avif&note=note`,
+    );
+    const bmp = await authorizedRequest(
+      `${baseUrl}/assets?target=photo.bmp&note=note`,
+    );
+
+    expect(avif.status).toBe(200);
+    expect(avif.headers.get("content-type")).toBe("image/avif");
+    expect(bmp.status).toBe(200);
+    expect(bmp.headers.get("content-type")).toBe("image/bmp");
+  });
+
   it("does not serve files outside the web root", async () => {
     const { baseUrl, root } = await createFixture();
     await fs.writeFile(path.join(root, "secret.txt"), "secret", "utf8");

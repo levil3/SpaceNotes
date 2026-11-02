@@ -634,7 +634,9 @@ enum E2ERunner {
     await runStep("vault-image", async () => {
       await openFile("notes/welcome.md");
       await sleep(800);
-      const image = document.querySelector(".editor-mount .milkdown img");
+      const image = document.querySelector(
+        ".editor-mount .milkdown img:not(.ProseMirror-separator)"
+      );
       expect(image, "vault image element is missing");
       expect(
         image.src.startsWith("notes-asset://vault/"),

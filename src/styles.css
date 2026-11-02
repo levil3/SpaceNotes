@@ -2659,6 +2659,24 @@ kbd {
   background: color-mix(in srgb, var(--canvas) 96.5%, var(--text) 3.5%);
 }
 
+.editor-mount .milkdown .milkdown-code-block.is-mermaid-block {
+  border-color: transparent;
+  background: transparent;
+}
+
+.editor-mount
+  .milkdown
+  .milkdown-code-block.is-mermaid-block:hover,
+.editor-mount
+  .milkdown
+  .milkdown-code-block.is-mermaid-block:focus-within,
+.editor-mount
+  .milkdown
+  .milkdown-code-block.is-mermaid-block.selected {
+  border-color: color-mix(in srgb, var(--canvas) 89%, var(--text) 11%);
+  background: color-mix(in srgb, var(--canvas) 96.5%, var(--text) 3.5%);
+}
+
 /* Crepe's floating block controls overlap text selections in a document-first
    editor. Markdown shortcuts remain available without the extra handle. */
 .editor-mount .milkdown .milkdown-block-handle {
@@ -2883,6 +2901,69 @@ kbd {
   padding: 3px 0;
   color: var(--text);
   text-align: center;
+}
+
+.editor-mount .milkdown .milkdown-code-block .preview-panel .preview:has(
+    .mermaid-preview
+  ) {
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
+.mermaid-preview {
+  width: 100%;
+  min-height: 30px;
+  user-select: text;
+}
+
+.mermaid-preview svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+/* Mermaid measures HTML labels with a 1.5 line-height. The editor's prose
+   line-height must not override it, or multi-line labels overflow the
+   foreignObject viewport and get clipped. */
+.mermaid-preview foreignObject p,
+.mermaid-preview foreignObject span,
+.mermaid-preview foreignObject div {
+  margin: 0;
+  line-height: 1.5 !important;
+}
+
+.mermaid-preview-loading {
+  color: var(--muted);
+  font-family: var(--ui-font);
+  font-size: 13px;
+}
+
+.mermaid-preview-error {
+  display: flex;
+  max-width: 720px;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 auto;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--canvas));
+  border-radius: 3px;
+  background: var(--danger-soft);
+  padding: 9px 11px;
+  color: var(--danger);
+  font-family: var(--ui-font);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.mermaid-preview-error strong {
+  font-weight: 600;
+}
+
+.mermaid-preview-error span {
+  color: var(--text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .editor-mount .milkdown .milkdown-code-block .cm-line {

@@ -6,7 +6,8 @@ macOS-specific implementation belongs in this directory:
 - `bridge/`: the authenticated `window.levilNotes` bridge.
 - `sidecar/`: Node sidecar transport and macOS file operations.
 - `native/`: the native file helper.
-- `scripts/`: per-arch macOS build, DMG verification and background E2E tooling.
+- `scripts/`: per-arch macOS build, fixed-path installation, DMG verification
+  and background E2E tooling.
 - `web/macos.css`: platform-only presentation overrides.
 
 The React application, `electron/api.cjs`, `electron/vault.cjs`,
@@ -30,6 +31,15 @@ npm run build:web
 cd macos && swift test
 cd .. && bash macos/scripts/build-macos.sh --arch arm64
 ```
+
+Install or update the single fixed application bundle after quitting the app:
+
+```bash
+npm run install:macos -- "build/macos/Levil Notes <version>-arm64.dmg"
+```
+
+The installer always replaces `/Applications/Levil Notes.app`; it never keeps
+versioned application copies or persistent installation backups.
 
 For UI automation that must not interrupt the active desktop:
 

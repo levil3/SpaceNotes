@@ -22,6 +22,57 @@ describe("Markdown asset URLs", () => {
     expect(toVaultMarkdown(editor)).toBe(source);
   });
 
+  it("round-trips encoded, spaced, titled, and parenthesized paths", () => {
+    const source = [
+      "![encoded](images/my%20image.png)",
+      '![title](images/my image.png "图片标题")',
+      "![angle](<images/my image.png> '说明')",
+      "![paren](images/paren(1).png)",
+      "![escaped](images/paren\\(2\\).png)",
+    ].join("\n");
+    const editor = toEditorMarkdown(source, "notes/example.md");
+
+    expect(editor.match(/notes-asset:\/\/vault\/\?/g)).toHaveLength(5);
+    expect(editor).toContain("target=images%2Fmy+image.png");
+    expect(editor).not.toContain("target=images%2Fmy%2520image.png");
+    expect(toVaultMarkdown(editor)).toBe(source);
+  });
+
+  it("renders and restores Obsidian image embeds", () => {
+    const source = [
+      "![[图片.png]]",
+      "![[images/photo one.png|320]]",
+    ].join("\n");
+    const editor = toEditorMarkdown(source, "notes/example.md");
+
+    expect(editor).not.toContain("![[");
+    expect(editor.match(/embed=wiki/g)).toHaveLength(2);
+    expect(toVaultMarkdown(editor)).toBe(source);
+  });
+
+  it("restores URLs escaped by the Markdown serializer", () => {
+    const source = [
+      "![encoded](images/my%20image.png)",
+      "![[图片.png]]",
+      "![[images/photo one.png|320]]",
+    ].join("\n");
+    const editor = toEditorMarkdown(source, "notes/example.md");
+    const serialized = editor.replace(/&/g, "\\&");
+
+    expect(toVaultMarkdown(serialized)).toBe(source);
+  });
+
+  it("does not rewrite image syntax inside inline or fenced code", () => {
+    const source = [
+      "`![inline](images/inline.png)`",
+      "```md",
+      "![fenced](images/fenced.png)",
+      "```",
+    ].join("\n");
+
+    expect(toEditorMarkdown(source, "notes/example.md")).toBe(source);
+  });
+
   it("keeps absolute and web image URLs untouched", () => {
     const source = [
       "![local](C:/images/example.png)",

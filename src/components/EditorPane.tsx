@@ -45,6 +45,12 @@ import {
   normalizeEditorLinkTarget,
   type EditorLinkTargetKind,
 } from "../lib/editorCommands";
+import {
+  clearMermaidPreviews,
+  isMermaidLanguage,
+  refreshMermaidPreviews,
+  renderMermaidPreview,
+} from "../lib/mermaid";
 import { toEditorMarkdown, toVaultMarkdown } from "../lib/markdown";
 import {
   FormatContextToolbar,
@@ -717,6 +723,22 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
               "is-latex-block",
               language === "latex" || language === "math",
             );
+            block.classList.toggle(
+              "is-mermaid-block",
+              isMermaidLanguage(language),
+            );
+            // Crepe normally waits for a code block to become visible before
+            // creating its preview. Mermaid is document content rather than
+            // editable source, so initialize it eagerly and show the diagram
+            // as soon as the note opens.
+            const spec = (block as ProseMirrorNodeViewElement).pmViewDesc?.spec;
+            if (
+              isMermaidLanguage(language) &&
+              spec?.initializeCodeMirror &&
+              !spec.initialized
+            ) {
+              spec.initializeCodeMirror();
+            }
           });
       };
       const scheduleBlockClassification = () => {
@@ -792,6 +814,11 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       blockObserver.observe(root, {
         childList: true,
         subtree: true,
+      });
+      const themeObserver = new MutationObserver(refreshMermaidPreviews);
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
       });
 
       const handleEditorWheel = (event: WheelEvent) => {
@@ -869,6 +896,10 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
           // Keep blank paragraphs free of Crepe's English placeholder so the
           // editing rhythm matches Obsidian.
           [CrepeFeature.Placeholder]: false,
+          // Crepe's block-image node stores its resize ratio in the Markdown
+          // alt field, which overwrites image descriptions on every save.
+          // CommonMark images preserve the original alt and title metadata.
+          [CrepeFeature.ImageBlock]: false,
         },
         featureConfigs: {
           [CrepeFeature.CodeMirror]: {
@@ -879,6 +910,10 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
               previewOnlyMode ? "编辑" : "预览",
             searchPlaceholder: "搜索语言",
             noResultText: "没有匹配语言",
+            renderPreview: (language: string, markdown: string) =>
+              isMermaidLanguage(language)
+                ? renderMermaidPreview(markdown)
+                : null,
           },
         },
       }).setReadonly(readOnlyRef.current);
@@ -925,6 +960,8 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
 
       return () => {
         blockObserver.disconnect();
+        themeObserver.disconnect();
+        clearMermaidPreviews();
         if (classifyTimer !== null) {
           window.clearTimeout(classifyTimer);
         }

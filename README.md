@@ -25,7 +25,7 @@ Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS DMG：Apple Silicon 
 - 文件树、标题/正文搜索、智能/精确匹配、标签、反链和可折叠大纲。
 - 多标签编辑、自动保存、当前笔记 `Ctrl+F` 查找和编辑器外观配置。
 - 兼容笔记库相对路径、笔记相对路径和旧笔记中的附件文件名。
-- 本地图片、表格和代码块渲染，支持明暗外观与常用主题切换。
+- 本地图片、表格、代码块和 Mermaid 图表渲染，支持明暗外观与常用主题切换。
 - IntelliJ IDEA 风格的 Git 状态颜色、提交差异预览、暂存、提交、拉取和推送。
 - 支持 `.gitignore`、隐藏目录显示开关和单目录/文件忽略操作。
 - 支持在访达中双击 Markdown 文件直接打开（macOS）。
@@ -36,11 +36,11 @@ Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS DMG：Apple Silicon 
 - Windows 10/11 x64。
 - macOS 13.5 或更高版本，支持 Intel 与 Apple Silicon。
 - 使用 Git 功能时需要在系统中安装 Git。
-- 从源码运行或构建时需要 Node.js 18 或更高版本。
+- 从源码运行或构建时需要 Node.js 20 或更高版本。
 
 ## 从源码运行
 
-以下命令适用于 Windows 与 macOS。请先安装 Node.js 18+、npm 和 Git；构建 macOS
+以下命令适用于 Windows 与 macOS。请先安装 Node.js 20+、npm 和 Git；构建 macOS
 原生外壳还需要 Xcode Command Line Tools。
 
 ### 共用前端与业务开发模式
@@ -98,6 +98,14 @@ open "build/macos/Levil Notes.app"
 不带参数时默认构建当前机器架构。首次构建会下载并校验对应架构的官方 Node.js。
 DMG 位于 `build/macos/Levil Notes <package.json version>-<arch>.dmg`
 （`universal` 模式不带架构后缀）。
+
+先退出应用，再使用固定路径安装器更新本机版本：
+
+```bash
+npm run install:macos -- "build/macos/Levil Notes <version>-<arch>.dmg"
+```
+
+安装器始终替换 `/Applications/Levil Notes.app`，不会保留版本化副本或安装备份。
 
 ## 验证与构建
 

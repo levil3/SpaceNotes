@@ -31,8 +31,8 @@ Markdown files, and Git history can continue to be used in place.
 - Multiple editor tabs, autosave, in-note `Ctrl+F`, and editor appearance
   settings.
 - Relative attachment paths from the vault, the current note, and older notes.
-- Local images, tables, syntax-highlighted code blocks, light and dark
-  appearances, and common editor themes.
+- Local images, tables, syntax-highlighted code blocks, Mermaid diagrams, light
+  and dark appearances, and common editor themes.
 - IntelliJ IDEA-style Git status colors, diff preview, staging, commit, pull, and
   push.
 - Double-click a Markdown file in Finder to open it directly (macOS).
@@ -46,11 +46,11 @@ Markdown files, and Git history can continue to be used in place.
 - Windows 10/11 x64.
 - macOS 13.5 or later, on Intel or Apple Silicon.
 - A system Git installation when using Git features.
-- Node.js 18 or later when running from source or building.
+- Node.js 20 or later when running from source or building.
 
 ## Run from source
 
-The commands below work on Windows and macOS. Install Node.js 18+, npm, and Git
+The commands below work on Windows and macOS. Install Node.js 20+, npm, and Git
 first. Building the native macOS shell also requires Xcode Command Line Tools.
 
 ### Shared frontend and business-logic development

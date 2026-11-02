@@ -75,7 +75,7 @@ macOS 版复用同一份 React/TypeScript 前端和 Node 业务核心。Swift �
 
 ### macOS 从源码构建
 
-需要安装 Xcode Command Line Tools、Node.js 18+ 和 Git：
+需要安装 Xcode Command Line Tools、Node.js 20+ 和 Git：
 
 ```bash
 xcode-select --install
@@ -98,6 +98,15 @@ build/macos/Levil Notes <version>-<arch>.dmg.sha256
 build/macos/macho-architectures-<arch>.txt
 ```
 
+先退出正在运行的 `Levil Notes`，再从源码构建产物或 DMG 更新本机安装：
+
+```bash
+npm run install:macos -- "build/macos/Levil Notes <version>-<arch>.dmg"
+```
+
+也可以传入已经挂载或解压的 `.app` 路径。安装器始终固定替换
+`/Applications/Levil Notes.app`，不会创建带时间戳的第二个应用或长期安装备份。
+
 `.github/workflows/build-macos.yml` 可在 Actions 页面手动运行
 `Build macOS DMG`。arm64 任务构建 arm64 与 x64 两枚 DMG；Intel 任务下载
 x64 DMG，挂载、校验 Mach-O 架构，并实际启动切片和 sidecar。
@@ -115,7 +124,7 @@ x64 DMG，挂载、校验 Mach-O 架构，并实际启动切片和 sidecar。
 
 ## 方式三：从源码运行
 
-需要 Windows 10/11 x64、Node.js 18+、npm 和 Git。
+需要 Windows 10/11 x64、Node.js 20+、npm 和 Git。
 
 ```powershell
 git clone https://github.com/levil3/SpaceNotes.git
