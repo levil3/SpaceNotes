@@ -63,6 +63,7 @@ export interface EditorHandle {
   jumpToHeading(text: string): void;
   setHeading(level: number | null): boolean;
   insertTitleHeading(): boolean;
+  loadExternalContent(markdown: string): void;
 }
 
 interface EditorPaneProps {
@@ -143,6 +144,14 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
     const onZoomRef = useRef(onZoom);
     const readOnlyRef = useRef(readOnly);
     const lastZoomAtRef = useRef(0);
+    // Replacing the buffer from disk makes ProseMirror report a document
+    // change. That echo must not be read as a user edit.
+    const suppressEditEchoRef = useRef(false);
+    const expectedExternalRef = useRef<string | null>(null);
+    // Crepe finishes creating asynchronously. An external update that lands
+    // before the buffer exists is applied as soon as it does.
+    const editorReadyRef = useRef(false);
+    const pendingExternalRef = useRef<string | null>(null);
     const [formatMenu, setFormatMenu] = useState<{
       x: number;
       y: number;
@@ -225,6 +234,25 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       return true;
     };
 
+    const applyExternalMarkdown = (markdown: string) => {
+      const crepe = crepeRef.current;
+      if (!crepe || !editorReadyRef.current) {
+        return false;
+      }
+      suppressEditEchoRef.current = true;
+      try {
+        crepe.editor.action(
+          replaceAll(toEditorMarkdown(markdown, path), true),
+        );
+      } finally {
+        suppressEditEchoRef.current = false;
+      }
+      // A listener that fires asynchronously still describes the text we just
+      // pushed in, so it must not be forwarded as an edit.
+      expectedExternalRef.current = toVaultMarkdown(crepe.getMarkdown());
+      return true;
+    };
+
     useImperativeHandle(ref, () => ({
       jumpToHeading(text: string) {
         const headings = rootRef.current?.querySelectorAll(
@@ -237,6 +265,14 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       },
       setHeading,
       insertTitleHeading,
+      // Replaces the buffer with what is now on disk. Deliberately silent: the
+      // file did not change because of anything typed here, so nothing may be
+      // written back or reported as an unsaved edit.
+      loadExternalContent(markdown: string) {
+        if (!applyExternalMarkdown(markdown)) {
+          pendingExternalRef.current = markdown;
+        }
+      },
     }));
 
     // Heading shortcuts stay inside the editor so the same key combinations
@@ -918,6 +954,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         },
       }).setReadonly(readOnlyRef.current);
       crepeRef.current = crepe;
+      editorReadyRef.current = false;
 
       crepe
         .create()
@@ -950,15 +987,35 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
               if (crepeRef.current !== crepe) {
                 return;
               }
-              onChangeRef.current(toVaultMarkdown(markdown));
+              if (suppressEditEchoRef.current) {
+                return;
+              }
+              const vaultMarkdown = toVaultMarkdown(markdown);
+              if (expectedExternalRef.current === vaultMarkdown) {
+                expectedExternalRef.current = null;
+                return;
+              }
+              expectedExternalRef.current = null;
+              onChangeRef.current(vaultMarkdown);
             });
           });
+
+          // Anything that arrived while Crepe was still creating is applied
+          // now, before the buffer is shown, so it never looks like a user edit.
+          editorReadyRef.current = true;
+          if (pendingExternalRef.current !== null) {
+            const markdown = pendingExternalRef.current;
+            pendingExternalRef.current = null;
+            applyExternalMarkdown(markdown);
+          }
         })
         .catch((error) => {
           console.error("Failed to create Markdown editor", error);
         });
 
       return () => {
+        editorReadyRef.current = false;
+        expectedExternalRef.current = null;
         blockObserver.disconnect();
         themeObserver.disconnect();
         clearMermaidPreviews();

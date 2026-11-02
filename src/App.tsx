@@ -48,6 +48,7 @@ import {
   remapPathAfterDirectoryRename,
 } from "./lib/paths";
 import { adjustEditorFontSize } from "./lib/editorZoom";
+import { planExternalReload } from "./lib/externalReload";
 import type { FileTreeSelectionItem } from "./lib/fileSelection";
 import type {
   AppSettings,
@@ -174,9 +175,17 @@ export default function App() {
   const didInitializeRef = useRef(false);
   const activePathRef = useRef("");
   const activeContentRef = useRef("");
+  const saveStateRef = useRef(saveState);
+  // The exact version of a note the editor is showing. The watcher reports the
+  // application's own saves too, so the modified time is what separates an
+  // outside edit from that echo.
+  const loadedNoteRef = useRef<{ path: string; modifiedAt: number } | null>(
+    null,
+  );
 
   activePathRef.current = activePath;
   activeContentRef.current = activeContent;
+  saveStateRef.current = saveState;
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -274,6 +283,9 @@ export default function App() {
         const title = note?.title || basename(path);
         setActivePath(path);
         setActiveContent(document.content);
+        loadedNoteRef.current = note
+          ? { path, modifiedAt: note.modifiedAt }
+          : null;
         setActiveView({ kind: "note" });
         setSaveState("saved");
         setTabs((current) =>
@@ -366,6 +378,29 @@ export default function App() {
     });
   }, [openNote]);
 
+  const reloadActiveNote = useCallback(
+    async (path: string, modifiedAt: number) => {
+      // Never race an explicit open: a user click owns the buffer after this.
+      if (!path || path !== activePathRef.current) {
+        return;
+      }
+      try {
+        const document = await window.levilNotes.readNote(path);
+        if (path !== activePathRef.current) {
+          return;
+        }
+        editorRef.current?.loadExternalContent(document.content);
+        setActiveContent(document.content);
+        loadedNoteRef.current = { path, modifiedAt };
+        setSaveState("saved");
+      } catch {
+        // The note disappeared between the index rebuild and this read. The
+        // next snapshot closes the tab, so nothing here has to undo the reload.
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     const unsubscribe = window.levilNotes.onVaultChanged(async (snapshot) => {
       setVault(snapshot);
@@ -389,11 +424,36 @@ export default function App() {
         setActiveView({ kind: "note" });
       }
       if (activePathRef.current && !activePathInTransition) {
+        const decision = planExternalReload({
+          reason: snapshot.reason,
+          activePath: activePathRef.current,
+          activeFile:
+            snapshot.files.find(
+              (file) => file.path === activePathRef.current,
+            ) ?? null,
+          loaded: loadedNoteRef.current,
+          hasUnsavedEdits:
+            pendingSaveRef.current !== null ||
+            saveStateRef.current === "dirty" ||
+            saveStateRef.current === "saving",
+          isInDirectoryTransition: Boolean(activePathInTransition),
+        });
+        if (decision.kind === "conflict") {
+          showToast("笔记在外部被修改。你的未保存编辑已保留。");
+        } else if (decision.kind === "reload") {
+          await reloadActiveNote(decision.path, decision.modifiedAt);
+        }
         await refreshVaultMetadata(activePathRef.current);
       }
     });
     return unsubscribe;
-  }, [refreshGit, refreshTags, refreshVaultMetadata]);
+  }, [
+    refreshGit,
+    refreshTags,
+    refreshVaultMetadata,
+    reloadActiveNote,
+    showToast,
+  ]);
 
   useEffect(() => {
     if (!settingsLoadedRef.current) {
@@ -430,8 +490,17 @@ export default function App() {
     }
     setSaveState("saving");
     try {
-      await window.levilNotes.writeNote(pending.path, pending.content);
+      const written = await window.levilNotes.writeNote(
+        pending.path,
+        pending.content,
+      );
       pendingSaveRef.current = null;
+      if (pending.path === activePathRef.current) {
+        loadedNoteRef.current = {
+          path: pending.path,
+          modifiedAt: written.modifiedAt,
+        };
+      }
       setSaveState("saved");
       await refreshGit();
     } catch (error) {
