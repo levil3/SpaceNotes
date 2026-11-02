@@ -130,9 +130,43 @@ jobs:
             docs/evidence/v${{ env.APP_VERSION }}/usage-model.json
           if-no-files-found: warn
 
+  # Intel capacity is not guaranteed: GitHub can answer a macos-15-intel
+  # request with an arm64 machine. Detect that here so the verification job can
+  # be reported as skipped instead of pretending Intel was tested.
+  probe-intel-runner:
+    name: Detect Intel runner availability
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    outputs:
+      intel-available: ${{ steps.detect.outputs.intel_available }}
+
+    steps:
+      - name: Detect runner architecture
+        id: detect
+        run: |
+          set -euo pipefail
+          arch="$(uname -m)"
+          if [ "$arch" = "x86_64" ]; then
+            intel_available=true
+            verdict="将继续（分配到 x86_64 机器）"
+          else
+            intel_available=false
+            verdict="SKIPPED（实际分配到 ${arch} 机器，本次未做 Intel 真机验证）"
+            echo "::notice title=Intel 真机验证未执行::${verdict}"
+          fi
+          echo "intel_available=${intel_available}" >> "$GITHUB_OUTPUT"
+          {
+            printf '### Verify x64 DMG on Intel\n\n'
+            printf -- '- Probe runner 架构：`%s`\n' "$arch"
+            printf -- '- Intel 真机验证：**%s**\n' "$verdict"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   intel-smoke:
     name: Verify x64 DMG on Intel
-    needs: build
+    needs:
+      - build
+      - probe-intel-runner
+    if: needs.probe-intel-runner.outputs.intel-available == 'true'
     runs-on: macos-15-intel
     timeout-minutes: 20
 
@@ -148,7 +182,14 @@ jobs:
 
       - name: Verify checksum and architectures
         run: |
-          test "$(uname -m)" = "x86_64"
+          set -euo pipefail
+          arch="$(uname -m)"
+          if [ "$arch" != "x86_64" ]; then
+            # The probe said Intel was available but this job landed elsewhere.
+            # Refuse rather than report Intel verification from an arm64 host.
+            echo "::error title=非 Intel 机器::runner 架构为 ${arch}，拒绝冒充 x86_64 验证"
+            exit 1
+          fi
           dmg_path="$(find "$PWD/artifact/build/macos" \
             -maxdepth 1 -type f -name '*-x64.dmg' -print -quit)"
           test -n "$dmg_path"
