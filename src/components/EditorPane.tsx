@@ -52,6 +52,7 @@ import {
   renderMermaidPreview,
 } from "../lib/mermaid";
 import { toEditorMarkdown, toVaultMarkdown } from "../lib/markdown";
+import { obsidianHighlightFeature } from "../lib/obsidianHighlightFeature";
 import {
   FormatContextToolbar,
   type FormatAction,
@@ -953,6 +954,9 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
           },
         },
       }).setReadonly(readOnlyRef.current);
+      // Obsidian 的 `==高亮==` 与仓库沿用的 `++高亮++` 需要在编辑器里成为
+      // 真正的标记，否则会被当成普通字符原样显示。必须在 create() 之前注册。
+      crepe.addFeature(obsidianHighlightFeature);
       crepeRef.current = crepe;
       editorReadyRef.current = false;
 

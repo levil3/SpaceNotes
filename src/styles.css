@@ -26,6 +26,8 @@
   --table-text: #222222;
   --border: color-mix(in srgb, var(--text) 16%, var(--canvas));
   --border-strong: color-mix(in srgb, var(--text) 25%, var(--canvas));
+  /* Obsidian 高亮 `==文字==` 的底色。 */
+  --highlight: rgba(255, 214, 10, 0.35);
   --accent-soft: color-mix(in srgb, var(--accent) 8%, var(--canvas));
   --accent-hover: color-mix(in srgb, var(--accent) 14%, var(--canvas));
   --accent-text: color-mix(in srgb, var(--accent) 78%, var(--text));
@@ -72,6 +74,7 @@
   --table-text: #dadada;
   --border: color-mix(in srgb, var(--text) 18%, var(--canvas));
   --border-strong: color-mix(in srgb, var(--text) 28%, var(--canvas));
+  --highlight: rgba(255, 214, 10, 0.28);
   --accent-soft: color-mix(in srgb, var(--accent) 22%, var(--canvas));
   --accent-hover: color-mix(in srgb, var(--accent) 30%, var(--canvas));
   --accent-text: color-mix(in srgb, var(--accent) 72%, white);
@@ -2406,6 +2409,17 @@ kbd {
 
 .editor-mount .milkdown .ProseMirror > * {
   max-width: none;
+}
+
+/* Obsidian 的 `==高亮==`，编辑器里显示为 mark 元素。 */
+.editor-mount .milkdown mark,
+.editor-mount .milkdown .ProseMirror mark {
+  background: var(--highlight);
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: inherit;
+  padding: 0 1px;
 }
 
 .editor-mount .milkdown h1,
