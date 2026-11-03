@@ -53,6 +53,7 @@ import {
 } from "../lib/mermaid";
 import { toEditorMarkdown, toVaultMarkdown } from "../lib/markdown";
 import { obsidianHighlightFeature } from "../lib/obsidianHighlightFeature";
+import { markdownFidelityFeature } from "../lib/markdownFidelity";
 import {
   FormatContextToolbar,
   type FormatAction,
@@ -957,6 +958,9 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       // Obsidian 的 `==高亮==` 与仓库沿用的 `++高亮++` 需要在编辑器里成为
       // 真正的标记，否则会被当成普通字符原样显示。必须在 create() 之前注册。
       crepe.addFeature(obsidianHighlightFeature);
+      // 正文里的 "[" 不应被转义，否则 Obsidian 的 [[wikilink]] 与 [^footnote]
+      // 会失效，普通文本也会被悄悄改写。
+      crepe.addFeature(markdownFidelityFeature);
       crepeRef.current = crepe;
       editorReadyRef.current = false;
 

@@ -458,10 +458,13 @@ export function toVaultMarkdown(markdown: string) {
       (_match: string, encodedPath: string) =>
         decodeURIComponent(encodedPath),
     )
-    // ProseMirror escapes the bracket after ">" even though Obsidian callout
-    // markers must remain unescaped to be recognized when the note is reopened.
+    // A bracket that starts a line is escaped, because there it could become
+    // a link definition. Obsidian's own constructs must keep the bracket
+    // unescaped, otherwise they stop working once the note is saved:
+    // callouts "> [!note]", wikilinks "[[Note]]" and footnotes "[^1]".
+    // The negative lookbehind keeps a deliberately escaped "\\[" untouched.
     .replace(
-      /^(\s*(?:>\s*)+)\\\[(![^\]\n]+)\]/gm,
-      "$1[$2]",
+      /(?<!\\)\\\[(?:(?:\\)?\[[^\]\n]*\]\]|[!^][^\]\n]*\])/g,
+      (match) => match.replace(/\\/g, ""),
     );
 }
