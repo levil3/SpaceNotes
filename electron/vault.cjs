@@ -273,6 +273,44 @@ function vaultPathOutsideError() {
   return error;
 }
 
+const DIRECTORY_MUTATION_RETRY_ATTEMPTS = 8;
+const DIRECTORY_MUTATION_RETRY_DELAY_MS = 100;
+
+function isRetryableDirectoryMutationError(error) {
+  const code = error && error.code;
+  return code === "EPERM" || code === "EBUSY";
+}
+
+/**
+ * Windows releases the handle it holds on a watched directory only some time
+ * after the watcher was closed, so the first rename or trash of that
+ * directory still fails with EPERM. Retry a few times before giving up.
+ */
+async function withDirectoryMutationRetry(operation) {
+  let lastError;
+  for (
+    let attempt = 1;
+    attempt <= DIRECTORY_MUTATION_RETRY_ATTEMPTS;
+    attempt += 1
+  ) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableDirectoryMutationError(error)) {
+        throw error;
+      }
+      if (attempt === DIRECTORY_MUTATION_RETRY_ATTEMPTS) {
+        break;
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, DIRECTORY_MUTATION_RETRY_DELAY_MS * attempt),
+      );
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Owns the Markdown index and is the only process allowed to touch vault files.
  * Renderer requests never receive unrestricted filesystem access.
@@ -998,7 +1036,9 @@ class VaultService {
           this.relativePathForFileOperations(destination),
         );
       } else {
-        await fs.rename(source, destination);
+        await withDirectoryMutationRetry(() =>
+          fs.rename(source, destination),
+        );
       }
 
       await this.resolveExistingEntryInsideVault(nextRelative);
@@ -1033,7 +1073,7 @@ class VaultService {
     }
 
     await this.withDirectoryWatcherPaused(async () => {
-      await this.trashItem(absolute);
+      await withDirectoryMutationRetry(() => this.trashItem(absolute));
       await this.rebuildIndex();
     });
     this.onVaultChanged?.(this.snapshot("trashed"));

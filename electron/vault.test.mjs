@@ -54,8 +54,14 @@ async function createFixture(platformActions = {}) {
 
   const settings = new SettingsStore(path.join(root, "settings.json"));
   await settings.load();
+  // Without the native helper the service falls back to node:fs, which is
+  // what Windows does. Some tests need to exercise exactly that path.
+  const useNativeFileOperations =
+    platformActions.useNativeFileOperations ?? true;
   const vault = new VaultService(settings, () => {}, {
-    ...(nativeFileOperations ? { fileOperations: nativeFileOperations } : {}),
+    ...(nativeFileOperations && useNativeFileOperations
+      ? { fileOperations: nativeFileOperations }
+      : {}),
     ...platformActions,
   });
   await vault.open(root);
@@ -513,6 +519,64 @@ describe("VaultService overwrite protection", () => {
       await expect(
         fs.readFile(path.join(root, destination.path), "utf8"),
       ).resolves.toBe("DESTINATION\n");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+});
+
+describe("VaultService directory mutation retries", () => {
+  it("retries a directory rename that Windows briefly blocks", async () => {
+    const { root, vault } = await createFixture({
+      useNativeFileOperations: false,
+    });
+    try {
+      const realRename = fs.rename.bind(fs);
+      let attempts = 0;
+      vi.spyOn(fs, "rename").mockImplementation(async (...args) => {
+        attempts += 1;
+        if (attempts <= 2) {
+          const error = new Error(
+            "EPERM: operation not permitted, rename",
+          );
+          error.code = "EPERM";
+          throw error;
+        }
+        return realRename(...args);
+      });
+
+      await expect(
+        vault.renameDirectory("notes/Java Base", "Java Advanced"),
+      ).resolves.toEqual({ path: "notes/Java Advanced" });
+      expect(attempts).toBe(3);
+      await expect(
+        fs.readFile(
+          path.join(root, "notes", "Java Advanced", "example.md"),
+          "utf8",
+        ),
+      ).resolves.toContain("# Example");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("does not retry a rename that fails for another reason", async () => {
+    const { vault } = await createFixture({
+      useNativeFileOperations: false,
+    });
+    try {
+      let attempts = 0;
+      vi.spyOn(fs, "rename").mockImplementation(async () => {
+        attempts += 1;
+        const error = new Error("EACCES: permission denied");
+        error.code = "EACCES";
+        throw error;
+      });
+
+      await expect(
+        vault.renameDirectory("notes/Java Base", "Java Advanced"),
+      ).rejects.toThrow(/EACCES/);
+      expect(attempts).toBe(1);
     } finally {
       await vault.closeWatcher();
     }
