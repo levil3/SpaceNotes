@@ -91,6 +91,54 @@ retry_hdiutil() {
   return 1
 }
 
+# hdiutil 把磁盘镜像的实际工作交给 diskimages-helper 进程。上一次卸载镜像后
+# 这个辅助进程可能还在收尾，此时新的 hdiutil 调用会以「Resource temporarily
+# unavailable」失败。等待它退出，再继续创建或校验镜像。
+wait_for_diskimages_helper() {
+  local attempts="${1:-15}"
+  local delay_seconds="${2:-1}"
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if ! pgrep -x diskimages-helper >/dev/null 2>&1 \
+      && ! pgrep -x diskimages-help >/dev/null 2>&1; then
+      return 0
+    fi
+    if ((attempt == attempts)); then
+      echo "diskimages-helper is still running after $attempts attempts" >&2
+      return 1
+    fi
+    sleep "$delay_seconds"
+  done
+  return 1
+}
+
+# 创建镜像并保证它在被校验前已经落盘。create 同样会受残留辅助进程影响，
+# 因此这里重试而不是只用一次 create -quiet（后者会把失败原因完全吞掉）。
+create_dmg() {
+  local attempts=5
+  local delay_seconds=3
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    wait_for_diskimages_helper 15 1 || true
+    if hdiutil create -ov \
+      -volname "Levil Notes" \
+      -srcfolder "$BUILD_ROOT/dmg-stage" \
+      -format UDZO \
+      "$DMG_PATH"; then
+      return 0
+    fi
+    if ((attempt == attempts)); then
+      echo "hdiutil create failed after $attempts attempts" >&2
+      return 1
+    fi
+    echo "hdiutil create attempt $attempt/$attempts failed; retrying" >&2
+    sleep "$delay_seconds"
+  done
+  return 1
+}
+
 mount_point_is_active() {
   mount | grep -F " on $mount_point " >/dev/null 2>&1
 }
@@ -357,18 +405,17 @@ codesign --force --deep --sign - "$APP_PATH"
 mkdir -p "$BUILD_ROOT/dmg-stage"
 cp -R "$APP_PATH" "$BUILD_ROOT/dmg-stage/"
 ln -s /Applications "$BUILD_ROOT/dmg-stage/Applications"
-hdiutil create -quiet -ov \
-  -volname "Levil Notes" \
-  -srcfolder "$BUILD_ROOT/dmg-stage" \
-  -format UDZO \
-  "$DMG_PATH"
-retry_hdiutil verify 5 2 "$DMG_PATH"
+create_dmg
+retry_hdiutil verify 8 3 "$DMG_PATH"
 
 mount_point="$BUILD_ROOT/dmg-mount"
 rm -rf "$mount_point"
 mkdir -p "$mount_point"
 cleanup() {
   detach_mount_point || true
+  # 卸载之后 diskimages-helper 可能还在收尾。同一个 job 里紧接着的下一个架构
+  # 会因此创建镜像失败，所以在退出前等它结束。
+  wait_for_diskimages_helper 15 1 || true
 }
 trap cleanup EXIT
 attach_dmg
