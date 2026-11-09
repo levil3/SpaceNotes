@@ -26,23 +26,78 @@ export function ModalDialog({
   onConfirm,
 }: ModalDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Modal callbacks are inline functions, so the keyboard listener effect
   // reruns after every controlled-input update. Initial text selection must be
   // mount-only or each keystroke replaces the user's new value.
   useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const input = inputRef.current;
+    if (input) {
+      input.focus();
+      input.select();
+    } else {
+      dialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    }
+    return () => {
+      if (opener?.isConnected) {
+        opener.focus();
+      }
+    };
   }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat) {
+        return;
+      }
+      // Keep keyboard focus inside the dialog: Tab must not walk into the
+      // background page while the dialog is up.
+      if (event.key === "Tab") {
+        const focusable = [
+          ...(dialogRef.current?.querySelectorAll<HTMLElement>(
+            "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])",
+          ) || []),
+        ];
+        if (!focusable.length) {
+          return;
+        }
+        const currentIndex = focusable.indexOf(
+          document.activeElement as HTMLElement,
+        );
+        const nextIndex = event.shiftKey
+          ? currentIndex <= 0
+            ? focusable.length - 1
+            : currentIndex - 1
+          : currentIndex === focusable.length - 1
+            ? 0
+            : currentIndex + 1;
+        event.preventDefault();
+        focusable[nextIndex]?.focus();
+        return;
+      }
       if (event.key === "Escape") {
+        event.preventDefault();
         onCancel();
+        return;
       }
-      if (event.key === "Enter") {
-        onConfirm();
+      if (event.key !== "Enter") {
+        return;
       }
+      // A focused button already handles Enter through its click handler.
+      // Confirming here as well would cancel and confirm in the same keystroke.
+      if (
+        event.target instanceof Element &&
+        event.target.closest("button")
+      ) {
+        return;
+      }
+      event.preventDefault();
+      onConfirm();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -51,6 +106,7 @@ export function ModalDialog({
   return (
     <div className="modal-backdrop" onMouseDown={onCancel}>
       <div
+        ref={dialogRef}
         className="modal-dialog"
         role="dialog"
         aria-modal="true"

@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, FileText, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   collectTreePaths,
   listAllTreeItems,
@@ -8,6 +8,7 @@ import {
   type FileTreeSelectionItem,
 } from "../../lib/fileSelection";
 import type { FileNode } from "../../lib/paths";
+import { formatShortcut } from "../../lib/shortcutLabels";
 import type { GitStatus, NoteFile } from "../../types";
 
 interface FilePanelProps {
@@ -15,6 +16,8 @@ interface FilePanelProps {
   tree: FileNode[];
   activePath: string;
   gitStatus: GitStatus | null;
+  /** Changes whenever the app wants the filter box focused (Ctrl+P). */
+  filterFocusRequest: number;
   onCreateNote(): void;
   onOpenNote(path: string): void;
   onContextMenu(
@@ -30,14 +33,22 @@ export function FilePanel({
   tree,
   activePath,
   gitStatus,
+  filterFocusRequest,
   onCreateNote,
   onOpenNote,
   onContextMenu,
 }: FilePanelProps) {
   const [filter, setFilter] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(tree.filter((node) => node.type === "folder").map((node) => node.path)),
+  // Top-level folders are expanded by default, deeper folders stay collapsed
+  // until opened. Keeping the two overrides separate means a tree refresh (or
+  // a vault switch) cannot resurrect folders the user collapsed.
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(
+    new Set(),
   );
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    new Set(),
+  );
+  const filterInputRef = useRef<HTMLInputElement>(null);
   // Keep file-tree selection separate from the active note: a range can
   // include folders and files without opening every item in the range.
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
@@ -68,9 +79,30 @@ export function FilePanel({
       ),
     [gitStatus?.changes],
   );
+  const openFolders = useMemo(() => {
+    const paths = new Set<string>();
+    const visit = (nodes: FileNode[], depth: number) => {
+      for (const node of nodes) {
+        if (node.type !== "folder") {
+          continue;
+        }
+        const isOpen =
+          depth === 0
+            ? !collapsedFolders.has(node.path)
+            : expandedFolders.has(node.path);
+        if (!isOpen) {
+          continue;
+        }
+        paths.add(node.path);
+        visit(node.children, depth + 1);
+      }
+    };
+    visit(filteredTree, 0);
+    return paths;
+  }, [collapsedFolders, expandedFolders, filteredTree]);
   const visibleSelectionItems = useMemo(
-    () => listVisibleTreeItems(filteredTree, expanded),
-    [expanded, filteredTree],
+    () => listVisibleTreeItems(filteredTree, openFolders),
+    [filteredTree, openFolders],
   );
   const allSelectionItems = useMemo(
     () => listAllTreeItems(tree),
@@ -88,10 +120,51 @@ export function FilePanel({
     setSelectionAnchor((current) =>
       current && validPaths.has(current) ? current : "",
     );
+    // A folder that was renamed or left the vault would otherwise keep a dead
+    // key, and that folder would render collapsed forever.
+    const folderPaths = new Set<string>();
+    const collectFolders = (nodes: FileNode[]) => {
+      for (const node of nodes) {
+        if (node.type !== "folder") {
+          continue;
+        }
+        folderPaths.add(node.path);
+        collectFolders(node.children);
+      }
+    };
+    collectFolders(tree);
+    const prune = (current: Set<string>) => {
+      const next = new Set(
+        [...current].filter((path) => folderPaths.has(path)),
+      );
+      return next.size === current.size ? current : next;
+    };
+    setCollapsedFolders(prune);
+    setExpandedFolders(prune);
   }, [tree]);
 
-  const toggleFolder = (path: string) => {
-    setExpanded((current) => {
+  useEffect(() => {
+    if (!filterFocusRequest) {
+      return;
+    }
+    filterInputRef.current?.focus();
+    filterInputRef.current?.select();
+  }, [filterFocusRequest]);
+
+  // Note changes that did not come from the tree (tab click, backlink, search
+  // result, history) still have to move the tree selection onto that note.
+  useEffect(() => {
+    if (!activePath) {
+      return;
+    }
+    setSelectedPaths((current) =>
+      current.has(activePath) ? current : new Set([activePath]),
+    );
+    setSelectionAnchor(activePath);
+  }, [activePath]);
+
+  const toggleFolder = (path: string, depth: number) => {
+    const update = (current: Set<string>) => {
       const next = new Set(current);
       if (next.has(path)) {
         next.delete(path);
@@ -99,7 +172,12 @@ export function FilePanel({
         next.add(path);
       }
       return next;
-    });
+    };
+    if (depth === 0) {
+      setCollapsedFolders(update);
+    } else {
+      setExpandedFolders(update);
+    }
   };
 
   const selectRow = (
@@ -156,7 +234,10 @@ export function FilePanel({
 
   const renderNode = (node: FileNode, depth = 0): React.ReactNode => {
     if (node.type === "folder") {
-      const isOpen = expanded.has(node.path);
+      const isOpen =
+        depth === 0
+          ? !collapsedFolders.has(node.path)
+          : expandedFolders.has(node.path);
       return (
         <div key={node.path}>
           <button
@@ -175,7 +256,7 @@ export function FilePanel({
             }
             onClick={(event) => {
               if (selectRow(node.path, event)) {
-                toggleFolder(node.path);
+                toggleFolder(node.path, depth);
               }
             }}
             onContextMenu={(event) => openContextMenu(node, event)}
@@ -244,6 +325,7 @@ export function FilePanel({
       <label className="sidebar-filter">
         <span className="sr-only">筛选文件</span>
         <input
+          ref={filterInputRef}
           autoFocus
           value={filter}
           onChange={(event) => {
@@ -253,7 +335,7 @@ export function FilePanel({
           }}
           placeholder="按标题或路径筛选"
         />
-        <kbd>Ctrl P</kbd>
+        <kbd>{formatShortcut("Ctrl P")}</kbd>
       </label>
       <div
         className="tree-scroll"
@@ -276,6 +358,9 @@ export function FilePanel({
             setSelectedPaths(
               new Set(visibleSelectionItems.map((item) => item.path)),
             );
+            // Later Shift+click ranges must start from a visible row instead
+            // of an anchor that may already be gone.
+            setSelectionAnchor(visibleSelectionItems[0]?.path || "");
           }
         }}
       >

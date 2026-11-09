@@ -11,6 +11,7 @@ import {
   FolderOpen,
   MoreHorizontal,
   PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   RotateCcw,
   RotateCw,
@@ -39,7 +40,11 @@ import { BacklinksPanel } from "./components/panels/BacklinksPanel";
 import { FilePanel } from "./components/panels/FilePanel";
 import { GitPanel } from "./components/panels/GitPanel";
 import { OutlinePanel } from "./components/panels/OutlinePanel";
-import { SearchPanel } from "./components/panels/SearchPanel";
+import {
+  SearchPanel,
+  type SearchMode,
+  type SearchScope,
+} from "./components/panels/SearchPanel";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { TagsPanel } from "./components/panels/TagsPanel";
 import {
@@ -50,6 +55,16 @@ import {
 import { adjustEditorFontSize } from "./lib/editorZoom";
 import { planExternalReload } from "./lib/externalReload";
 import type { FileTreeSelectionItem } from "./lib/fileSelection";
+import {
+  belongsToDirectory,
+  isPathMissingFromVault,
+  pickFallbackTab,
+  planVaultTransition,
+  tabKey,
+  tabKeyOf,
+  type HistoryEntry,
+  type VaultTab,
+} from "./lib/vaultTransition";
 import type {
   AppSettings,
   BacklinkResult,
@@ -104,22 +119,32 @@ function entryName(relativePath: string) {
   return relativePath.split("/").pop() || relativePath;
 }
 
-function basename(relativePath: string) {
-  return entryName(relativePath).replace(/\.md$/i, "");
+/** True when typing into a field must win over a global shortcut. */
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+    return true;
+  }
+  return (
+    target.isContentEditable ||
+    Boolean(
+      target.closest("input, textarea, select, [contenteditable='true']"),
+    )
+  );
 }
 
-function belongsToDirectory(relativePath: string, directory: string) {
-  return (
-    relativePath === directory ||
-    relativePath.startsWith(`${directory}/`)
-  );
+function basename(relativePath: string) {
+  return entryName(relativePath).replace(/\.md$/i, "");
 }
 
 export default function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [booted, setBooted] = useState(false);
   const [vault, setVault] = useState<VaultSnapshot | null>(null);
-  const [tabs, setTabs] = useState<Array<{ path: string; title: string }>>([]);
+  const [tabs, setTabs] = useState<VaultTab[]>([]);
   const [activePath, setActivePath] = useState("");
   const [activeContent, setActiveContent] = useState("");
   const [activePanel, setActivePanel] = useState<SidebarPanel>("files");
@@ -152,9 +177,16 @@ export default function App() {
     isDirectory: boolean;
     scope: GitIgnoreScope;
   } | null>(null);
-  const [historyTrail, setHistoryTrail] = useState<string[]>([]);
+  const [historyTrail, setHistoryTrail] = useState<HistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [searchSeed, setSearchSeed] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchScope, setSearchScope] = useState<SearchScope>("all");
+  const [searchMode, setSearchMode] = useState<SearchMode>("smart");
+  // Incremented by Ctrl+P so the file panel can focus its filter box.
+  const [fileFilterFocusRequest, setFileFilterFocusRequest] = useState(0);
+  // Bumped by every applied snapshot so search results can refresh when the
+  // vault index changes behind the panel.
+  const [vaultRevision, setVaultRevision] = useState(0);
   const [editorModes, setEditorModes] = useState<Record<string, EditorMode>>(
     {},
   );
@@ -169,6 +201,10 @@ export default function App() {
     kind: "rename" | "trash";
     path: string;
   } | null>(null);
+  // Renaming one note also emits a snapshot before the IPC call resolves; the
+  // parent directory is protected for that moment so the tab survives.
+  const noteTransitionDirectoryRef = useRef<string | null>(null);
+  const closeTabRef = useRef<(tabId: string) => Promise<void>>(async () => {});
   // Tracks the newest note request so a slower, stale read cannot replace it.
   const openRequestRef = useRef(0);
   const settingsLoadedRef = useRef(false);
@@ -182,14 +218,37 @@ export default function App() {
   const loadedNoteRef = useRef<{ path: string; modifiedAt: number } | null>(
     null,
   );
+  // The renderer is not the only actor that can replace the open vault (the
+  // macOS host does it when a Markdown file is opened from Finder), so the
+  // workspace reconciles against snapshots instead of trusting its own state.
+  // These refs let an async snapshot handler see the newest values at once.
+  const vaultPathRef = useRef("");
+  const vaultSnapshotRef = useRef<VaultSnapshot | null>(null);
+  const snapshotEpochRef = useRef(0);
+  const tabsRef = useRef<VaultTab[]>([]);
+  const historyTrailRef = useRef<HistoryEntry[]>([]);
+  const historyIndexRef = useRef(-1);
+  const toastTimerRef = useRef<number | null>(null);
+  // Orders concurrent vault switches requested by tab clicks / history.
+  const vaultSwitchRequestRef = useRef(0);
 
   activePathRef.current = activePath;
   activeContentRef.current = activeContent;
   saveStateRef.current = saveState;
+  tabsRef.current = tabs;
+  historyTrailRef.current = historyTrail;
+  historyIndexRef.current = historyIndex;
 
   const showToast = useCallback((message: string) => {
+    // A newer message must not be cut short by the timer of an older one.
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
     setToast(message);
-    window.setTimeout(() => setToast(""), 3600);
+    toastTimerRef.current = window.setTimeout(() => {
+      toastTimerRef.current = null;
+      setToast("");
+    }, 3600);
   }, []);
 
   const updateSettings = useCallback(
@@ -249,10 +308,16 @@ export default function App() {
   }, [showToast]);
 
   const refreshVaultMetadata = useCallback(async (path: string) => {
+    const vaultPath = vaultPathRef.current;
     const [nextOutline, nextBacklinks] = await Promise.all([
       path ? window.levilNotes.getOutline(path) : Promise.resolve([]),
       path ? window.levilNotes.getBacklinks(path) : Promise.resolve([]),
     ]);
+    // Two quick opens can resolve out of order; never show note A's outline
+    // and backlinks while note B (or another vault) is active.
+    if (path !== activePathRef.current || vaultPath !== vaultPathRef.current) {
+      return;
+    }
     setOutline(nextOutline);
     setBacklinks(nextBacklinks);
   }, []);
@@ -261,17 +326,221 @@ export default function App() {
     setTags(await window.levilNotes.getTags());
   }, []);
 
+  const cancelPendingSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
+  }, []);
+
+  /**
+   * Reconciles the workspace with a vault snapshot. Tabs remember the vault
+   * their path came from, so opening a document in another folder keeps the
+   * previously opened documents in the strip; only tabs of the vault described
+   * by this snapshot can be validated and garbage-collected. Per-vault UI
+   * (Git selection, commit draft, outline, dialogs) is reset when the vault
+   * around the active note changes.
+   */
+  const applyVaultSnapshot = useCallback(
+    (
+      snapshot: VaultSnapshot,
+      options?: { protectedDirectory?: string | null },
+    ) => {
+      const previousActivePath = activePathRef.current;
+      const previousVaultPath = vaultPathRef.current;
+      const previousPending = pendingSaveRef.current;
+      const transition = planVaultTransition({
+        previousVaultPath,
+        snapshot,
+        tabs: tabsRef.current,
+        activePath: previousActivePath,
+        activeVaultPath: previousVaultPath,
+        historyTrail: historyTrailRef.current,
+        historyIndex: historyIndexRef.current,
+        protectedDirectory: options?.protectedDirectory ?? null,
+      });
+
+      vaultPathRef.current = snapshot.path;
+      vaultSnapshotRef.current = snapshot;
+      snapshotEpochRef.current += 1;
+      setVaultRevision((current) => current + 1);
+      tabsRef.current = transition.tabs;
+      historyTrailRef.current = transition.historyTrail;
+      historyIndexRef.current = transition.historyIndex;
+      setVault(snapshot);
+      setTabs(transition.tabs);
+      setHistoryTrail(transition.historyTrail);
+      setHistoryIndex(transition.historyIndex);
+
+      const activePathChanged = transition.activePath !== previousActivePath;
+      if (activePathChanged) {
+        activePathRef.current = transition.activePath;
+        setActivePath(transition.activePath);
+        activeContentRef.current = "";
+        setActiveContent("");
+        setActiveView({ kind: "note" });
+        loadedNoteRef.current = null;
+      }
+
+      if (transition.vaultChanged) {
+        // The host flushes unsaved edits before switching vaults; anything
+        // still queued belongs to the replaced vault and is unsafe to write.
+        // Tabs from that vault stay in the strip and can be picked again.
+        if (previousPending) {
+          cancelPendingSave();
+          showToast("笔记库已切换，上一笔记未保存的修改没有写入。");
+        }
+        setSelectedGitPaths(new Set());
+        setCommitMessage("");
+        setOutline([]);
+        setBacklinks([]);
+        setDialog(null);
+        setContextMenu(null);
+        setEditorMenuOpen(false);
+        setSaveState("saved");
+        setActiveView({ kind: "note" });
+        if (transition.discardedPaths.length > 0) {
+          setEditorModes((current) => {
+            const next = { ...current };
+            for (const discarded of transition.discardedPaths) {
+              delete next[tabKey(snapshot.path, discarded)];
+            }
+            return next;
+          });
+        }
+      } else {
+        if (
+          activePathChanged &&
+          previousPending &&
+          previousPending.path === previousActivePath
+        ) {
+          // The open note was moved or deleted outside the app. A debounced
+          // write that is still queued would recreate the missing file.
+          cancelPendingSave();
+          setSaveState("saved");
+          showToast("笔记已被移动或删除，未保存的修改没有写入。");
+        }
+        if (transition.discardedPaths.length > 0) {
+          setEditorModes((current) => {
+            const next = { ...current };
+            for (const discarded of transition.discardedPaths) {
+              delete next[tabKey(snapshot.path, discarded)];
+            }
+            return next;
+          });
+        }
+      }
+
+      return transition;
+    },
+    [cancelPendingSave, showToast],
+  );
+
   const openNote = useCallback(
-    async (path: string, recordHistory = true) => {
+    async (
+      path: string,
+      recordHistory = true,
+      options?: { fromHost?: boolean },
+    ) => {
       if (!path) {
+        return;
+      }
+      const fromHost = options?.fromHost === true;
+      const protectedDirectory =
+        directoryTransitionRef.current?.path ??
+        noteTransitionDirectoryRef.current ??
+        null;
+      const isProtectedPath = (candidate: string) =>
+        Boolean(protectedDirectory) &&
+        belongsToDirectory(candidate, protectedDirectory as string);
+
+      // VaultService.open() does not broadcast a snapshot, so a Finder-driven
+      // vault switch reaches the renderer only as side data. Reconcile against
+      // the live snapshot before trusting `path`; a fetch that resolves after a
+      // newer snapshot was applied is ignored.
+      const vaultPathBefore = vaultPathRef.current;
+      const epochBefore = snapshotEpochRef.current;
+      try {
+        const fetched = await window.levilNotes.getVaultSnapshot();
+        if (fetched && snapshotEpochRef.current === epochBefore) {
+          applyVaultSnapshot(fetched, { protectedDirectory });
+        }
+      } catch {
+        // Fall back to the workspace state that is already applied.
+      }
+      // Always reconcile against the newest snapshot that was actually
+      // applied, so a slow fetch can never bring back an older vault.
+      const snapshot = vaultSnapshotRef.current;
+      const currentVaultPath = vaultPathRef.current;
+      const vaultChanged =
+        vaultPathBefore !== "" && currentVaultPath !== vaultPathBefore;
+      if (vaultChanged) {
+        // Tags and Git data describe the vault that just stopped being open.
+        void refreshTags();
+        void refreshGit();
+        if (!fromHost && !isProtectedPath(path)) {
+          // The toolbar/files panel still show the old vault's paths; resolve
+          // nothing against the replacement vault.
+          showToast("笔记库已切换，请从文件列表重新打开笔记。");
+          return;
+        }
+      }
+
+      if (
+        !fromHost &&
+        !isProtectedPath(path) &&
+        isPathMissingFromVault(snapshot, path)
+      ) {
+        // The note was moved or deleted outside the app; it can never be
+        // opened again, but tabs from other vaults are unaffected.
+        setTabs((current) =>
+          current.filter(
+            (tab) =>
+              !(
+                tab.vaultPath === currentVaultPath &&
+                tab.path === path
+              ),
+          ),
+        );
+        setEditorModes((current) => {
+          const key = tabKey(currentVaultPath, path);
+          if (!(key in current)) {
+            return current;
+          }
+          const next = { ...current };
+          delete next[key];
+          return next;
+        });
+        showToast(`笔记已不存在：${path}`);
         return;
       }
 
       const requestId = ++openRequestRef.current;
       const pending = pendingSaveRef.current;
       if (pending) {
-        await window.levilNotes.writeNote(pending.path, pending.content);
-        pendingSaveRef.current = null;
+        try {
+          await window.levilNotes.writeNote(pending.path, pending.content);
+          if (pendingSaveRef.current === pending) {
+            pendingSaveRef.current = null;
+          }
+        } catch (error) {
+          // A failing save must never block opening another note: one
+          // unreadable file must not freeze the whole tab strip.
+          if (
+            !isProtectedPath(pending.path) &&
+            isPathMissingFromVault(snapshot, pending.path)
+          ) {
+            pendingSaveRef.current = null;
+            setSaveState("saved");
+            showToast("上一笔记已不在笔记库中，未保存的修改没有写入。");
+          } else {
+            setSaveState("error");
+            showToast(
+              String(error instanceof Error ? error.message : error),
+            );
+          }
+        }
       }
 
       try {
@@ -279,49 +548,136 @@ export default function App() {
         if (requestId !== openRequestRef.current) {
           return;
         }
-        const note = vault?.files.find((file) => file.path === path);
+        // Another vault switch landed while the read was in flight; this
+        // result belongs to a workspace that is no longer open.
+        if (vaultPathRef.current !== currentVaultPath) {
+          return;
+        }
+        const note =
+          snapshot?.files.find((file) => file.path === path) ??
+          vault?.files.find((file) => file.path === path);
         const title = note?.title || basename(path);
+        activePathRef.current = path;
         setActivePath(path);
         setActiveContent(document.content);
         loadedNoteRef.current = note
           ? { path, modifiedAt: note.modifiedAt }
           : null;
         setActiveView({ kind: "note" });
-        setSaveState("saved");
+        // A failed pre-open flush leaves its buffer pending; pretending the
+        // workspace is saved would hide that.
+        if (pendingSaveRef.current === null) {
+          setSaveState("saved");
+        }
         setTabs((current) =>
-          current.some((tab) => tab.path === path)
+          current.some(
+            (tab) =>
+              tab.vaultPath === currentVaultPath &&
+              tab.path === path,
+          )
             ? current
-            : [...current, { path, title }],
+            : [...current, { path, title, vaultPath: currentVaultPath }],
         );
         await refreshVaultMetadata(path);
 
         if (recordHistory) {
-          setHistoryTrail((current) => {
-            const clipped = current.slice(0, historyIndex + 1);
-            return clipped[clipped.length - 1] === path
-              ? clipped
-              : [...clipped, path];
-          });
-          setHistoryIndex((current) =>
-            Math.min(current + 1, historyTrail.length),
+          const clipped = historyTrailRef.current.slice(
+            0,
+            historyIndexRef.current + 1,
           );
+          const last = clipped[clipped.length - 1];
+          const nextTrail =
+            last &&
+            last.path === path &&
+            last.vaultPath === currentVaultPath
+              ? clipped
+              : [...clipped, { path, vaultPath: currentVaultPath }];
+          historyTrailRef.current = nextTrail;
+          historyIndexRef.current = nextTrail.length - 1;
+          setHistoryTrail(nextTrail);
+          setHistoryIndex(nextTrail.length - 1);
         }
       } catch (error) {
+        // A read can fail because the index lagged behind a file that was just
+        // renamed or created on disk. Reconcile before declaring the tab dead,
+        // so an index update race never turns into a wrong "missing" toast.
+        if (
+          !fromHost &&
+          !isProtectedPath(path) &&
+          vaultPathRef.current === currentVaultPath
+        ) {
+          const errorEpoch = snapshotEpochRef.current;
+          let live = vaultSnapshotRef.current;
+          try {
+            const latest = await window.levilNotes.getVaultSnapshot();
+            if (latest && snapshotEpochRef.current === errorEpoch) {
+              applyVaultSnapshot(latest, { protectedDirectory });
+              live = latest;
+            }
+          } catch {
+            // Keep the workspace state that is already applied.
+          }
+          if (
+            vaultPathRef.current === currentVaultPath &&
+            isPathMissingFromVault(live, path)
+          ) {
+            setTabs((current) =>
+              current.filter(
+                (tab) =>
+                  !(
+                    tab.vaultPath === currentVaultPath &&
+                    tab.path === path
+                  ),
+              ),
+            );
+            setEditorModes((current) => {
+              const key = tabKey(currentVaultPath, path);
+              if (!(key in current)) {
+                return current;
+              }
+              const next = { ...current };
+              delete next[key];
+              return next;
+            });
+            showToast(`笔记已不存在：${path}`);
+            return;
+          }
+        }
         showToast(String(error instanceof Error ? error.message : error));
       }
     },
-    [historyIndex, historyTrail.length, refreshVaultMetadata, showToast, vault],
+    [
+      applyVaultSnapshot,
+      refreshGit,
+      refreshTags,
+      refreshVaultMetadata,
+      showToast,
+      vault,
+    ],
   );
 
   const initializeVault = useCallback(
     async (snapshot: VaultSnapshot) => {
-      setVault(snapshot);
+      // The host may have replaced the vault while this snapshot was in
+      // flight, and a stale snapshot must never reset the workspace back to a
+      // vault that is no longer open. Prefer the live snapshot when it is
+      // available and fall back to the one that was handed over.
+      let live = snapshot;
+      try {
+        const latest = await window.levilNotes.getVaultSnapshot();
+        if (latest) {
+          live = latest;
+        }
+      } catch {
+        // Fall back to the snapshot that was handed over.
+      }
+      applyVaultSnapshot(live);
       await Promise.all([refreshTags(), refreshGit()]);
-      if (!activePathRef.current && snapshot.files[0]) {
-        await openNote(snapshot.files[0].path, true);
+      if (!activePathRef.current && live.files[0]) {
+        await openNote(live.files[0].path, true);
       }
     },
-    [openNote, refreshGit, refreshTags],
+    [applyVaultSnapshot, openNote, refreshGit, refreshTags],
   );
 
   useEffect(() => {
@@ -339,7 +695,12 @@ export default function App() {
         setSettings(loaded);
         applySettings(loaded);
         settingsLoadedRef.current = true;
-        const snapshot = await window.levilNotes.restoreVault();
+        // A file opened from Finder can make the host open a vault before the
+        // page finishes booting. Prefer that live vault over restoring the
+        // last used one, which would replace the file's vault again.
+        const live = await window.levilNotes.getVaultSnapshot();
+        const snapshot =
+          live ?? (await window.levilNotes.restoreVault());
         if (!cancelled) {
           if (snapshot) {
             await initializeVault(snapshot);
@@ -361,10 +722,16 @@ export default function App() {
       return;
     }
     setTabs((current) =>
-      current.map((tab) => ({
-        ...tab,
-        title: vault.files.find((file) => file.path === tab.path)?.title || tab.title,
-      })),
+      current.map((tab) =>
+        tab.vaultPath === vault.path
+          ? {
+              ...tab,
+              title:
+                vault.files.find((file) => file.path === tab.path)?.title ||
+                tab.title,
+            }
+          : tab,
+      ),
     );
   }, [vault]);
 
@@ -374,7 +741,9 @@ export default function App() {
       return undefined;
     }
     return hostEvents.onOpenFile((path) => {
-      void openNote(path, false);
+      // The host may have switched the vault for this file; `fromHost` keeps a
+      // legitimate open of the new vault from being rejected as a stale tab.
+      void openNote(path, false, { fromHost: true });
     });
   }, [openNote]);
 
@@ -401,28 +770,52 @@ export default function App() {
     [],
   );
 
+  const refreshActiveNote = useCallback(async () => {
+    try {
+      const snapshot = await window.levilNotes.getVaultSnapshot();
+      if (snapshot) {
+        applyVaultSnapshot(snapshot);
+      }
+      await Promise.all([refreshTags(), refreshGit()]);
+      const path = activePathRef.current;
+      if (!path) {
+        return;
+      }
+      if (
+        pendingSaveRef.current !== null ||
+        saveStateRef.current === "dirty" ||
+        saveStateRef.current === "saving"
+      ) {
+        showToast("当前笔记有未保存的修改，未从磁盘重新载入。");
+        return;
+      }
+      const file = snapshot?.files.find((entry) => entry.path === path);
+      await reloadActiveNote(path, file?.modifiedAt ?? Date.now());
+      showToast("已刷新当前笔记。");
+    } catch (error) {
+      showToast(String(error instanceof Error ? error.message : error));
+    }
+  }, [
+    applyVaultSnapshot,
+    refreshGit,
+    refreshTags,
+    reloadActiveNote,
+    showToast,
+  ]);
+
   useEffect(() => {
     const unsubscribe = window.levilNotes.onVaultChanged(async (snapshot) => {
-      setVault(snapshot);
+      const transition = directoryTransitionRef.current;
+      const protectedDirectory =
+        transition?.path ?? noteTransitionDirectoryRef.current ?? null;
+      const activePathInTransition = Boolean(
+        transition &&
+          activePathRef.current &&
+          belongsToDirectory(activePathRef.current, transition.path),
+      );
+      applyVaultSnapshot(snapshot, { protectedDirectory });
       await refreshTags();
       await refreshGit();
-      const transition = directoryTransitionRef.current;
-      const activePathInTransition =
-        transition &&
-        activePathRef.current &&
-        belongsToDirectory(activePathRef.current, transition.path);
-      if (
-        activePathRef.current &&
-        !activePathInTransition &&
-        !snapshot.files.some((file) => file.path === activePathRef.current)
-      ) {
-        setTabs((current) =>
-          current.filter((tab) => tab.path !== activePathRef.current),
-        );
-        setActivePath("");
-        setActiveContent("");
-        setActiveView({ kind: "note" });
-      }
       if (activePathRef.current && !activePathInTransition) {
         const decision = planExternalReload({
           reason: snapshot.reason,
@@ -448,6 +841,7 @@ export default function App() {
     });
     return unsubscribe;
   }, [
+    applyVaultSnapshot,
     refreshGit,
     refreshTags,
     refreshVaultMetadata,
@@ -494,14 +888,18 @@ export default function App() {
         pending.path,
         pending.content,
       );
-      pendingSaveRef.current = null;
-      if (pending.path === activePathRef.current) {
-        loadedNoteRef.current = {
-          path: pending.path,
-          modifiedAt: written.modifiedAt,
-        };
+      // The user may have typed again while the write was in flight; only the
+      // version that was just written is settled.
+      if (pendingSaveRef.current === pending) {
+        pendingSaveRef.current = null;
+        if (pending.path === activePathRef.current) {
+          loadedNoteRef.current = {
+            path: pending.path,
+            modifiedAt: written.modifiedAt,
+          };
+        }
+        setSaveState("saved");
       }
-      setSaveState("saved");
       await refreshGit();
     } catch (error) {
       setSaveState("error");
@@ -509,13 +907,69 @@ export default function App() {
     }
   }, [refreshGit, showToast]);
 
-  const cancelPendingSave = useCallback(() => {
-    if (saveTimerRef.current) {
-      window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
+  // The macOS host flushes unsaved edits before it replaces the vault for a
+  // Finder double-click. This is the only moment the renderer can still write
+  // to the vault that is currently open.
+  useEffect(() => {
+    window.__levilNotesHostFlushSave = () => flushPendingSave();
+    return () => {
+      delete window.__levilNotesHostFlushSave;
+    };
+  }, [flushPendingSave]);
+
+  // Tabs can outlive a vault switch, so each one carries its vault path.
+  // Selecting a tab from another vault first asks the native host to reopen
+  // that vault; the sidecar can only serve one vault at a time.
+  const switchToVault = async (vaultPath: string) => {
+    if (vaultPath === vaultPathRef.current) {
+      return true;
     }
-    pendingSaveRef.current = null;
-  }, []);
+    const hostEvents = window.__levilNotesHostEvents;
+    if (!hostEvents?.switchVault) {
+      showToast("当前环境不支持切换笔记库。");
+      return false;
+    }
+    await flushPendingSave();
+    const requestId = vaultSwitchRequestRef.current + 1;
+    vaultSwitchRequestRef.current = requestId;
+    try {
+      const snapshot = await hostEvents.switchVault(vaultPath);
+      if (requestId !== vaultSwitchRequestRef.current) {
+        return false;
+      }
+      const latest =
+        snapshot ?? (await window.levilNotes.getVaultSnapshot());
+      if (requestId !== vaultSwitchRequestRef.current) {
+        return false;
+      }
+      if (latest) {
+        applyVaultSnapshot(latest);
+      }
+    } catch (error) {
+      showToast(String(error instanceof Error ? error.message : error));
+      return false;
+    }
+    if (vaultPathRef.current !== vaultPath) {
+      return false;
+    }
+    void refreshTags();
+    void refreshGit();
+    return true;
+  };
+
+  const selectTab = async (tabId: string) => {
+    const tab = tabsRef.current.find((entry) => tabKeyOf(entry) === tabId);
+    if (!tab) {
+      return;
+    }
+    if (tab.vaultPath !== vaultPathRef.current) {
+      const switched = await switchToVault(tab.vaultPath);
+      if (!switched || vaultPathRef.current !== tab.vaultPath) {
+        return;
+      }
+    }
+    await openNote(tab.path);
+  };
 
   const handleEditorChange = useCallback(
     (path: string, markdown: string) => {
@@ -524,6 +978,10 @@ export default function App() {
       // note the user just opened.
       if (!path || path !== activePathRef.current) {
         return;
+      }
+      const previousPending = pendingSaveRef.current;
+      if (previousPending && previousPending.path !== path) {
+        showToast("上一笔记的未保存修改仍未写入，已停止重试。");
       }
       setActiveContent(markdown);
       setSaveState("dirty");
@@ -538,17 +996,29 @@ export default function App() {
         void flushPendingSave();
       }, 650);
     },
-    [flushPendingSave],
+    [flushPendingSave, showToast],
   );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // Modal dialogs own the keyboard while they are open: a shortcut must
+      // not switch panels or save behind them.
+      if (dialog || ignoreDialog) {
+        return;
+      }
+
       const command = event.ctrlKey || event.metaKey;
+      // Use the physical key for panel shortcuts: on macOS Option+digit
+      // reports symbols such as "¡" through event.key, so matching only the
+      // character makes the advertised Alt+1…7 shortcuts dead there.
+      const digitMatch = /^(?:Digit|Numpad)([1-7])$/.exec(event.code);
       if (
         event.altKey &&
         !command &&
         !event.shiftKey &&
-        ["1", "2", "3", "4", "5", "6", "7"].includes(event.key)
+        !event.isComposing &&
+        !isEditableTarget(event.target) &&
+        (digitMatch || /^[1-7]$/.test(event.key))
       ) {
         event.preventDefault();
         const panels: SidebarPanel[] = [
@@ -560,27 +1030,49 @@ export default function App() {
           "git",
           "settings",
         ];
-        setActivePanel(panels[Number(event.key) - 1]);
+        const index = Number(digitMatch?.[1] ?? event.key) - 1;
+        setActivePanel(panels[index]);
         setSettings((current) => ({ ...current, sidebarCollapsed: false }));
         return;
       }
 
       if (!command) {
         if (event.key === "Escape") {
+          // One Escape dismisses one layer: only leave a diff/preview view when
+          // no menu or popover was open to begin with.
+          const hadOverlay =
+            Boolean(contextMenu) ||
+            editorMenuOpen ||
+            Boolean(
+              document.querySelector(
+                ".context-menu, .git-branch-menu, .format-context-toolbar, .editor-link-popover, .editor-toolbar-menu",
+              ),
+            );
           setContextMenu(null);
           setEditorMenuOpen(false);
+          if (!hadOverlay && activeView.kind !== "note") {
+            setActiveView({ kind: "note" });
+          }
         }
         return;
       }
 
       const editorOwnsBoldShortcut =
         event.target instanceof Element &&
-        Boolean(event.target.closest(".editor-mount .ProseMirror"));
+        Boolean(event.target.closest(".editor-mount .ProseMirror")) &&
+        // Reading mode keeps ProseMirror mounted but read-only; there Ctrl+B
+        // belongs to the sidebar toggle instead of being swallowed.
+        Boolean(event.target.closest(".editor-mount:not(.is-readonly)"));
 
       if (event.key.toLowerCase() === "b") {
         // Let Milkdown's Mod-b command format the note instead of toggling
         // the workspace sidebar while the editor owns keyboard focus.
         if (editorOwnsBoldShortcut) {
+          return;
+        }
+        // Typing in a search/commit/rename field must not lose the caret to a
+        // sidebar toggle.
+        if (isEditableTarget(event.target)) {
           return;
         }
         event.preventDefault();
@@ -600,15 +1092,39 @@ export default function App() {
         setActivePanel("git");
         setSettings((current) => ({ ...current, sidebarCollapsed: false }));
       } else if (event.key.toLowerCase() === "p") {
+        const targetInEditor =
+          event.target instanceof Element &&
+          Boolean(event.target.closest(".editor-mount"));
+        if (isEditableTarget(event.target) && !targetInEditor) {
+          return;
+        }
         event.preventDefault();
         setActivePanel("files");
+        setFileFilterFocusRequest((current) => current + 1);
         setSettings((current) => ({ ...current, sidebarCollapsed: false }));
+      } else if (
+        event.key.toLowerCase() === "w" &&
+        !event.shiftKey &&
+        !isEditableTarget(event.target) &&
+        activePathRef.current
+      ) {
+        event.preventDefault();
+        void closeTabRef.current(
+          tabKey(vaultPathRef.current, activePathRef.current),
+        );
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [flushPendingSave]);
+  }, [
+    activeView.kind,
+    contextMenu,
+    dialog,
+    editorMenuOpen,
+    flushPendingSave,
+    ignoreDialog,
+  ]);
 
   useEffect(() => {
     const closeMenus = (event: MouseEvent) => {
@@ -628,11 +1144,8 @@ export default function App() {
     try {
       const snapshot = await window.levilNotes.chooseVault();
       if (snapshot) {
-        setTabs([]);
-        setActivePath("");
-        setActiveContent("");
-        setHistoryTrail([]);
-        setHistoryIndex(-1);
+        // Tabs from the previous vault stay in the strip; selecting one later
+        // switches the vault back through the native host.
         await initializeVault(snapshot);
       }
     } catch (error) {
@@ -641,13 +1154,20 @@ export default function App() {
   };
 
   const navigateHistory = async (direction: -1 | 1) => {
-    const nextIndex = historyIndex + direction;
-    const nextPath = historyTrail[nextIndex];
-    if (!nextPath) {
+    const nextIndex = historyIndexRef.current + direction;
+    const entry = historyTrailRef.current[nextIndex];
+    if (!entry) {
       return;
     }
+    historyIndexRef.current = nextIndex;
     setHistoryIndex(nextIndex);
-    await openNote(nextPath, false);
+    if (entry.vaultPath !== vaultPathRef.current) {
+      const switched = await switchToVault(entry.vaultPath);
+      if (!switched || vaultPathRef.current !== entry.vaultPath) {
+        return;
+      }
+    }
+    await openNote(entry.path, false);
   };
 
   const activeFile = useMemo(
@@ -655,8 +1175,13 @@ export default function App() {
     [activePath, vault],
   );
   const activeTitle = activeFile?.title || basename(activePath);
-  const activeEditorMode: EditorMode = activePath
-    ? editorModes[activePath] || DEFAULT_EDITOR_MODE
+  const currentVaultPath = vault?.path ?? vaultPathRef.current;
+  // Editor modes are per tab, and two vaults can both hold "README.md".
+  const activeTabKey = activePath
+    ? tabKey(currentVaultPath, activePath)
+    : "";
+  const activeEditorMode: EditorMode = activeTabKey
+    ? editorModes[activeTabKey] || DEFAULT_EDITOR_MODE
     : DEFAULT_EDITOR_MODE;
   const fileTree = useMemo(
     () => buildFileTree(vault?.files || [], vault?.directories || []),
@@ -675,10 +1200,44 @@ export default function App() {
     startNewNoteInFolder(parentFolder(activePath));
   };
 
+  // Navigation history crosses vaults; rename and trash only affect notes of
+  // the vault that is open right now.
+  const remapHistoryPath = (vaultPath: string, from: string, to: string) => {
+    const trail = historyTrailRef.current.map((entry) =>
+      entry.vaultPath === vaultPath && entry.path === from
+        ? { ...entry, path: to }
+        : entry,
+    );
+    historyTrailRef.current = trail;
+    setHistoryTrail(trail);
+  };
+
+  const forgetHistoryPath = (vaultPath: string, target: string) => {
+    const previousTrail = historyTrailRef.current;
+    const previousIndex = historyIndexRef.current;
+    const removedIndex = previousTrail.findLastIndex(
+      (entry) => entry.vaultPath === vaultPath && entry.path === target,
+    );
+    const trail = previousTrail.filter(
+      (entry) =>
+        !(entry.vaultPath === vaultPath && entry.path === target),
+    );
+    let index = previousIndex;
+    if (removedIndex >= 0 && removedIndex <= previousIndex) {
+      index = previousIndex - 1;
+    }
+    index = Math.min(Math.max(index, -1), trail.length - 1);
+    historyTrailRef.current = trail;
+    historyIndexRef.current = index;
+    setHistoryTrail(trail);
+    setHistoryIndex(index);
+  };
+
   const confirmDialog = async () => {
     if (!dialog) {
       return;
     }
+    const vaultPath = vaultPathRef.current;
     try {
       if (dialog.kind === "create") {
         const created = await window.levilNotes.createNote(
@@ -691,38 +1250,56 @@ export default function App() {
         }
         setEditorModes((current) => ({
           ...current,
-          [created.path]: "edit",
+          [tabKey(vaultPath, created.path)]: "edit",
         }));
         await openNote(created.path);
       } else if (dialog.kind === "rename") {
+        // A queued save for the old path would recreate the note that is being
+        // renamed, so write it first.
+        await flushPendingSave();
+        // renameNote emits a "renamed" snapshot before its IPC reply; protect
+        // the parent folder so that snapshot cannot drop the tab/active note.
+        noteTransitionDirectoryRef.current = parentFolder(dialog.path);
         const result = await window.levilNotes.renameNote(
           dialog.path,
           dialog.value,
         );
         setTabs((current) =>
           current.map((tab) =>
-            tab.path === dialog.path
-              ? { path: result.path, title: dialog.value }
+            tab.vaultPath === vaultPath && tab.path === dialog.path
+              ? { ...tab, path: result.path, title: dialog.value }
               : tab,
           ),
         );
         setEditorModes((current) => {
-          const mode = current[dialog.path];
+          const fromKey = tabKey(vaultPath, dialog.path);
+          const mode = current[fromKey];
           if (!mode) {
             return current;
           }
-          const next = { ...current, [result.path]: mode };
-          delete next[dialog.path];
+          const next = {
+            ...current,
+            [tabKey(vaultPath, result.path)]: mode,
+          };
+          delete next[fromKey];
           return next;
         });
+        remapHistoryPath(vaultPath, dialog.path, result.path);
+        if (loadedNoteRef.current?.path === dialog.path) {
+          loadedNoteRef.current = {
+            ...loadedNoteRef.current,
+            path: result.path,
+          };
+        }
         if (activePath === dialog.path) {
-          setActivePath(result.path);
           activePathRef.current = result.path;
+          setActivePath(result.path);
         }
         const snapshot = await window.levilNotes.getVaultSnapshot();
         if (snapshot) {
           setVault(snapshot);
         }
+        noteTransitionDirectoryRef.current = null;
       } else if (dialog.kind === "rename-folder") {
         await flushPendingSave();
         directoryTransitionRef.current = {
@@ -740,16 +1317,32 @@ export default function App() {
             result.path,
           );
         setTabs((current) =>
-          current.map((tab) => ({ ...tab, path: remapPath(tab.path) })),
+          current.map((tab) =>
+            tab.vaultPath === vaultPath
+              ? { ...tab, path: remapPath(tab.path) }
+              : tab,
+          ),
         );
         setEditorModes((current) => {
+          const keyPrefix = tabKey(vaultPath, "");
           const next: Record<string, EditorMode> = {};
-          Object.entries(current).forEach(([path, mode]) => {
-            next[remapPath(path)] = mode;
-          });
+          for (const [key, mode] of Object.entries(current)) {
+            if (key.startsWith(keyPrefix)) {
+              next[tabKey(vaultPath, remapPath(key.slice(keyPrefix.length)))] =
+                mode;
+            } else {
+              next[key] = mode;
+            }
+          }
           return next;
         });
-        setHistoryTrail((current) => current.map(remapPath));
+        setHistoryTrail((current) =>
+          current.map((entry) =>
+            entry.vaultPath === vaultPath
+              ? { ...entry, path: remapPath(entry.path) }
+              : entry,
+          ),
+        );
         const nextActivePath = remapPath(activePath);
         cancelPendingSave();
         activePathRef.current = nextActivePath;
@@ -762,16 +1355,29 @@ export default function App() {
         }
         directoryTransitionRef.current = null;
       } else if (dialog.kind === "delete") {
+        await flushPendingSave();
         await window.levilNotes.trashNote(dialog.path);
+        forgetHistoryPath(vaultPath, dialog.path);
         setTabs((current) =>
-          current.filter((tab) => tab.path !== dialog.path),
+          current.filter(
+            (tab) =>
+              !(tab.vaultPath === vaultPath && tab.path === dialog.path),
+          ),
         );
         setEditorModes((current) => {
+          const key = tabKey(vaultPath, dialog.path);
+          if (!(key in current)) {
+            return current;
+          }
           const next = { ...current };
-          delete next[dialog.path];
+          delete next[key];
           return next;
         });
         if (activePath === dialog.path) {
+          // The file is gone; a debounced write would recreate it.
+          cancelPendingSave();
+          loadedNoteRef.current = null;
+          activePathRef.current = "";
           setActivePath("");
           setActiveContent("");
           setActiveView({ kind: "note" });
@@ -791,26 +1397,42 @@ export default function App() {
         const removedPrefix = `${dialog.path}/`;
         const belongsToDeletedFolder = (path: string) =>
           path === dialog.path || path.startsWith(removedPrefix);
+        const belongsToCurrentVault = (tab: { vaultPath: string; path: string }) =>
+          tab.vaultPath === vaultPath &&
+          belongsToDeletedFolder(tab.path);
         setTabs((current) =>
-          current.filter((tab) => !belongsToDeletedFolder(tab.path)),
+          current.filter((tab) => !belongsToCurrentVault(tab)),
         );
-        setEditorModes((current) =>
-          Object.fromEntries(
+        setEditorModes((current) => {
+          const keyPrefix = tabKey(vaultPath, "");
+          return Object.fromEntries(
             Object.entries(current).filter(
-              ([path]) => !belongsToDeletedFolder(path),
+              ([key]) =>
+                !(
+                  key.startsWith(keyPrefix) &&
+                  belongsToDeletedFolder(key.slice(keyPrefix.length))
+                ),
             ),
-          ),
+          );
+        });
+        const remainingHistory = historyTrailRef.current.filter(
+          (entry) =>
+            !(
+              entry.vaultPath === vaultPath &&
+              belongsToDeletedFolder(entry.path)
+            ),
         );
-        const remainingHistory = historyTrail.filter(
-          (path) => !belongsToDeletedFolder(path),
+        const nextIndex = Math.min(
+          historyIndexRef.current,
+          remainingHistory.length - 1,
         );
+        historyTrailRef.current = remainingHistory;
+        historyIndexRef.current = Math.max(nextIndex, -1);
         setHistoryTrail(remainingHistory);
-        setHistoryIndex((current) =>
-          Math.min(current, remainingHistory.length - 1),
-        );
+        setHistoryIndex(Math.max(nextIndex, -1));
         if (belongsToDeletedFolder(activePath)) {
-          setActivePath("");
           activePathRef.current = "";
+          setActivePath("");
           setActiveContent("");
           setActiveView({ kind: "note" });
         }
@@ -836,33 +1458,80 @@ export default function App() {
       setDialog(null);
     } catch (error) {
       directoryTransitionRef.current = null;
+      noteTransitionDirectoryRef.current = null;
       showToast(String(error instanceof Error ? error.message : error));
     }
   };
 
-  const closeTab = async (path: string) => {
-    if (path === activePath) {
+  const closeTab = async (tabId: string) => {
+    const tab = tabsRef.current.find((entry) => tabKeyOf(entry) === tabId);
+    if (!tab) {
+      return;
+    }
+    const isActive =
+      tab.vaultPath === vaultPathRef.current &&
+      tab.path === activePathRef.current;
+    if (isActive) {
       await flushPendingSave();
     }
+    const fallback = pickFallbackTab(
+      tabsRef.current,
+      tabId,
+      vaultPathRef.current,
+    );
+    const remaining = tabsRef.current.filter(
+      (entry) => tabKeyOf(entry) !== tabId,
+    );
+    tabsRef.current = remaining;
+    setTabs(remaining);
     setEditorModes((current) => {
-      const next = { ...current };
-      delete next[path];
-      return next;
-    });
-    setTabs((current) => {
-      const next = current.filter((tab) => tab.path !== path);
-      if (path === activePath) {
-        const fallback = next[next.length - 1];
-        if (fallback) {
-          void openNote(fallback.path);
-        } else {
-          setActivePath("");
-          setActiveContent("");
-        }
+      const key = tabKey(tab.vaultPath, tab.path);
+      if (!(key in current)) {
+        return current;
       }
+      const next = { ...current };
+      delete next[key];
       return next;
     });
+    if (!isActive) {
+      return;
+    }
+    if (!fallback) {
+      activePathRef.current = "";
+      setActivePath("");
+      setActiveContent("");
+      setActiveView({ kind: "note" });
+      return;
+    }
+    if (fallback.vaultPath !== vaultPathRef.current) {
+      const switched = await switchToVault(fallback.vaultPath);
+      if (!switched || vaultPathRef.current !== fallback.vaultPath) {
+        activePathRef.current = "";
+        setActivePath("");
+        setActiveContent("");
+        setActiveView({ kind: "note" });
+        return;
+      }
+    }
+    await openNote(fallback.path);
   };
+  closeTabRef.current = closeTab;
+
+  useEffect(() => {
+    // Cmd+W (macOS menu) and Ctrl+W (Electron) close the active tab instead of
+    // throwing the whole window away.
+    window.__levilNotesCloseActiveTab = () => {
+      const path = activePathRef.current;
+      if (!path) {
+        return false;
+      }
+      void closeTabRef.current(tabKey(vaultPathRef.current, path));
+      return true;
+    };
+    return () => {
+      delete window.__levilNotesCloseActiveTab;
+    };
+  }, []);
 
   const copyActiveNotePath = async () => {
     if (!activePath) {
@@ -887,7 +1556,7 @@ export default function App() {
     }
     setEditorModes((current) => ({
       ...current,
-      [activePath]: nextMode,
+      [activeTabKey]: nextMode,
     }));
   };
 
@@ -1073,6 +1742,12 @@ export default function App() {
   };
 
   const updateSidebarPanel = (panel: SidebarPanel) => {
+    // Clicking the active rail item again is the natural way to reclaim the
+    // space the sidebar takes, matching the Ctrl+B and status-bar toggles.
+    if (!settings.sidebarCollapsed && panel === activePanel) {
+      setSettings((current) => ({ ...current, sidebarCollapsed: true }));
+      return;
+    }
     setActivePanel(panel);
     if (settings.sidebarCollapsed) {
       setSettings((current) => ({ ...current, sidebarCollapsed: false }));
@@ -1111,11 +1786,21 @@ export default function App() {
       }
     >
       <TopBar
-        tabs={tabs}
-        activePath={activePath}
+        tabs={tabs.map((tab) => {
+          const id = tabKeyOf(tab);
+          return {
+            id,
+            title: tab.title,
+            vaultName:
+              tab.vaultPath === currentVaultPath
+                ? vault?.name || ""
+                : basename(tab.vaultPath),
+            active: id === activeTabKey,
+          };
+        })}
         sidebarCollapsed={settings.sidebarCollapsed}
-        onSelectTab={(path) => void openNote(path)}
-        onCloseTab={(path) => void closeTab(path)}
+        onSelectTab={(id) => void selectTab(id)}
+        onCloseTab={(id) => void closeTab(id)}
         onToggleSidebar={() =>
           setSettings((current) => ({
             ...current,
@@ -1167,6 +1852,7 @@ export default function App() {
                 tree={fileTree}
                 activePath={activePath}
                 gitStatus={gitStatus}
+                filterFocusRequest={fileFilterFocusRequest}
                 onCreateNote={startNewNote}
                 onOpenNote={(path) => void openNote(path)}
                 onContextMenu={(path, kind, event, selection) => {
@@ -1182,13 +1868,27 @@ export default function App() {
               />
             ) : activePanel === "outline" ? (
               <OutlinePanel
+                notePath={activePath}
                 title={activeTitle}
                 entries={outline}
-                onJump={(entry) => editorRef.current?.jumpToHeading(entry.text)}
+                onJump={(entry) => {
+                  const entryIndex = outline.indexOf(entry);
+                  const occurrence = outline
+                    .slice(0, Math.max(entryIndex, 0))
+                    .filter((candidate) => candidate.text === entry.text)
+                    .length;
+                  editorRef.current?.jumpToHeading(entry.text, occurrence);
+                }}
               />
             ) : activePanel === "search" ? (
               <SearchPanel
-                initialQuery={searchSeed}
+                query={searchQuery}
+                scope={searchScope}
+                mode={searchMode}
+                revision={vaultRevision}
+                onQueryChange={setSearchQuery}
+                onScopeChange={setSearchScope}
+                onModeChange={setSearchMode}
                 onOpenResult={(result: SearchResult) =>
                   void openNote(result.path)
                 }
@@ -1197,7 +1897,8 @@ export default function App() {
               <TagsPanel
                 tags={tags}
                 onSelectTag={(tag) => {
-                  setSearchSeed(`#${tag}`);
+                  setSearchQuery(`#${tag}`);
+                  setSearchScope("all");
                   setActivePanel("search");
                 }}
               />
@@ -1298,9 +1999,9 @@ export default function App() {
               <button
                 type="button"
                 className="icon-button"
-                title="刷新"
-                aria-label="刷新"
-                onClick={() => void refreshGit()}
+                title="刷新笔记与 Git 状态"
+                aria-label="刷新笔记与 Git 状态"
+                onClick={() => void refreshActiveNote()}
               >
                 <RotateCw size={14} />
               </button>
@@ -1384,7 +2085,7 @@ export default function App() {
                     disabled={!activePath}
                     onClick={() => {
                       setEditorMenuOpen(false);
-                      void closeTab(activePath);
+                      void closeTab(tabKey(currentVaultPath, activePath));
                     }}
                   >
                     <X size={14} />
@@ -1427,6 +2128,7 @@ export default function App() {
                 }`}
                 diff={activeView.diff}
                 mode="preview"
+                onBack={() => setActiveView({ kind: "note" })}
               />
             ) : activeView.kind === "working-diff" ? (
               <DiffViewer
@@ -1434,6 +2136,7 @@ export default function App() {
                 subtitle="工作区差异 · 点击左侧 Git 文件可切换"
                 diff={activeView.diff}
                 mode="working"
+                onBack={() => setActiveView({ kind: "note" })}
               />
             ) : activeView.kind === "commit-diff" ? (
               <DiffViewer
@@ -1441,11 +2144,12 @@ export default function App() {
                 subtitle="历史提交差异"
                 diff={activeView.diff}
                 mode="commit"
+                onBack={() => setActiveView({ kind: "note" })}
               />
             ) : activePath ? (
               <EditorPane
                 ref={editorRef}
-                key={activePath}
+                key={activeTabKey || activePath}
                 path={activePath}
                 title={activeTitle}
                 content={activeContent}
@@ -1520,7 +2224,11 @@ export default function App() {
               }))
             }
           >
-            <PanelLeftClose size={13} />
+            {settings.sidebarCollapsed ? (
+              <PanelLeftOpen size={13} />
+            ) : (
+              <PanelLeftClose size={13} />
+            )}
           </button>
         </div>
       </footer>

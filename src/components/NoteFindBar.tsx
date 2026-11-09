@@ -140,7 +140,17 @@ export function NoteFindBar({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const command = event.ctrlKey || event.metaKey;
-      if (command && event.key.toLowerCase() === "f") {
+      if (
+        command &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === "f"
+      ) {
+        // Ctrl/Cmd+Shift+F belongs to the vault search panel, and a modal
+        // dialog owns the keyboard while it is open.
+        if (document.querySelector(".modal-backdrop")) {
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
         if (!open) {
@@ -154,7 +164,7 @@ export function NoteFindBar({
           inputRef.current?.focus();
           inputRef.current?.select();
         }, 0);
-      } else if (open && event.key === "Escape") {
+      } else if (open && event.key === "Escape" && !event.isComposing) {
         event.preventDefault();
         closeFinder();
       } else if (open && event.key === "F3") {
@@ -273,6 +283,10 @@ export function NoteFindBar({
             setActiveIndex(0);
           }}
           onKeyDown={(event) => {
+            // Enter that confirms a Pinyin candidate must not cycle matches.
+            if (event.nativeEvent.isComposing) {
+              return;
+            }
             if (event.key === "Enter") {
               event.preventDefault();
               moveToMatch(event.shiftKey ? -1 : 1);

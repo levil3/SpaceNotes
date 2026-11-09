@@ -2,30 +2,41 @@ import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { SearchResult } from "../../types";
 
+export type SearchScope = "all" | "title" | "content";
+export type SearchMode = "smart" | "exact";
+
 interface SearchPanelProps {
-  initialQuery?: string;
+  // The query lives in App so switching panels does not throw it away and a
+  // tag click can seed it without resurrecting on the next mount.
+  query: string;
+  scope: SearchScope;
+  mode: SearchMode;
+  onQueryChange(value: string): void;
+  onScopeChange(value: SearchScope): void;
+  onModeChange(value: SearchMode): void;
+  /** Snapshot revision; results must refresh when the index changed. */
+  revision: number;
   onOpenResult(result: SearchResult): void;
 }
 
 export function SearchPanel({
-  initialQuery = "",
+  query,
+  scope,
+  mode,
+  onQueryChange,
+  onScopeChange,
+  onModeChange,
+  revision,
   onOpenResult,
 }: SearchPanelProps) {
-  const [query, setQuery] = useState(initialQuery);
-  const [scope, setScope] = useState<"all" | "title" | "content">("all");
-  const [mode, setMode] = useState<"smart" | "exact">("smart");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    if (initialQuery) {
-      setQuery(initialQuery);
-    }
-  }, [initialQuery]);
+  const [searchError, setSearchError] = useState("");
 
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
+      setSearchError("");
       return;
     }
 
@@ -36,6 +47,14 @@ export function SearchPanel({
         const nextResults = await window.levilNotes.search(query, scope, mode);
         if (!cancelled) {
           setResults(nextResults);
+          setSearchError("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setResults([]);
+          setSearchError(
+            String(error instanceof Error ? error.message : error),
+          );
         }
       } finally {
         if (!cancelled) {
@@ -48,7 +67,7 @@ export function SearchPanel({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, scope, mode]);
+  }, [query, scope, mode, revision]);
 
   return (
     <div className="side-panel-content">
@@ -65,7 +84,7 @@ export function SearchPanel({
         <input
           autoFocus
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => onQueryChange(event.target.value)}
           placeholder="搜索标题或正文"
         />
       </label>
@@ -77,7 +96,7 @@ export function SearchPanel({
               type="button"
               key={value}
               className={scope === value ? "active" : ""}
-              onClick={() => setScope(value)}
+              onClick={() => onScopeChange(value)}
             >
               {value === "all" ? "全部" : value === "title" ? "标题" : "正文"}
             </button>
@@ -87,7 +106,7 @@ export function SearchPanel({
           aria-label="搜索匹配方式"
           value={mode}
           onChange={(event) =>
-            setMode(event.target.value as "smart" | "exact")
+            onModeChange(event.target.value as SearchMode)
           }
         >
           <option value="smart">智能匹配</option>
@@ -98,6 +117,8 @@ export function SearchPanel({
       <div className="search-results">
         {searching ? (
           <div className="panel-empty">正在搜索...</div>
+        ) : searchError ? (
+          <div className="panel-empty">{searchError}</div>
         ) : query && !results.length ? (
           <div className="panel-empty">
             <Search size={22} />

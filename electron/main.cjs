@@ -3,6 +3,7 @@ const { pathToFileURL } = require("node:url");
 const {
   app,
   BrowserWindow,
+  Menu,
   clipboard,
   dialog,
   ipcMain,
@@ -61,6 +62,34 @@ async function createWindow() {
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
+  });
+
+  // The editor writes 650 ms after the last keystroke. Give the renderer a
+  // chance to flush that buffer before the window disappears.
+  const windowRef = mainWindow;
+  let closeFlushed = false;
+  mainWindow.on("close", (event) => {
+    if (closeFlushed || windowRef.isDestroyed()) {
+      return;
+    }
+    event.preventDefault();
+    const finish = () => {
+      if (closeFlushed) {
+        return;
+      }
+      closeFlushed = true;
+      if (!windowRef.isDestroyed()) {
+        windowRef.close();
+      }
+    };
+    const timer = setTimeout(finish, 1500);
+    windowRef.webContents
+      .executeJavaScript("window.__levilNotesHostFlushSave?.() ?? null", true)
+      .catch(() => null)
+      .finally(() => {
+        clearTimeout(timer);
+        finish();
+      });
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -158,6 +187,13 @@ app.whenReady().then(async () => {
     fileOperations,
   });
   gitService = new GitService(vaultService);
+
+  // The packaged Windows build has no menu bar; keeping Electron's default
+  // application menu would leave Reload (Ctrl+R), DevTools and page zoom
+  // accelerators active, which can silently drop unsaved state.
+  if (app.isPackaged) {
+    Menu.setApplicationMenu(null);
+  }
 
   registerAssetProtocol();
   registerDesktopIpcHandlers();

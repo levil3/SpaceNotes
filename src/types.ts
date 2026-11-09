@@ -233,6 +233,12 @@ declare global {
       onOpenFile(
         callback: (relativePath: string) => void,
       ): () => void;
+      /** macOS only: switch the native host back to a vault a tab came from. */
+      switchVault?(vaultPath: string): Promise<VaultSnapshot | null>;
     };
+    /** Set by the renderer; the macOS host awaits it before replacing the vault. */
+    __levilNotesHostFlushSave?: () => Promise<void>;
+    /** Set by the renderer; the native window menu uses it for Cmd+W. */
+    __levilNotesCloseActiveTab?: () => boolean;
   }
 }

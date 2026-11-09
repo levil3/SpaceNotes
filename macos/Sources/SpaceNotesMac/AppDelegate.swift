@@ -11,6 +11,24 @@ private final class BackgroundE2EWindow: NSWindow {
     }
 }
 
+/// Resumes a continuation at most once, so a flush timeout and a late WebKit
+/// callback can never resume it twice.
+private final class OnceContinuation {
+    private let lock = NSLock()
+    private var resumed = false
+
+    func resume(_ continuation: CheckedContinuation<Void, Never>) {
+        lock.lock()
+        guard !resumed else {
+            lock.unlock()
+            return
+        }
+        resumed = true
+        lock.unlock()
+        continuation.resume()
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let smokeTest = CommandLine.arguments.contains("--smoke-test")
     private let backgroundE2E = ProcessInfo.processInfo.environment[
@@ -54,6 +72,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ sender: NSApplication
     ) -> Bool {
         false
+    }
+
+    /// The editor debounces writes, so quitting immediately after typing would
+    /// drop the last edits. Wait for the renderer to flush (bounded by the
+    /// flush timeout) before the application terminates.
+    func applicationShouldTerminate(
+        _ sender: NSApplication
+    ) -> NSApplication.TerminateReply {
+        guard !isTerminating, let webView else {
+            return .terminateNow
+        }
+        isTerminating = true
+        Task { @MainActor [weak self] in
+            guard let self else {
+                sender.reply(toApplicationShouldTerminate: true)
+                return
+            }
+            await self.flushRendererPendingSave(webView)
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -394,6 +433,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 currentVaultPath: currentVaultPath
             )
             if destination.needsVaultSwitch {
+                // The renderer still holds unsaved edits for the vault that is
+                // open right now; give it a chance to write them before the
+                // sidecar switches away from that vault.
+                await self.flushRendererPendingSave(webView)
                 do {
                     _ = try await client.internalCall(
                         method: "openVault",
@@ -425,6 +468,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.appendDiagnostic(
                     "open-file-evaluate-failed=\(error.localizedDescription)"
                 )
+            }
+        }
+    }
+
+    /// Asks the page to persist unsaved edits. The page owns the debounced
+    /// save buffer, and it is the only place that can still write to the vault
+    /// that is about to be replaced. A Finder open must never hang on a page
+    /// that does not answer, so the flush has a hard timeout.
+    @MainActor
+    private func flushRendererPendingSave(_ webView: WKWebView) async {
+        let once = OnceContinuation()
+        await withCheckedContinuation {
+            (continuation: CheckedContinuation<Void, Never>) in
+            let timeout = DispatchWorkItem {
+                self.appendDiagnostic("host-flush-timeout")
+                once.resume(continuation)
+            }
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + 3,
+                execute: timeout
+            )
+            webView.callAsyncJavaScript(
+                """
+                if (typeof window.__levilNotesHostFlushSave === "function") {
+                    await window.__levilNotesHostFlushSave();
+                }
+                """,
+                arguments: [:],
+                in: nil,
+                in: .page
+            ) { [weak self] result in
+                timeout.cancel()
+                if case let .failure(error) = result {
+                    self?.appendDiagnostic(
+                        "host-flush-failed=\(error.localizedDescription)"
+                    )
+                }
+                once.resume(continuation)
             }
         }
     }
@@ -737,10 +818,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(windowItem)
         let windowMenu = NSMenu(title: "窗口")
         windowItem.submenu = windowMenu
+        let closeTabItem = NSMenuItem(
+            title: "关闭标签页",
+            action: #selector(closeActiveTabOrWindow),
+            keyEquivalent: "w"
+        )
+        closeTabItem.target = self
+        windowMenu.addItem(closeTabItem)
         let closeItem = NSMenuItem(
             title: "关闭窗口",
             action: #selector(closeMainWindow),
-            keyEquivalent: "w"
+            keyEquivalent: "W"
         )
         closeItem.target = self
         windowMenu.addItem(closeItem)
@@ -771,6 +859,21 @@ extension AppDelegate: NSWindowDelegate {
         appendDiagnostic(
             "window-closed-webview-retained=\(webView != nil)"
         )
+    }
+
+    /// Cmd+W closes the active tab when there is one, otherwise the window.
+    @objc private func closeActiveTabOrWindow() {
+        guard let webView, window != nil else {
+            return
+        }
+        webView.evaluateJavaScript(
+            "window.__levilNotesCloseActiveTab?.() ?? false"
+        ) { [weak self] result, _ in
+            if let handled = result as? Bool, handled {
+                return
+            }
+            self?.window?.performClose(nil)
+        }
     }
 
     @objc private func closeMainWindow() {

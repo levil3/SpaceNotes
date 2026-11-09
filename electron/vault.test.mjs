@@ -100,6 +100,31 @@ describe("VaultService platform actions", () => {
   });
 });
 
+describe("VaultService index extraction", () => {
+  it("ignores wikilinks and tags inside fenced code blocks", async () => {
+    const { vault } = await createFixture();
+    try {
+      await vault.writeNote(
+        "notes/fenced.md",
+        [
+          "# 标题",
+          "",
+          "```md",
+          "[[假链接]] #假标签",
+          "```",
+          "",
+          "[[真链接]] #真标签",
+        ].join("\n"),
+      );
+      const record = vault.documents.get("notes/fenced.md");
+      expect([...record.links]).toEqual(["真链接"]);
+      expect(record.tags).toEqual(["真标签"]);
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+});
+
 describe("VaultService path containment", () => {
   it("creates nested notes through fd-relative parent creation", async () => {
     const { vault } = await createFixture();

@@ -122,8 +122,10 @@ export function GitPanel({
 }: GitPanelProps) {
   const [tab, setTab] = useState<GitTab>("changes");
   const [history, setHistory] = useState<GitCommit[]>([]);
+  const [historyError, setHistoryError] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [branches, setBranches] = useState<GitBranchInfo[]>([]);
+  const [branchesError, setBranchesError] = useState("");
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const [creatingBranch, setCreatingBranch] = useState(false);
@@ -137,6 +139,7 @@ export function GitPanel({
     }
     let cancelled = false;
     setLoadingHistory(true);
+    setHistoryError("");
     window.levilNotes
       .gitLog(activeNotePath || undefined)
       .then((commits) => {
@@ -144,9 +147,12 @@ export function GitPanel({
           setHistory(commits);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
           setHistory([]);
+          setHistoryError(
+            String(error instanceof Error ? error.message : error),
+          );
         }
       })
       .finally(() => {
@@ -163,8 +169,40 @@ export function GitPanel({
     if (!branchMenuOpen) {
       return;
     }
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest(".git-branch-menu, .git-branch-trigger")
+      ) {
+        return;
+      }
+      setBranchMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setBranchMenuOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", closeOnOutsidePointerDown, true);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener(
+        "pointerdown",
+        closeOnOutsidePointerDown,
+        true,
+      );
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [branchMenuOpen]);
+
+  useEffect(() => {
+    if (!branchMenuOpen) {
+      return;
+    }
     let cancelled = false;
     setLoadingBranches(true);
+    setBranchesError("");
     window.levilNotes
       .gitBranches()
       .then((nextBranches) => {
@@ -172,9 +210,12 @@ export function GitPanel({
           setBranches(nextBranches);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
           setBranches([]);
+          setBranchesError(
+            String(error instanceof Error ? error.message : error),
+          );
         }
       })
       .finally(() => {
@@ -334,6 +375,8 @@ export function GitPanel({
             <div className="git-branch-list">
               {loadingBranches ? (
                 <span className="git-branch-loading">正在读取分支...</span>
+              ) : branchesError ? (
+                <span className="git-branch-loading">{branchesError}</span>
               ) : branches.length ? (
                 branches.map((branch) => (
                   <button
@@ -593,7 +636,9 @@ export function GitPanel({
               <button
                 type="button"
                 className="secondary-action"
-                disabled={busy || !selectedPaths.size}
+                disabled={
+                  busy || !selectedPaths.size || !commitMessage.trim()
+                }
                 onClick={() => onCommit(false)}
               >
                 提交
@@ -601,7 +646,9 @@ export function GitPanel({
               <button
                 type="button"
                 className="primary-action"
-                disabled={busy || !selectedPaths.size}
+                disabled={
+                  busy || !selectedPaths.size || !commitMessage.trim()
+                }
                 onClick={() => onCommit(true)}
               >
                 提交并推送
@@ -618,6 +665,8 @@ export function GitPanel({
           <div className="git-history-list">
             {loadingHistory ? (
               <div className="panel-empty">正在读取提交历史...</div>
+            ) : historyError ? (
+              <div className="panel-empty">{historyError}</div>
             ) : history.length ? (
               history.map((commit) => (
                 <button

@@ -26,6 +26,43 @@ describe("toVaultMarkdown Obsidian bracket fidelity", () => {
   it("does not touch brackets that were never escaped", () => {
     expect(toVaultMarkdown("普通 [文字] 保持")).toBe("普通 [文字] 保持");
   });
+
+  it("also protects tilde fences and unclosed trailing fences", () => {
+    const source = [
+      "~~~md",
+      "\\[\\[示例笔记]]",
+      "~~~",
+      "正文 \\[\\[真实链接]]",
+      "```",
+      "\\[\\[仍未闭合]]",
+    ].join("\n");
+    expect(toVaultMarkdown(source)).toBe(
+      [
+        "~~~md",
+        "\\[\\[示例笔记]]",
+        "~~~",
+        "正文 [[真实链接]]",
+        "```",
+        "\\[\\[仍未闭合]]",
+      ].join("\n"),
+    );
+  });
+
+  it("leaves escaped brackets inside a fenced code block alone", () => {
+    const source = [
+      "```md",
+      "\\[\\[示例笔记]]",
+      "> \\[!note] 示例",
+      "```",
+      "",
+      "正文 \\[\\[真实链接]]",
+    ].join("\n");
+    expect(toVaultMarkdown(source)).toBe(
+      ["```md", "\\[\\[示例笔记]]", "> \\[!note] 示例", "```", "", "正文 [[真实链接]]"].join(
+        "\n",
+      ),
+    );
+  });
 });
 
 describe("narrowBracketRule", () => {

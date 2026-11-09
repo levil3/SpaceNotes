@@ -13,13 +13,14 @@ import {
 import type { OutlineEntry } from "../../types";
 
 interface OutlinePanelProps {
+  notePath: string;
   title: string;
   entries: OutlineEntry[];
   onJump(entry: OutlineEntry): void;
 }
 
 export function OutlinePanel({
-  title,
+  notePath,
   entries,
   onJump,
 }: OutlinePanelProps) {
@@ -27,9 +28,11 @@ export function OutlinePanel({
   const tree = buildOutlineTree(entries);
   const collapsibleIds = collectCollapsibleOutlineIds(tree);
 
+  // Key the reset on the note path: two notes with the same title must not
+  // inherit each other's collapse state, and a rename must not reset it.
   useEffect(() => {
     setCollapsed(new Set());
-  }, [title]);
+  }, [notePath]);
 
   const toggleCollapsed = (id: string) => {
     setCollapsed((current) => {
@@ -42,6 +45,10 @@ export function OutlinePanel({
       return next;
     });
   };
+
+  const allCollapsed =
+    collapsibleIds.size > 0 &&
+    [...collapsibleIds].every((id) => collapsed.has(id));
 
   const renderNode = (node: OutlineNode, depth = 0): React.ReactNode => {
     const hasChildren = node.children.length > 0;
@@ -98,14 +105,20 @@ export function OutlinePanel({
         <button
           type="button"
           className="outline-collapse-all"
-          title="收起全部"
-          aria-label="收起全部大纲"
+          title={allCollapsed ? "展开全部" : "收起全部"}
+          aria-label={allCollapsed ? "展开全部大纲" : "收起全部大纲"}
           disabled={collapsibleIds.size === 0}
           onClick={() => {
-            setCollapsed(new Set(collapsibleIds));
+            setCollapsed(
+              allCollapsed ? new Set() : new Set(collapsibleIds),
+            );
           }}
         >
-          <ListCollapse size={14} />
+          {allCollapsed ? (
+            <ListTree size={14} />
+          ) : (
+            <ListCollapse size={14} />
+          )}
         </button>
       </div>
       <div className="panel-list outline-list">

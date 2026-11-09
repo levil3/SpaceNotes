@@ -62,7 +62,7 @@ import {
 import { NoteFindBar } from "./NoteFindBar";
 
 export interface EditorHandle {
-  jumpToHeading(text: string): void;
+  jumpToHeading(text: string, occurrence?: number): void;
   setHeading(level: number | null): boolean;
   insertTitleHeading(): boolean;
   loadExternalContent(markdown: string): void;
@@ -150,6 +150,12 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
     // change. That echo must not be read as a user edit.
     const suppressEditEchoRef = useRef(false);
     const expectedExternalRef = useRef<string | null>(null);
+    // Last markdown this editor handed to App, so the content prop coming back
+    // as an echo does not get re-applied as "external" content.
+    const lastEmittedMarkdownRef = useRef<string | null>(null);
+    const applyExternalMarkdownRef = useRef<
+      ((markdown: string) => boolean) | null
+    >(null);
     // Crepe finishes creating asynchronously. An external update that lands
     // before the buffer exists is applied as soon as it does.
     const editorReadyRef = useRef(false);
@@ -255,14 +261,27 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       return true;
     };
 
+    applyExternalMarkdownRef.current = applyExternalMarkdown;
+
     useImperativeHandle(ref, () => ({
-      jumpToHeading(text: string) {
-        const headings = rootRef.current?.querySelectorAll(
-          "h1, h2, h3, h4, h5, h6",
+      jumpToHeading(text: string, occurrence = 0) {
+        // Outline text is raw Markdown ("## **重点**") while the rendered
+        // heading only carries its text content, so compare normalized forms.
+        const normalize = (value: string) =>
+          value.replace(/[*_`~]/g, "").trim();
+        const headings = [
+          ...(rootRef.current?.querySelectorAll<HTMLElement>(
+            "h1, h2, h3, h4, h5, h6",
+          ) || []),
+        ];
+        const wanted = normalize(text);
+        const matches = headings.filter(
+          (heading) => normalize(heading.textContent || "") === wanted,
         );
-        const target = [...(headings || [])].find(
-          (heading) => heading.textContent?.trim() === text.trim(),
-        );
+        const target =
+          matches[
+            Math.min(Math.max(occurrence, 0), matches.length - 1)
+          ];
         target?.scrollIntoView({ behavior: "smooth", block: "center" });
       },
       setHeading,
@@ -999,6 +1018,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
                 return;
               }
               const vaultMarkdown = toVaultMarkdown(markdown);
+              lastEmittedMarkdownRef.current = vaultMarkdown;
               if (expectedExternalRef.current === vaultMarkdown) {
                 expectedExternalRef.current = null;
                 return;
@@ -1024,6 +1044,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       return () => {
         editorReadyRef.current = false;
         expectedExternalRef.current = null;
+        applyExternalMarkdownRef.current = null;
         blockObserver.disconnect();
         themeObserver.disconnect();
         clearMermaidPreviews();
@@ -1057,6 +1078,24 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         crepe.destroy();
       };
     }, [path]);
+
+    // The editor is keyed by note path, so re-opening the active note reuses
+    // the mounted buffer. Disk content that is not just this editor's own echo
+    // has to be pushed into the live buffer or the next save writes stale text.
+    useEffect(() => {
+      const apply = applyExternalMarkdownRef.current;
+      const crepe = crepeRef.current;
+      if (!apply || !crepe || !editorReadyRef.current) {
+        return;
+      }
+      if (lastEmittedMarkdownRef.current === content) {
+        return;
+      }
+      if (toVaultMarkdown(crepe.getMarkdown()) === content) {
+        return;
+      }
+      apply(content);
+    }, [content]);
 
     useEffect(() => {
       const crepe = crepeRef.current;

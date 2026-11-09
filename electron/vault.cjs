@@ -197,15 +197,42 @@ function extractHeadings(content) {
   return headings;
 }
 
+/**
+ * Drops fenced code blocks so link/tag examples inside ``` fences do not
+ * invent backlinks or tags. Heading extraction already skips fences.
+ */
+function stripFencedCode(content) {
+  const kept = [];
+  let insideFence = false;
+  let fenceMarker = "";
+  for (const line of content.split(/\r?\n/)) {
+    const fence = line.match(/^\s*(```+|~~~+)/);
+    if (fence) {
+      if (!insideFence) {
+        insideFence = true;
+        fenceMarker = fence[1][0];
+      } else if (fence[1][0] === fenceMarker) {
+        insideFence = false;
+      }
+      continue;
+    }
+    if (!insideFence) {
+      kept.push(line);
+    }
+  }
+  return kept.join("\n");
+}
+
 function extractLinks(content) {
   const links = new Set();
   const wikiPattern = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
   const markdownPattern = /\[[^\]]*\]\(([^)#]+\.md)(?:#[^)]+)?\)/gi;
+  const searchable = stripFencedCode(content);
 
-  for (const match of content.matchAll(wikiPattern)) {
+  for (const match of searchable.matchAll(wikiPattern)) {
     links.add(normalizeLinkTarget(match[1]));
   }
-  for (const match of content.matchAll(markdownPattern)) {
+  for (const match of searchable.matchAll(markdownPattern)) {
     links.add(normalizeLinkTarget(match[1]));
   }
   return links;
@@ -214,7 +241,7 @@ function extractLinks(content) {
 function extractTags(content) {
   const tags = new Set();
   const inlinePattern = /(^|\s)#([\p{L}\p{N}_/-]+)/gu;
-  for (const match of content.matchAll(inlinePattern)) {
+  for (const match of stripFencedCode(content).matchAll(inlinePattern)) {
     const tag = match[2].trim();
     if (tag && !/^\d+$/.test(tag)) {
       tags.add(tag);

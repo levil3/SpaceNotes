@@ -265,12 +265,28 @@ pre {
   display: flex;
   min-width: 0;
   flex: 1;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
+.tab-strip::-webkit-scrollbar {
+  height: 3px;
+}
+
+.tab-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-strip::-webkit-scrollbar-thumb {
+  border-radius: 2px;
+  background: var(--border);
 }
 
 .note-tab {
   position: relative;
   display: flex;
+  flex: 0 0 auto;
   min-width: 156px;
   max-width: 260px;
   align-items: center;
@@ -321,8 +337,12 @@ pre {
 }
 
 .tab-add {
+  position: sticky;
+  right: 0;
   width: 37px;
   height: 100%;
+  flex: 0 0 37px;
+  background: var(--chrome);
 }
 
 .window-controls {

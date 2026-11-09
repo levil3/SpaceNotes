@@ -116,6 +116,12 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
         switch request.name {
         case "chooseVault":
             chooseVault(request)
+        case "switchVault":
+            guard let rootPath = request.arguments.first as? String else {
+                reject(request, message: "笔记库路径无效。")
+                return
+            }
+            switchVault(rootPath, request: request)
         case "trashNote":
             guard let path = request.arguments.first as? String else {
                 reject(request, message: "文件路径无效。")
@@ -145,6 +151,27 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
             resolve(request, value: NSNull())
         default:
             reject(request, message: "当前宿主不支持该操作。")
+        }
+    }
+
+    /// Reopens a vault a tab came from. The renderer flushes unsaved edits
+    /// before asking, because the sidecar can only have one vault open.
+    private func switchVault(_ rootPath: String, request: BridgeRequest) {
+        guard let client = clientProvider() else {
+            reject(request, message: "后台服务不可用。")
+            return
+        }
+        Task {
+            do {
+                let snapshot = try await client.internalCall(
+                    method: "openVault",
+                    arguments: [rootPath]
+                )
+                appendDiagnostic("host-switch-vault")
+                resolve(request, value: snapshot ?? NSNull())
+            } catch {
+                reject(request, message: error.localizedDescription)
+            }
         }
     }
 

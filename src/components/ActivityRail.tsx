@@ -7,6 +7,7 @@ import {
   Settings,
   Tags,
 } from "lucide-react";
+import { formatShortcut } from "../lib/shortcutLabels";
 import type { SidebarPanel } from "../types";
 
 const items: Array<{
@@ -36,21 +37,25 @@ export function ActivityRail({
 }: ActivityRailProps) {
   return (
     <nav className="activity-rail" aria-label="左侧导航">
-      {items.map(({ id, label, hotkey, Icon }) => (
-        <button
-          type="button"
-          key={id}
-          className={`rail-button ${activePanel === id ? "active" : ""}`}
-          aria-label={`${label} (${hotkey})`}
-          title={`${label} (${hotkey})`}
-          onClick={() => onChange(id)}
-        >
-          <Icon size={18} />
-          {id === "git" && gitChanges > 0 ? (
-            <span className="rail-badge">{Math.min(gitChanges, 99)}</span>
-          ) : null}
-        </button>
-      ))}
+      {items.map(({ id, label, hotkey, Icon }) => {
+        const hotkeyLabel = formatShortcut(hotkey);
+        return (
+          <button
+            type="button"
+            key={id}
+            className={`rail-button ${activePanel === id ? "active" : ""}`}
+            aria-label={`${label} (${hotkeyLabel})`}
+            aria-pressed={activePanel === id}
+            title={`${label} (${hotkeyLabel})`}
+            onClick={() => onChange(id)}
+          >
+            <Icon size={18} />
+            {id === "git" && gitChanges > 0 ? (
+              <span className="rail-badge">{Math.min(gitChanges, 99)}</span>
+            ) : null}
+          </button>
+        );
+      })}
       <span className="rail-spacer" />
       <button
         type="button"

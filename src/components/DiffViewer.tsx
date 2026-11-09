@@ -1,10 +1,11 @@
-import { FileDiff, FileSearch, GitCommitHorizontal } from "lucide-react";
+import { ArrowLeft, FileDiff, FileSearch, GitCommitHorizontal } from "lucide-react";
 
 interface DiffViewerProps {
   title: string;
   subtitle: string;
   diff: string;
   mode: "working" | "preview" | "commit";
+  onBack(): void;
 }
 
 export function DiffViewer({
@@ -12,10 +13,20 @@ export function DiffViewer({
   subtitle,
   diff,
   mode,
+  onBack,
 }: DiffViewerProps) {
   return (
     <div className="diff-view">
       <div className="diff-view-heading">
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="返回笔记"
+          title="返回笔记 (Esc)"
+          onClick={onBack}
+        >
+          <ArrowLeft size={15} />
+        </button>
         <div className="diff-heading-icon">
           {mode === "working" ? (
             <FileDiff size={18} />

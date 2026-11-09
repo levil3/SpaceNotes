@@ -95,6 +95,8 @@ export function normalizeEditorLinkTarget(
 
   const [rawPath, ...hashParts] = target.split("#");
   const hash = hashParts.length ? `#${hashParts.join("#")}` : "";
+  // Attachments (for example image.png) are valid internal targets, so any
+  // suffix means the link is already complete; only bare note names get .md.
   if (!rawPath || /\.[a-z0-9]+$/i.test(rawPath)) {
     return `${rawPath}${hash}`;
   }

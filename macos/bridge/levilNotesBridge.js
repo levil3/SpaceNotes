@@ -184,6 +184,16 @@
     // Host-only events stay outside `levilNotes` so the renderer surface
     // shared with the Electron shell keeps the exact same shape.
     const hostEvents = {
+      // Tabs can outlive a vault switch, so selecting one from a previous vault
+      // asks the native host to reopen that vault before the note is read.
+      switchVault: (vaultPath) => {
+        if (typeof vaultPath !== "string" || vaultPath.length === 0) {
+          return Promise.reject(
+            new TypeError("vault path must be a non-empty string"),
+          );
+        }
+        return requestHost("switchVault", [vaultPath]);
+      },
       onOpenFile: (callback) => {
         if (typeof callback !== "function") {
           throw new TypeError("open file callback must be a function");

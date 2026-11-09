@@ -1,4 +1,5 @@
 import { AlertTriangle, FileText, Folder, GitBranch } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { GitIgnoreScope } from "../types";
 
 interface GitIgnoreDialogProps {
@@ -35,10 +36,63 @@ export function GitIgnoreDialog({
   onConfirm,
 }: GitIgnoreDialogProps) {
   const pattern = formatIgnorePattern(path, isDirectory);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    dialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    return () => {
+      if (opener?.isConnected) {
+        opener.focus();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) {
+        return;
+      }
+      if (event.key === "Tab") {
+        const focusable = [
+          ...(dialogRef.current?.querySelectorAll<HTMLElement>(
+            "button:not([disabled]), input:not([disabled]), select:not([disabled])",
+          ) || []),
+        ];
+        if (!focusable.length) {
+          return;
+        }
+        const currentIndex = focusable.indexOf(
+          document.activeElement as HTMLElement,
+        );
+        const nextIndex = event.shiftKey
+          ? currentIndex <= 0
+            ? focusable.length - 1
+            : currentIndex - 1
+          : currentIndex === focusable.length - 1
+            ? 0
+            : currentIndex + 1;
+        event.preventDefault();
+        focusable[nextIndex]?.focus();
+        return;
+      }
+      if (event.key !== "Escape") {
+        return;
+      }
+      event.preventDefault();
+      onCancel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
 
   return (
     <div className="modal-backdrop" onMouseDown={onCancel}>
       <div
+        ref={dialogRef}
         className="modal-dialog git-ignore-dialog"
         role="dialog"
         aria-modal="true"

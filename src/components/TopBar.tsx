@@ -6,19 +6,22 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import dogMark from "../../resources/icon.svg";
+import { formatShortcut } from "../lib/shortcutLabels";
 
 interface OpenTab {
-  path: string;
+  id: string;
   title: string;
+  vaultName: string;
+  active: boolean;
 }
 
 interface TopBarProps {
   tabs: OpenTab[];
-  activePath: string;
   sidebarCollapsed: boolean;
-  onSelectTab(path: string): void;
-  onCloseTab(path: string): void;
+  onSelectTab(id: string): void;
+  onCloseTab(id: string): void;
   onToggleSidebar(): void;
   onNewNote(): void;
   onShowVaultMenu(): void;
@@ -26,7 +29,6 @@ interface TopBarProps {
 
 export function TopBar({
   tabs,
-  activePath,
   sidebarCollapsed,
   onSelectTab,
   onCloseTab,
@@ -34,6 +36,16 @@ export function TopBar({
   onNewNote,
   onShowVaultMenu,
 }: TopBarProps) {
+  const tabStripRef = useRef<HTMLDivElement>(null);
+  const activeTabId = tabs.find((tab) => tab.active)?.id || "";
+
+  // Keep the active tab reachable when the strip has more tabs than width.
+  useEffect(() => {
+    tabStripRef.current
+      ?.querySelector<HTMLElement>('[aria-selected="true"]')
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [activeTabId, tabs.length]);
+
   return (
     <header className="topbar">
       <div className="topbar-leading">
@@ -48,7 +60,7 @@ export function TopBar({
         <button
           className="icon-button"
           aria-label={sidebarCollapsed ? "展开侧栏" : "收起侧栏"}
-          title={sidebarCollapsed ? "展开侧栏 (Ctrl+B)" : "收起侧栏 (Ctrl+B)"}
+          title={`${sidebarCollapsed ? "展开侧栏" : "收起侧栏"} (${formatShortcut("Ctrl+B")})`}
           onClick={onToggleSidebar}
         >
           {sidebarCollapsed ? (
@@ -62,15 +74,36 @@ export function TopBar({
         </span>
       </div>
 
-      <div className="tab-strip" role="tablist" aria-label="已打开的笔记">
+      <div
+        ref={tabStripRef}
+        className="tab-strip"
+        role="tablist"
+        aria-label="已打开的笔记"
+        onWheel={(event) => {
+          const strip = event.currentTarget;
+          if (strip.scrollWidth <= strip.clientWidth) {
+            return;
+          }
+          if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) {
+            return;
+          }
+          // A vertical wheel over the tab strip scrolls through tabs.
+          strip.scrollLeft += event.deltaY;
+        }}
+      >
         {tabs.map((tab) => (
           <button
-            key={tab.path}
+            key={tab.id}
             type="button"
             role="tab"
-            aria-selected={tab.path === activePath}
-            className={`note-tab ${tab.path === activePath ? "active" : ""}`}
-            onClick={() => onSelectTab(tab.path)}
+            aria-selected={tab.active}
+            title={
+              tab.vaultName
+                ? `${tab.title} · ${tab.vaultName}`
+                : tab.title
+            }
+            className={`note-tab ${tab.active ? "active" : ""}`}
+            onClick={() => onSelectTab(tab.id)}
           >
             <FileText size={13} />
             <span className="tab-title">{tab.title}</span>
@@ -82,12 +115,12 @@ export function TopBar({
               title={`关闭 ${tab.title}`}
               onClick={(event) => {
                 event.stopPropagation();
-                onCloseTab(tab.path);
+                onCloseTab(tab.id);
               }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.stopPropagation();
-                  onCloseTab(tab.path);
+                  onCloseTab(tab.id);
                 }
               }}
             >

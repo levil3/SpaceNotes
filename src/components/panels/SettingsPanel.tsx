@@ -230,6 +230,7 @@ export function SettingsPanel({
         <div className="preset-list">
           {themePresets.map((preset) => {
             const selected =
+              settings.themeMode === preset.values.themeMode &&
               settings.background === preset.values.background &&
               settings.textColor === preset.values.textColor &&
               settings.accent === preset.values.accent;

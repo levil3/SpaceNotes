@@ -77,6 +77,27 @@ describe("WKWebView levilNotes bridge", () => {
     expect(Object.keys(window.levilNotes).sort()).toEqual(preloadMethods);
   });
 
+  it("switches vaults through a host request", async () => {
+    const { window, postedHostMessages } = await loadBridge({
+      fetchImpl: async () => response(null),
+      EventSourceImpl: FakeEventSource,
+    });
+
+    const promise = window.__levilNotesHostEvents.switchVault("/vault/a");
+    expect(postedHostMessages.at(-1)).toMatchObject({
+      name: "switchVault",
+      args: ["/vault/a"],
+    });
+    window.__levilNotesHostResolve(postedHostMessages.at(-1).id, {
+      path: "/vault/a",
+    });
+
+    await expect(promise).resolves.toEqual({ path: "/vault/a" });
+    await expect(
+      window.__levilNotesHostEvents.switchVault(""),
+    ).rejects.toBeInstanceOf(TypeError);
+  });
+
   it("queues host open-file requests until the app subscribes", async () => {
     const { window } = await loadBridge({
       fetchImpl: async () => response(null),

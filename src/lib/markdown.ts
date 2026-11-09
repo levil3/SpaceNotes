@@ -452,19 +452,44 @@ export function toVaultMarkdown(markdown: string) {
   );
 
   // Keep compatibility with drafts and images created by the first prototype.
-  return restored
-    .replace(
-      /notes-asset:\/\/vault\/([^)\s?]+)/g,
-      (_match: string, encodedPath: string) =>
-        decodeURIComponent(encodedPath),
-    )
-    // A bracket that starts a line is escaped, because there it could become
-    // a link definition. Obsidian's own constructs must keep the bracket
-    // unescaped, otherwise they stop working once the note is saved:
-    // callouts "> [!note]", wikilinks "[[Note]]" and footnotes "[^1]".
-    // The negative lookbehind keeps a deliberately escaped "\\[" untouched.
-    .replace(
-      /(?<!\\)\\\[(?:(?:\\)?\[[^\]\n]*\]\]|[!^][^\]\n]*\])/g,
-      (match) => match.replace(/\\/g, ""),
-    );
+  const withLegacyAssets = restored.replace(
+    /notes-asset:\/\/vault\/([^)\s?]+)/g,
+    (_match: string, encodedPath: string) =>
+      decodeURIComponent(encodedPath),
+  );
+  return unescapeObsidianBracketsOutsideFences(withLegacyAssets);
+}
+
+// A bracket that starts a line is escaped, because there it could become a
+// link definition. Obsidian's own constructs must keep the bracket unescaped,
+// otherwise they stop working once the note is saved: callouts "> [!note]",
+// wikilinks "[[Note]]" and footnotes "[^1]". Fenced code is skipped so a
+// sample that shows the escaped form is not rewritten on save.
+const OBSIDIAN_BRACKET_PATTERN =
+  /(?<!\\)\\\[(?:(?:\\)?\[[^\]\n]*\]\]|[!^][^\]\n]*\])/g;
+
+function unescapeObsidianBracketsOutsideFences(markdown: string) {
+  let insideFence = false;
+  let fenceMarker = "";
+  return markdown
+    .split("\n")
+    .map((line) => {
+      const fence = line.match(/^\s*(`{3,}|~{3,})/);
+      if (fence) {
+        if (!insideFence) {
+          insideFence = true;
+          fenceMarker = fence[1][0];
+        } else if (fence[1][0] === fenceMarker) {
+          insideFence = false;
+        }
+        return line;
+      }
+      if (insideFence) {
+        return line;
+      }
+      return line.replace(OBSIDIAN_BRACKET_PATTERN, (match) =>
+        match.replace(/\\/g, ""),
+      );
+    })
+    .join("\n");
 }

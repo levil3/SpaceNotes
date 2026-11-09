@@ -227,8 +227,17 @@ enum E2ERunner {
       if (!button) {
         throw new Error(`missing rail ${label}`);
       }
-      button.click();
-      await sleep(140);
+      // Clicking the active rail item toggles the sidebar closed, so the
+      // helper must only click when the panel is not already showing.
+      const shell = document.querySelector(".app-shell");
+      const alreadyShowing =
+        button.classList.contains("active") &&
+        shell &&
+        !shell.classList.contains("sidebar-collapsed");
+      if (!alreadyShowing) {
+        button.click();
+        await sleep(140);
+      }
     };
     const setInput = async (selector, value) => {
       const input = requireElement(selector);
@@ -398,6 +407,23 @@ enum E2ERunner {
       expect(
         shell.classList.contains("sidebar-collapsed") === initial,
         "sidebar did not restore"
+      );
+      // The active rail item is a toggle as well: first click collapses the
+      // sidebar, second click brings the same panel back.
+      await clickRail("文件");
+      const activeRail = document.querySelector(".rail-button.active");
+      expect(activeRail, "no active rail item to toggle");
+      activeRail.click();
+      await sleep(140);
+      expect(
+        shell.classList.contains("sidebar-collapsed"),
+        "active rail item did not collapse the sidebar"
+      );
+      activeRail.click();
+      await sleep(140);
+      expect(
+        !shell.classList.contains("sidebar-collapsed"),
+        "second active rail click did not restore the sidebar"
       );
     });
     await runStep("rail-navigation-cycle", async () => {
