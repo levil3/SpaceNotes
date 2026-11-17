@@ -20,6 +20,10 @@ function createFixture() {
       path: `${parent}/${title}.md`,
       content: `# ${title}`,
     })),
+    saveAttachment: vi.fn(async (notePath, payload) => ({
+      path: `${notePath}/attachments/pasted.png`,
+      target: "attachments/pasted.png",
+    })),
     trashNote: vi.fn(async () => {}),
     renameNote: vi.fn(async (_path, title) => ({ path: `${title}.md` })),
     renameDirectory: vi.fn(async (_path, name) => ({
@@ -66,6 +70,7 @@ function createFixture() {
     chooseVaultFolder: vi.fn(async () => "/selected"),
     showInFolder: vi.fn(),
     readClipboardText: vi.fn(() => "clipboard text"),
+    readClipboardImage: vi.fn(() => "cG5n"),
     writeClipboardText: vi.fn(),
     minimizeWindow: vi.fn(),
     toggleMaximizeWindow: vi.fn(),
@@ -102,6 +107,15 @@ describe("shared LevilNotes API", () => {
     await api.renameDirectory("notes/previous", "next");
     await api.trashDirectory("notes/obsolete");
 
+    await api.saveAttachment("notes/today.md", {
+      name: "pasted.png",
+      data: "cG5n",
+    });
+
+    expect(vaultService.saveAttachment).toHaveBeenCalledWith(
+      "notes/today.md",
+      { name: "pasted.png", data: "cG5n" },
+    );
     expect(hostActions.chooseVaultFolder).toHaveBeenCalledOnce();
     expect(vaultService.open).toHaveBeenCalledWith("/selected");
     expect(vaultService.readNote).toHaveBeenCalledWith("notes/today.md");
@@ -167,6 +181,7 @@ describe("shared LevilNotes API", () => {
 
     api.showInFolder("notes/today.md");
     expect(api.readClipboardText()).toBe("clipboard text");
+    expect(api.readClipboardImage()).toBe("cG5n");
     api.writeClipboardText("copied note");
     api.minimizeWindow();
     api.toggleMaximizeWindow();
@@ -174,6 +189,7 @@ describe("shared LevilNotes API", () => {
 
     expect(hostActions.showInFolder).toHaveBeenCalledWith("notes/today.md");
     expect(hostActions.readClipboardText).toHaveBeenCalledOnce();
+    expect(hostActions.readClipboardImage).toHaveBeenCalledOnce();
     expect(hostActions.writeClipboardText).toHaveBeenCalledWith(
       "copied note",
     );

@@ -26,6 +26,7 @@ Windows 安装包 `Levil Notes Setup x.y.z.exe`，或 macOS DMG：Apple Silicon 
 - 多标签编辑、自动保存、当前笔记 `Ctrl+F` 查找和编辑器外观配置。
 - 兼容笔记库相对路径、笔记相对路径和旧笔记中的附件文件名。
 - 本地图片、表格、代码块和 Mermaid 图表渲染，支持明暗外观与常用主题切换。
+- 直接粘贴或拖入截图：图片自动存为笔记同级 `attachments/` 附件并以相对路径写入。
 - 支持 Obsidian 高亮 `==文字==`，并保留 `[[双链]]`、`![[嵌入]]`、脚注 `[^1]` 与
   `> [!note]` 标注框的原始写法，保存时不会破坏这些语法。
 - IntelliJ IDEA 风格的 Git 状态颜色、提交差异预览、暂存、提交、拉取和推送。
@@ -169,6 +170,8 @@ macos/                  AppKit + WKWebView、sidecar、DMG 脚本和 macOS 测�
 src/App.tsx             应用状态、标签和工作区编排
 src/components/         UI 组件与左侧面板
 src/lib/markdown.ts     编辑器图片 URL 与原始 Markdown 往返
+src/lib/attachment.ts   剪贴板图片识别与附件负载转换
+src/lib/imagePaste.ts   粘贴/拖入图片落盘并插入编辑器
 src/lib/obsidianHighlight*  Obsidian 高亮语法与编辑器标记
 src/lib/markdownFidelity.ts  正文方括号不被转义，保留原始写法
 ```

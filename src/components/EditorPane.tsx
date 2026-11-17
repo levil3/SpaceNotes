@@ -53,6 +53,11 @@ import {
 } from "../lib/mermaid";
 import { toEditorMarkdown, toVaultMarkdown } from "../lib/markdown";
 import { obsidianHighlightFeature } from "../lib/obsidianHighlightFeature";
+import {
+  imagePasteFeature,
+  pasteClipboardImage,
+  type ImagePasteOptions,
+} from "../lib/imagePaste";
 import { markdownFidelityFeature } from "../lib/markdownFidelity";
 import {
   FormatContextToolbar,
@@ -75,6 +80,8 @@ interface EditorPaneProps {
   readOnly: boolean;
   onChange(markdown: string): void;
   onZoom(step: -1 | 1): void;
+  /** 编辑器内部失败（例如图片附件写入失败）时的可见提示。 */
+  onError?(message: string): void;
 }
 
 interface LinkDialogState {
@@ -137,13 +144,15 @@ function syncCodeBlockEditability(root: HTMLElement | null) {
  */
 export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
   function EditorPane(
-    { path, title, content, readOnly, onChange, onZoom },
+    { path, title, content, readOnly, onChange, onZoom, onError },
     ref,
   ) {
     const rootRef = useRef<HTMLDivElement>(null);
     const crepeRef = useRef<Crepe | null>(null);
     const onChangeRef = useRef(onChange);
     const onZoomRef = useRef(onZoom);
+    const onErrorRef = useRef(onError);
+    const imagePasteOptionsRef = useRef<ImagePasteOptions | null>(null);
     const readOnlyRef = useRef(readOnly);
     const lastZoomAtRef = useRef(0);
     // Replacing the buffer from disk makes ProseMirror report a document
@@ -172,6 +181,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
     const showInlineTitle = !hasLeadingHeading(content);
     onChangeRef.current = onChange;
     onZoomRef.current = onZoom;
+    onErrorRef.current = onError;
     readOnlyRef.current = readOnly;
 
     const setHeading = (level: number | null) => {
@@ -602,6 +612,20 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         return;
       }
 
+      // 剪贴板里可能是截图，也可能是文字；图片优先，没有图片才贴文本。
+      const imageOptions = imagePasteOptionsRef.current;
+      const pastedImage = imageOptions
+        ? await crepe.editor.action((ctx) =>
+            pasteClipboardImage(
+              ctx.get(editorViewCtx),
+              imageOptions,
+            ),
+          )
+        : false;
+      if (pastedImage) {
+        return;
+      }
+
       const text = await readClipboardText();
       if (!text) {
         return;
@@ -980,6 +1004,19 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       // 正文里的 "[" 不应被转义，否则 Obsidian 的 [[wikilink]] 与 [^footnote]
       // 会失效，普通文本也会被悄悄改写。
       crepe.addFeature(markdownFidelityFeature);
+      // 粘贴/拖入的图片先落到笔记库附件目录，再以相对路径插入。
+      // Crepe 默认 uploader 生成的 blob: URL 被 CSP 拦下，图片不会显示。
+      const imagePasteOptions: ImagePasteOptions = {
+        notePath: path,
+        saveAttachment: (payload) =>
+          window.levilNotes.saveAttachment(path, payload),
+        onError: (message) => onErrorRef.current?.(message),
+        readClipboardImage: window.levilNotes.readClipboardImage
+          ? () => window.levilNotes.readClipboardImage()
+          : undefined,
+      };
+      imagePasteOptionsRef.current = imagePasteOptions;
+      crepe.addFeature(imagePasteFeature, imagePasteOptions);
       crepeRef.current = crepe;
       editorReadyRef.current = false;
 
@@ -1075,6 +1112,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         if (crepeRef.current === crepe) {
           crepeRef.current = null;
         }
+        imagePasteOptionsRef.current = null;
         crepe.destroy();
       };
     }, [path]);

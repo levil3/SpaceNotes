@@ -111,6 +111,8 @@
         invoke("writeNote", [relativePath, content]),
       createNote: (parentPath, title) =>
         invoke("createNote", [parentPath, title]),
+      saveAttachment: (notePath, payload) =>
+        invoke("saveAttachment", [notePath, payload]),
       trashNote: (relativePath) =>
         requestHost("trashNote", [relativePath]),
       renameNote: (relativePath, title) =>
@@ -155,6 +157,7 @@
       getSettings: () => invoke("getSettings"),
       saveSettings: (updates) => invoke("saveSettings", [updates]),
       readClipboardText: () => requestHost("readClipboardText"),
+      readClipboardImage: () => requestHost("readClipboardImage"),
       writeClipboardText: (text) =>
         requestHost("writeClipboardText", [text]),
       showInFolder: (relativePath) =>

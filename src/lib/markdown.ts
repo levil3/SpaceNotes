@@ -325,6 +325,14 @@ function escapeImageAlt(alt: string) {
   return alt.replace(/([\\\[\]])/g, "\\$1");
 }
 
+/**
+ * 新插入的附件没有"原始写法"可保留，目标路径本身就是写入磁盘的写法，
+ * 因此 source 与 target 取同一个值，保存时会原样还原。
+ */
+export function imageEditorUrl(notePath: string, target: string) {
+  return assetUrl(notePath, target, target);
+}
+
 function transformImageLine(line: string, notePath: string) {
   let output = "";
   let cursor = 0;

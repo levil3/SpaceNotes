@@ -778,6 +778,130 @@ describe("VaultService asset resolution", () => {
   );
 });
 
+describe("VaultService attachment storage", () => {
+  const PNG_BYTES = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  it("stores a pasted image next to the note and returns a relative target", async () => {
+    const { root, vault } = await createFixture();
+    try {
+      const saved = await vault.saveAttachment(
+        "notes/Java Base/example.md",
+        { name: "image.png", data: PNG_BYTES.toString("base64") },
+      );
+
+      expect(saved.path).toMatch(
+        /^notes\/Java Base\/attachments\/pasted-\d{8}-\d{6}\.png$/,
+      );
+      expect(saved.target).toBe(
+        `attachments/${saved.path.split("/").pop()}`,
+      );
+      await expect(fs.readFile(path.join(root, saved.path))).resolves.toEqual(
+        PNG_BYTES,
+      );
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("keeps the image extension and never overwrites an existing attachment", async () => {
+    const { root, vault } = await createFixture();
+    try {
+      const payload = {
+        name: "截图 2026.jpeg",
+        data: PNG_BYTES.toString("base64"),
+      };
+      const first = await vault.saveAttachment("notes/example.md", payload);
+      const second = await vault.saveAttachment("notes/example.md", payload);
+
+      expect(first.path).toMatch(/\.jpeg$/);
+      expect(second.path).not.toBe(first.path);
+      expect(second.path).toMatch(/-2\.jpeg$/);
+      await expect(
+        Promise.all([
+          fs.readFile(path.join(root, first.path)),
+          fs.readFile(path.join(root, second.path)),
+        ]),
+      ).resolves.toHaveLength(2);
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("rejects empty or oversized payloads instead of writing a broken file", async () => {
+    const { vault } = await createFixture();
+    try {
+      await expect(
+        vault.saveAttachment("notes/example.md", { name: "a.png", data: "" }),
+      ).rejects.toThrow("图片内容为空");
+      await expect(
+        vault.saveAttachment("notes/example.md", {
+          name: "big.png",
+          data: Buffer.alloc(13 * 1024 * 1024).toString("base64"),
+        }),
+      ).rejects.toThrow("图片过大");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("indexes the new attachment so it resolves through notes-asset", async () => {
+    const { vault } = await createFixture();
+    try {
+      const saved = await vault.saveAttachment(
+        "notes/Java Base/example.md",
+        { name: "shot.png", data: PNG_BYTES.toString("base64") },
+      );
+      const resolved = await vault.resolveAsset(
+        saved.target,
+        "notes/Java Base/example.md",
+      );
+      expect(resolved.endsWith(saved.path.split("/").pop())).toBe(true);
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  // Windows 没有原生 fs helper，走的是 node:fs 分支。二进制附件在那里
+  // 必须逐字节落盘，不能被 utf8 转码改写。
+  it("writes attachment bytes unchanged through the node:fs path", async () => {
+    const { root, vault } = await createFixture({
+      useNativeFileOperations: false,
+    });
+    const rawBytes = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe, 0x80,
+    ]);
+    try {
+      const saved = await vault.saveAttachment("notes/example.md", {
+        name: "raw.png",
+        data: rawBytes.toString("base64"),
+      });
+
+      const written = await fs.readFile(path.join(root, saved.path));
+      expect(Buffer.compare(written, rawBytes)).toBe(0);
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+
+  it("still writes note text as utf8 through the node:fs path", async () => {
+    const { root, vault } = await createFixture({
+      useNativeFileOperations: false,
+    });
+    try {
+      await vault.writeNote("notes/中文笔记.md", "# 中文标题\n\n正文\n");
+
+      await expect(
+        fs.readFile(path.join(root, "notes", "中文笔记.md"), "utf8"),
+      ).resolves.toBe("# 中文标题\n\n正文\n");
+    } finally {
+      await vault.closeWatcher();
+    }
+  });
+});
+
 describe("VaultService hidden entries", () => {
   it("shows dot directories and notes only when the setting is enabled", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "space-notes-hidden-"));

@@ -40,6 +40,35 @@ const IMAGE_EXTENSIONS = new Set([
   ".webp",
 ]);
 
+// Pasted images land in an `attachments` subfolder next to the note, which is
+// what Obsidian does with its default "subfolder under current folder" setting.
+const ATTACHMENT_DIRECTORY = "attachments";
+const MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024;
+
+function attachmentTimestamp(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    "-",
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join("");
+}
+
+function noteRelativeTarget(notePath, relativePath) {
+  const directory = notePath ? path.posix.dirname(notePath) : "";
+  if (!directory || directory === ".") {
+    return relativePath;
+  }
+  const prefix = `${directory}/`;
+  return relativePath.startsWith(prefix)
+    ? relativePath.slice(prefix.length)
+    : relativePath;
+}
+
 /**
  * Persists user-facing preferences outside the note vault so switching between
  * Markdown editors never rewrites the user's existing workspace.
@@ -1007,6 +1036,76 @@ class VaultService {
     );
     this.onVaultChanged?.(this.snapshot("created"));
     return { path: relativePath, content };
+  }
+
+  /**
+   * Stores a pasted or dropped image next to the note and returns the path the
+   * Markdown should reference. The renderer only ever hands over bytes, so the
+   * note text never has to embed a data URL and the vault stays portable.
+   */
+  async saveAttachment(notePath, payload) {
+    this.assertVaultReady();
+    const name = typeof payload?.name === "string" ? payload.name : "";
+    const data = typeof payload?.data === "string" ? payload.data : "";
+    if (!data) {
+      throw new Error("图片内容为空。");
+    }
+
+    let extension = path
+      .extname(name || String(payload?.extension || ""))
+      .toLowerCase();
+    if (!IMAGE_EXTENSIONS.has(extension)) {
+      extension = ".png";
+    }
+
+    const bytes = Buffer.from(data, "base64");
+    if (bytes.length === 0) {
+      throw new Error("图片内容为空。");
+    }
+    if (bytes.length > MAX_ATTACHMENT_BYTES) {
+      throw new Error("图片过大，请压缩后再粘贴。");
+    }
+
+    const noteDirectory = notePath ? path.posix.dirname(notePath) : "";
+    const directory = noteDirectory === "." ? "" : noteDirectory;
+    const prefix = directory ? `${directory}/` : "";
+    const baseName = `pasted-${attachmentTimestamp(new Date())}`;
+
+    let relativePath = `${prefix}${ATTACHMENT_DIRECTORY}/${baseName}${extension}`;
+    let suffix = 2;
+    while (
+      await this.entryExists(this.resolveInsideVault(relativePath))
+    ) {
+      relativePath = `${prefix}${ATTACHMENT_DIRECTORY}/${baseName}-${suffix}${extension}`;
+      suffix += 1;
+    }
+
+    const absolute = await this.resolveWritablePathInsideVault(relativePath);
+    const parentDirectory = path.resolve(path.dirname(absolute));
+    if (this.fileOperations) {
+      if (parentDirectory !== path.resolve(this.vaultPath)) {
+        await this.fileOperations.mkdir(
+          this.vaultPath,
+          this.relativePathForFileOperations(parentDirectory),
+        );
+      }
+    } else {
+      await fs.mkdir(parentDirectory, { recursive: true });
+    }
+    await this.writeFileNoFollow(
+      await this.resolveWritablePathInsideVault(relativePath),
+      bytes,
+      { exclusive: true },
+    );
+
+    const fileName = relativePath.split("/").pop().toLocaleLowerCase();
+    this.assets.set(fileName, [...(this.assets.get(fileName) || []), relativePath]);
+    this.onVaultChanged?.(this.snapshot("attachment"));
+
+    return {
+      path: relativePath,
+      target: noteRelativeTarget(notePath, relativePath),
+    };
   }
 
   /**

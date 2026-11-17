@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld("levilNotes", {
     ipcRenderer.invoke("note:write", relativePath, content),
   createNote: (parentPath, title) =>
     ipcRenderer.invoke("note:create", parentPath, title),
+  saveAttachment: (notePath, payload) =>
+    ipcRenderer.invoke("note:save-attachment", notePath, payload),
   trashNote: (relativePath) =>
     ipcRenderer.invoke("note:trash", relativePath),
   renameNote: (relativePath, title) =>
@@ -58,6 +60,7 @@ contextBridge.exposeInMainWorld("levilNotes", {
   getSettings: () => ipcRenderer.invoke("settings:get"),
   saveSettings: (updates) => ipcRenderer.invoke("settings:save", updates),
   readClipboardText: () => ipcRenderer.invoke("clipboard:read-text"),
+  readClipboardImage: () => ipcRenderer.invoke("clipboard:read-image"),
   writeClipboardText: (text) =>
     ipcRenderer.invoke("clipboard:write-text", text),
   showInFolder: (relativePath) =>

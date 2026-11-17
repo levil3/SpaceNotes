@@ -143,6 +143,11 @@ function createDesktopApi() {
       shell.showItemInFolder(vaultService.resolveInsideVault(relativePath));
     },
     readClipboardText: () => clipboard.readText(),
+    // 剪贴板里的截图没有文件路径，只能由宿主读出字节交给渲染层。
+    readClipboardImage: () => {
+      const image = clipboard.readImage();
+      return image.isEmpty() ? "" : image.toPNG().toString("base64");
+    },
     writeClipboardText: (text) => clipboard.writeText(text),
     minimizeWindow: () => mainWindow?.minimize(),
     toggleMaximizeWindow: () => {

@@ -7,6 +7,7 @@ const IPC_METHODS = Object.freeze({
   "note:create": "createNote",
   "note:trash": "trashNote",
   "note:rename": "renameNote",
+  "note:save-attachment": "saveAttachment",
   "directory:rename": "renameDirectory",
   "directory:trash": "trashDirectory",
   "note:history": "getNoteHistory",
@@ -34,6 +35,7 @@ const IPC_METHODS = Object.freeze({
   "settings:get": "getSettings",
   "settings:save": "saveSettings",
   "clipboard:read-text": "readClipboardText",
+  "clipboard:read-image": "readClipboardImage",
   "clipboard:write-text": "writeClipboardText",
   "app:show-in-folder": "showInFolder",
   "window:minimize": "minimizeWindow",
@@ -75,6 +77,8 @@ function createLevilNotesApi({
       vaultService.writeNote(relativePath, content),
     createNote: (parentPath, title) =>
       vaultService.createNote(parentPath, title),
+    saveAttachment: (notePath, payload) =>
+      vaultService.saveAttachment(notePath, payload),
     trashNote: (relativePath) => vaultService.trashNote(relativePath),
     renameNote: (relativePath, title) =>
       vaultService.renameNote(relativePath, title),
@@ -125,6 +129,8 @@ function createLevilNotesApi({
     },
     readClipboardText: () =>
       hostAction(hostActions, "readClipboardText")(),
+    readClipboardImage: () =>
+      hostAction(hostActions, "readClipboardImage")(),
     writeClipboardText: (text) =>
       hostAction(hostActions, "writeClipboardText")(text),
     showInFolder: (relativePath) => {

@@ -31,6 +31,8 @@ Markdown files, and Git history can continue to be used in place.
 - Multiple editor tabs, autosave, in-note `Ctrl+F`, and editor appearance
   settings.
 - Relative attachment paths from the vault, the current note, and older notes.
+- Paste or drop a screenshot and it is saved as an `attachments/` file next to
+  the note, referenced by a relative path.
 - Local images, tables, syntax-highlighted code blocks, Mermaid diagrams, light
   and dark appearances, and common editor themes.
 - IntelliJ IDEA-style Git status colors, diff preview, staging, commit, pull, and

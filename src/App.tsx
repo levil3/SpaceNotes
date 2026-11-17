@@ -2157,6 +2157,7 @@ export default function App() {
                   handleEditorChange(activePath, markdown)
                 }
                 readOnly={activeEditorMode === "read"}
+                onError={showToast}
                 onZoom={(step) =>
                   setSettings((current) => {
                     // Ctrl+wheel is a document-level zoom gesture and shares

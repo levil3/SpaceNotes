@@ -140,6 +140,12 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
                 return
             }
             showInFolder(path, request: request)
+        case "readClipboardImage":
+            // 剪贴板里的截图没有文件路径，只能读出位图再交给渲染层落盘。
+            resolve(
+                request,
+                value: HostMessageHandler.clipboardImageBase64()
+            )
         case "minimizeWindow":
             window?.performMiniaturize(nil)
             resolve(request, value: NSNull())
@@ -152,6 +158,33 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
         default:
             reject(request, message: "当前宿主不支持该操作。")
         }
+    }
+
+    /// 把剪贴板里的图片统一转成 PNG base64，空剪贴板返回空字符串。
+    private static func clipboardImageBase64() -> String {
+        let pasteboard = NSPasteboard.general
+        let image: NSImage?
+        if let png = pasteboard.data(forType: .png) {
+            image = NSImage(data: png)
+        } else if let tiff = pasteboard.data(forType: .tiff) {
+            image = NSImage(data: tiff)
+        } else {
+            image = pasteboard
+                .readObjects(
+                    forClasses: [NSImage.self],
+                    options: nil
+                )?
+                .first as? NSImage
+        }
+        guard
+            let image,
+            let tiff = image.tiffRepresentation,
+            let bitmap = NSBitmapImageRep(data: tiff),
+            let png = bitmap.representation(using: .png, properties: [:])
+        else {
+            return ""
+        }
+        return png.base64EncodedString()
     }
 
     /// Reopens a vault a tab came from. The renderer flushes unsaved edits

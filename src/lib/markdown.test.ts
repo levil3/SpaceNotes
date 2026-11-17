@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  imageEditorUrl,
   normalizeTableBoundaries,
   toEditorMarkdown,
   toVaultMarkdown,
@@ -80,6 +81,21 @@ describe("Markdown asset URLs", () => {
     ].join("\n");
 
     expect(toEditorMarkdown(source, "notes/example.md")).toBe(source);
+  });
+
+  it("builds an editor URL for a newly saved attachment that round-trips", () => {
+    const url = imageEditorUrl(
+      "notes/Java Base/example.md",
+      "attachments/pasted-20260101-120000.png",
+    );
+
+    expect(url).toContain("notes-asset://vault/?");
+    expect(url).toContain(
+      "target=attachments%2Fpasted-20260101-120000.png",
+    );
+    expect(
+      toVaultMarkdown(`![shot](${url})`),
+    ).toBe("![shot](attachments/pasted-20260101-120000.png)");
   });
 
   it("ends a table before the next paragraph when the source has no blank line", () => {

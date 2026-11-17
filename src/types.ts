@@ -159,6 +159,10 @@ export interface LevilNotesApi {
     parentPath: string,
     title: string,
   ): Promise<{ path: string; content: string }>;
+  saveAttachment(
+    notePath: string,
+    payload: { name: string; data: string },
+  ): Promise<{ path: string; target: string }>;
   trashNote(path: string): Promise<void>;
   renameNote(path: string, title: string): Promise<{ path: string }>;
   renameDirectory(path: string, name: string): Promise<{ path: string }>;
@@ -215,6 +219,7 @@ export interface LevilNotesApi {
     updates: Partial<AppSettings>,
   ): Promise<AppSettings>;
   readClipboardText(): Promise<string>;
+  readClipboardImage(): Promise<string>;
   writeClipboardText(text: string): Promise<void>;
   showInFolder(path: string): Promise<void>;
 
