@@ -14,7 +14,8 @@ const { Readable } = require("node:stream");
 
 const DEFAULT_REPOSITORY = "levil3/SpaceNotes";
 const CHECK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+// 慢网络下 48 MB 的安装包可能要十几分钟，给足时间再判定超时。
+const DOWNLOAD_TIMEOUT_MS = 30 * 60 * 1000;
 
 const PHASES = Object.freeze([
   "idle",

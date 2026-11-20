@@ -807,6 +807,10 @@ describe("VaultService attachment storage", () => {
   });
 
   it("keeps the image extension and never overwrites an existing attachment", async () => {
+    // 附件名精确到秒；CI 上两次写入可能跨秒，导致 `-2` 后缀不出现。
+    // 冻结时钟让两次写入落在同一秒，断言才是确定性的。
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-02T03:04:05Z"));
     const { root, vault } = await createFixture();
     try {
       const payload = {
@@ -827,6 +831,7 @@ describe("VaultService attachment storage", () => {
       ).resolves.toHaveLength(2);
     } finally {
       await vault.closeWatcher();
+      vi.useRealTimers();
     }
   });
 
