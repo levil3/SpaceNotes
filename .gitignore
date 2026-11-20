@@ -11,3 +11,6 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# 设计原型与评审稿，不进入版本库
+docs/
