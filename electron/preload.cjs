@@ -70,6 +70,21 @@ contextBridge.exposeInMainWorld("levilNotes", {
   toggleMaximizeWindow: () =>
     ipcRenderer.invoke("window:toggle-maximize"),
   closeWindow: () => ipcRenderer.invoke("window:close"),
+  openPath: (target) => ipcRenderer.invoke("app:open-path", target),
+
+  getUpdateState: () => ipcRenderer.invoke("update:state"),
+  checkForUpdate: (options) => ipcRenderer.invoke("update:check", options),
+  downloadUpdate: () => ipcRenderer.invoke("update:download"),
+  cancelUpdate: () => ipcRenderer.invoke("update:cancel"),
+  installUpdate: () => ipcRenderer.invoke("update:install"),
+  openUpdateReleasePage: () =>
+    ipcRenderer.invoke("update:release-page"),
+
+  onUpdateChanged: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("update:changed", listener);
+    return () => ipcRenderer.removeListener("update:changed", listener);
+  },
 
   onVaultChanged: (callback) => {
     const listener = (_event, snapshot) => callback(snapshot);

@@ -21,6 +21,49 @@ export interface AppSettings {
   sidebarCollapsed: boolean;
   showHiddenFiles: boolean;
   recentVault: string;
+  autoCheckUpdates: boolean;
+  skippedUpdateVersion: string;
+  lastUpdateCheckAt: number;
+}
+
+export type UpdatePhase =
+  | "idle"
+  | "checking"
+  | "latest"
+  | "available"
+  | "downloading"
+  | "ready"
+  | "error";
+
+export interface UpdateInfo {
+  version: string;
+  notes: string;
+  publishedAt: string;
+  fileName: string;
+  sizeBytes: number;
+  digest: string;
+  downloadUrl: string;
+  releaseUrl: string;
+}
+
+export interface UpdateState {
+  phase: UpdatePhase;
+  currentVersion: string;
+  info: UpdateInfo | null;
+  progress: number;
+  error: string;
+  lastCheckedAt: number;
+  canInstallInApp: boolean;
+}
+
+export interface UpdateInstallResult extends UpdateState {
+  opened: boolean;
+  target?: string;
+}
+
+export interface UpdateReleaseResult {
+  opened: boolean;
+  url: string;
 }
 
 export interface NoteFile {
@@ -222,6 +265,18 @@ export interface LevilNotesApi {
   readClipboardImage(): Promise<string>;
   writeClipboardText(text: string): Promise<void>;
   showInFolder(path: string): Promise<void>;
+  openPath(target: string): Promise<void>;
+
+  getUpdateState(): Promise<UpdateState>;
+  checkForUpdate(options?: {
+    force?: boolean;
+    silent?: boolean;
+  }): Promise<UpdateState>;
+  downloadUpdate(): Promise<UpdateState>;
+  cancelUpdate(): Promise<UpdateState>;
+  installUpdate(): Promise<UpdateInstallResult>;
+  openUpdateReleasePage(): Promise<UpdateReleaseResult>;
+  onUpdateChanged(callback: (state: UpdateState) => void): () => void;
 
   minimizeWindow(): Promise<void>;
   toggleMaximizeWindow(): Promise<void>;

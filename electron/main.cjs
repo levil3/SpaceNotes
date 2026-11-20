@@ -17,6 +17,7 @@ const {
 } = require("./api.cjs");
 const { GitService } = require("./git.cjs");
 const { SettingsStore, VaultService } = require("./vault.cjs");
+const { UpdateService } = require("./update.cjs");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -34,6 +35,7 @@ let mainWindow = null;
 let settingsStore = null;
 let vaultService = null;
 let gitService = null;
+let updateService = null;
 
 function sendVaultChanged(snapshot) {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -161,6 +163,8 @@ function createDesktopApi() {
       }
     },
     closeWindow: () => mainWindow?.close(),
+    openPath: (target) => shell.openPath(target),
+    quitApp: () => app.quit(),
   };
 
   return createLevilNotesApi({
@@ -168,6 +172,7 @@ function createDesktopApi() {
     gitService,
     settingsStore,
     hostActions,
+    updateService,
   });
 }
 
@@ -192,6 +197,22 @@ app.whenReady().then(async () => {
     fileOperations,
   });
   gitService = new GitService(vaultService);
+  updateService = new UpdateService({
+    // 开发模式下 app.getVersion() 返回 Electron 版本，只有打包后才可信。
+    currentVersion: app.isPackaged
+      ? app.getVersion()
+      : require("../package.json").version,
+    platform: process.platform === "win32" ? "win" : "mac",
+    arch: process.arch === "arm64" ? "arm64" : "x64",
+    cacheDir: path.join(app.getPath("userData"), "updates"),
+    // 允许指向自建更新镜像；默认走 GitHub 公共接口。
+    apiBase: process.env.SPACENOTES_UPDATE_API_BASE || undefined,
+    onChange: (state) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("update:changed", state);
+      }
+    },
+  });
 
   // The packaged Windows build has no menu bar; keeping Electron's default
   // application menu would leave Reload (Ctrl+R), DevTools and page zoom

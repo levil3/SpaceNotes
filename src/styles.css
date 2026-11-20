@@ -3782,3 +3782,473 @@ kbd {
   }
 }
 
+/* ---------- 应用内更新 ---------- */
+.update-about {
+  margin-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, var(--canvas));
+  padding-top: 14px;
+}
+
+.update-about-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.update-about-mark {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 7px;
+  object-fit: contain;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.update-about-head strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.update-about-head small {
+  display: block;
+  margin-top: 1px;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.update-about-state {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.update-about-state.ok {
+  color: var(--git-added);
+}
+
+.update-about-state.new {
+  color: var(--accent-text);
+}
+
+.update-about-state.error {
+  color: var(--danger);
+}
+
+.update-about-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.update-about-button {
+  height: 27px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 0 11px;
+  color: var(--text);
+  font-size: 11.5px;
+}
+
+.update-about-button:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.update-about-button:disabled {
+  opacity: 0.6;
+}
+
+.update-about-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent-text);
+  font-size: 11.5px;
+}
+
+.update-about-link:hover {
+  text-decoration: underline;
+}
+
+.update-about-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.update-about-toggle small {
+  display: block;
+  margin-top: 1px;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.update-backdrop {
+  z-index: 121;
+}
+
+.update-dialog {
+  width: min(540px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.update-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 18px 18px 0;
+}
+
+.update-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.update-head-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-head-copy h2 {
+  margin: 1px 0 0;
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.update-meta {
+  margin: 4px 0 0;
+  color: var(--faint);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.update-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--faint);
+}
+
+.update-close:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+}
+
+.update-close:disabled {
+  opacity: 0.4;
+}
+
+.update-body {
+  padding: 14px 18px 0;
+  overflow: auto;
+}
+
+.update-notes {
+  max-height: 232px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--canvas) 97%, var(--text) 3%);
+  padding: 12px 14px;
+}
+
+.update-notes h3 {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.update-notes h3:not(:first-child) {
+  margin-top: 13px;
+}
+
+.update-notes ul {
+  margin: 0 0 10px;
+  padding-left: 16px;
+}
+
+.update-notes ul:last-child {
+  margin-bottom: 0;
+}
+
+.update-notes li {
+  margin-bottom: 5px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.update-notes p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.update-notes-empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.update-trust {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 10px 0 0;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.update-progress {
+  padding: 2px 0 4px;
+}
+
+.update-progress-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.update-progress-top b {
+  color: var(--text);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.update-bar {
+  height: 4px;
+  margin: 10px 0 6px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  overflow: hidden;
+}
+
+.update-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 180ms linear;
+}
+
+.update-progress-error {
+  margin: 6px 0 0;
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.update-copy {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.update-steps {
+  margin: 0;
+  padding-left: 18px;
+  counter-reset: update-step;
+  list-style: none;
+}
+
+.update-steps li {
+  position: relative;
+  padding: 0 0 9px 4px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.update-steps li::before {
+  counter-increment: update-step;
+  content: counter(update-step);
+  position: absolute;
+  left: -18px;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.update-note {
+  margin: 10px 0 0;
+  border: 1px solid color-mix(in srgb, #c9a227 32%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, #c9a227 9%, var(--canvas));
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.update-error-box {
+  border: 1px solid color-mix(in srgb, var(--danger) 26%, transparent);
+  border-radius: 7px;
+  background: var(--danger-soft);
+  padding: 10px 12px;
+  color: var(--danger);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.update-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 18px 18px;
+}
+
+.update-spacer {
+  flex: 1;
+}
+
+.update-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.update-link:hover {
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.update-ghost,
+.update-primary {
+  height: 29px;
+  border-radius: 6px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.update-ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.update-ghost:hover {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--text);
+}
+
+.update-primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.update-primary:hover:not(:disabled) {
+  background: var(--accent-text);
+  border-color: var(--accent-text);
+}
+
+.update-primary:disabled {
+  opacity: 0.6;
+}
+
+.update-primary.small,
+.update-ghost.small {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.update-prompt {
+  position: fixed;
+  z-index: 100;
+  right: 18px;
+  bottom: 44px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 320px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+
+.update-prompt-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.update-prompt-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-prompt-body strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.update-prompt-body > span {
+  display: block;
+  margin-top: 3px;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.update-prompt-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.update-prompt-close {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.update-prompt-close:hover {
+  color: var(--text);
+}

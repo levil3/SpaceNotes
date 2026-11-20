@@ -41,6 +41,13 @@ const IPC_METHODS = Object.freeze({
   "window:minimize": "minimizeWindow",
   "window:toggle-maximize": "toggleMaximizeWindow",
   "window:close": "closeWindow",
+  "app:open-path": "openPath",
+  "update:state": "getUpdateState",
+  "update:check": "checkForUpdate",
+  "update:download": "downloadUpdate",
+  "update:cancel": "cancelUpdate",
+  "update:install": "installUpdate",
+  "update:release-page": "openUpdateReleasePage",
 });
 
 function hostAction(hostActions, name) {
@@ -61,7 +68,15 @@ function createLevilNotesApi({
   gitService,
   settingsStore,
   hostActions,
+  updateService = null,
 }) {
+  const requireUpdateService = () => {
+    if (!updateService) {
+      throw new Error("当前环境不支持更新检查。");
+    }
+    return updateService;
+  };
+
   return Object.freeze({
     chooseVault: async () => {
       const selectedPath = await hostAction(
@@ -143,6 +158,68 @@ function createLevilNotesApi({
     toggleMaximizeWindow: () =>
       hostAction(hostActions, "toggleMaximizeWindow")(),
     closeWindow: () => hostAction(hostActions, "closeWindow")(),
+    openPath: (target) => {
+      if (typeof target !== "string" || !target) {
+        throw new Error("路径无效。");
+      }
+      return hostAction(hostActions, "openPath")(target);
+    },
+
+    getUpdateState: () => requireUpdateService().getState(),
+
+    checkForUpdate: (options = {}) =>
+      requireUpdateService().check({
+        force: Boolean(options && options.force),
+        silent: Boolean(options && options.silent),
+      }),
+
+    downloadUpdate: () => requireUpdateService().download(),
+    cancelUpdate: () => requireUpdateService().cancel(),
+
+    /**
+     * 由宿主决定怎么打开安装包：Electron 有 shell.openPath，可以直接装；
+     * macOS sidecar 没有打开能力，把路径交回渲染层走宿主桥。
+     */
+    installUpdate: async () => {
+      const service = requireUpdateService();
+      const plan = service.installPlan();
+      const open =
+        hostActions && typeof hostActions.openPath === "function"
+          ? hostActions.openPath
+          : null;
+      if (!open) {
+        return {
+          ...service.getState(),
+          opened: false,
+          target: plan.target,
+        };
+      }
+      await open(plan.target);
+      if (plan.quitAfterInstall) {
+        setTimeout(() => {
+          try {
+            hostActions.quitApp?.();
+          } catch {
+            // 退出失败不影响安装器已经启动。
+          }
+        }, 400);
+      }
+      return { ...service.getState(), opened: true };
+    },
+
+    openUpdateReleasePage: async () => {
+      const service = requireUpdateService();
+      const url = service.releasePageUrl();
+      const open =
+        hostActions && typeof hostActions.openPath === "function"
+          ? hostActions.openPath
+          : null;
+      if (!open) {
+        return { opened: false, url };
+      }
+      await open(url);
+      return { opened: true, url };
+    },
   });
 }
 

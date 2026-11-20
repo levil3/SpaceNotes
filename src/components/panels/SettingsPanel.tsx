@@ -1,9 +1,11 @@
 import { Check, RotateCcw } from "lucide-react";
+import brandMark from "../../../resources/icon.svg";
 import {
   EDITOR_FONT_SIZE_MAX,
   EDITOR_FONT_SIZE_MIN,
 } from "../../lib/editorZoom";
 import type { AppSettings, ThemeMode } from "../../types";
+import type { Updater } from "../../lib/updater";
 
 // Presets only change document colors; layout and saved notes remain untouched.
 const themePresets = [
@@ -139,18 +141,47 @@ const defaults: AppSettings = {
   sidebarCollapsed: false,
   showHiddenFiles: false,
   recentVault: "",
+  autoCheckUpdates: true,
+  skippedUpdateVersion: "",
+  lastUpdateCheckAt: 0,
 };
 
 interface SettingsPanelProps {
   settings: AppSettings;
   onChange(updates: Partial<AppSettings>): void;
+  updater: Updater;
 }
 
 export function SettingsPanel({
   settings,
   onChange,
+  updater,
 }: SettingsPanelProps) {
   const setThemeMode = (themeMode: ThemeMode) => onChange({ themeMode });
+  const update = updater.state;
+  const updateStateText = updater.skipped
+    ? `已跳过 ${update.info?.version ?? ""}`
+    : update.phase === "checking"
+      ? "正在检查更新…"
+      : update.phase === "downloading"
+        ? `正在下载 ${Math.round(update.progress)}%`
+        : update.phase === "ready"
+          ? `${update.info?.version ?? ""} 已下载，待安装`
+          : update.phase === "available"
+            ? `有新版本 ${update.info?.version ?? ""}`
+            : update.phase === "latest"
+              ? "已是最新版本"
+              : update.phase === "error"
+                ? "检查更新失败"
+                : "检查更新，获取最新版本与修复。";
+  const updateStateTone =
+    updater.skipped || update.phase === "idle"
+      ? "idle"
+      : update.phase === "latest"
+        ? "ok"
+        : update.phase === "error"
+          ? "error"
+          : "new";
 
   return (
     <div className="side-panel-content settings-panel">
@@ -344,6 +375,71 @@ export function SettingsPanel({
             }
           />
         </label>
+      </section>
+
+      <section className="settings-section update-about">
+        <div className="update-about-head">
+          <img className="update-about-mark" src={brandMark} alt="" />
+          <span>
+            <strong>Levil Notes</strong>
+            <small>版本 {update.currentVersion || "—"}</small>
+          </span>
+        </div>
+        <p className={`update-about-state ${updateStateTone}`}>
+          {updateStateText}
+        </p>
+        <div className="update-about-actions">
+          <button
+            type="button"
+            className="update-about-button"
+            onClick={() => void updater.check(true)}
+            disabled={updater.busy || update.phase === "checking"}
+          >
+            {update.phase === "checking" ? "检查中…" : "检查更新"}
+          </button>
+          {update.phase === "available" ||
+          update.phase === "ready" ||
+          update.phase === "downloading" ? (
+            <button
+              type="button"
+              className="update-about-link"
+              onClick={() => updater.openDialog()}
+            >
+              查看
+            </button>
+          ) : null}
+          {updater.skipped || update.phase === "error" ? (
+            <button
+              type="button"
+              className="update-about-link"
+              onClick={() =>
+                void (updater.skipped
+                  ? updater.unskipVersion()
+                  : updater.check(true))
+              }
+            >
+              {updater.skipped ? "恢复提示" : "重试"}
+            </button>
+          ) : null}
+        </div>
+        <div className="update-about-toggle">
+          <span>
+            启动时自动检查
+            <small>每 24 小时最多一次</small>
+          </span>
+          <button
+            type="button"
+            className="settings-switch"
+            role="switch"
+            aria-label="启动时自动检查更新"
+            aria-checked={settings.autoCheckUpdates}
+            onClick={() =>
+              onChange({ autoCheckUpdates: !settings.autoCheckUpdates })
+            }
+          >
+            <span />
+          </button>
+        </div>
       </section>
     </div>
   );

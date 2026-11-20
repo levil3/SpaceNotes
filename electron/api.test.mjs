@@ -200,3 +200,92 @@ describe("shared LevilNotes API", () => {
     expect(gitService.status).not.toHaveBeenCalled();
   });
 });
+
+describe("更新相关 API", () => {
+  const baseState = {
+    phase: "ready",
+    currentVersion: "0.1.25",
+    info: { version: "0.2.0", fileName: "Levil Notes Setup 0.2.0.exe" },
+    progress: 100,
+    error: "",
+    lastCheckedAt: 1,
+    canInstallInApp: true,
+  };
+
+  function createUpdateApi(hostActions) {
+    const updateService = {
+      getState: vi.fn(() => baseState),
+      check: vi.fn(async () => ({ ...baseState, phase: "latest" })),
+      download: vi.fn(async () => baseState),
+      cancel: vi.fn(() => ({ ...baseState, phase: "available" })),
+      installPlan: vi.fn(() => ({
+        target: "/tmp/updates/Levil Notes Setup 0.2.0.exe",
+        quitAfterInstall: true,
+      })),
+      releasePageUrl: vi.fn(() => "https://example.test/releases"),
+    };
+    const api = createLevilNotesApi({
+      vaultService: {},
+      gitService: {},
+      settingsStore: {},
+      hostActions,
+      updateService,
+    });
+    return { api, updateService };
+  }
+
+  it("有宿主打开能力时：打开安装包并退出应用", async () => {
+    vi.useFakeTimers();
+    const hostActions = {
+      openPath: vi.fn(async () => {}),
+      quitApp: vi.fn(),
+    };
+    const { api, updateService } = createUpdateApi(hostActions);
+    const result = await api.installUpdate();
+    expect(hostActions.openPath).toHaveBeenCalledWith(
+      "/tmp/updates/Levil Notes Setup 0.2.0.exe",
+    );
+    expect(result.opened).toBe(true);
+    vi.advanceTimersByTime(500);
+    expect(hostActions.quitApp).toHaveBeenCalledOnce();
+    expect(updateService.installPlan).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
+  it("没有宿主打开能力时：把路径交回渲染层", async () => {
+    const { api } = createUpdateApi({});
+    const result = await api.installUpdate();
+    expect(result.opened).toBe(false);
+    expect(result.target).toContain("Levil Notes Setup 0.2.0.exe");
+  });
+
+  it("发布页同样按宿主能力分流", async () => {
+    const withHost = createUpdateApi({
+      openPath: vi.fn(async () => {}),
+    });
+    expect((await withHost.api.openUpdateReleasePage()).opened).toBe(true);
+    const withoutHost = createUpdateApi({});
+    const result = await withoutHost.api.openUpdateReleasePage();
+    expect(result.opened).toBe(false);
+    expect(result.url).toBe("https://example.test/releases");
+  });
+
+  it("检查更新透传 force / silent", async () => {
+    const { api, updateService } = createUpdateApi({});
+    await api.checkForUpdate({ force: true, silent: false });
+    expect(updateService.check).toHaveBeenCalledWith({
+      force: true,
+      silent: false,
+    });
+  });
+
+  it("缺少更新服务时给出明确错误", () => {
+    const api = createLevilNotesApi({
+      vaultService: {},
+      gitService: {},
+      settingsStore: {},
+      hostActions: {},
+    });
+    expect(() => api.getUpdateState()).toThrow("不支持更新检查");
+  });
+});

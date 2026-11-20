@@ -140,6 +140,12 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
                 return
             }
             showInFolder(path, request: request)
+        case "openPath":
+            guard let target = request.arguments.first as? String else {
+                reject(request, message: "目标无效。")
+                return
+            }
+            openPath(target, request: request)
         case "readClipboardImage":
             // 剪贴板里的截图没有文件路径，只能读出位图再交给渲染层落盘。
             resolve(
@@ -294,6 +300,33 @@ final class HostMessageHandler: NSObject, WKScriptMessageHandler {
                 reject(request, message: error.localizedDescription)
             }
         }
+    }
+
+    /// 打开更新安装包（DMG）或发布页链接。只放行安装包后缀与 http(s) 链接，
+    /// 避免渲染层借这个动作执行任意文件。
+    private func openPath(_ target: String, request: BridgeRequest) {
+        let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            reject(request, message: "目标无效。")
+            return
+        }
+        if let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
+           scheme == "https" || scheme == "http" {
+            NSWorkspace.shared.open(url)
+            resolve(request, value: NSNull())
+            return
+        }
+        let allowedExtensions: Set<String> = ["dmg", "exe", "pkg", "zip"]
+        let fileURL = URL(fileURLWithPath: trimmed)
+        let ext = fileURL.pathExtension.lowercased()
+        guard allowedExtensions.contains(ext),
+              FileManager.default.fileExists(atPath: fileURL.path)
+        else {
+            reject(request, message: "只能打开更新安装包。")
+            return
+        }
+        NSWorkspace.shared.open(fileURL)
+        resolve(request, value: NSNull())
     }
 
     private func showInFolder(_ relativePath: String, request: BridgeRequest) {

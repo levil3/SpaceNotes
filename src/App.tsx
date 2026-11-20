@@ -1,4 +1,5 @@
 import {
+  ArrowDownToLine,
   ArrowLeft,
   ArrowRight,
   BookOpen,
@@ -46,6 +47,7 @@ import {
   type SearchScope,
 } from "./components/panels/SearchPanel";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { TagsPanel } from "./components/panels/TagsPanel";
 import {
   buildFileTree,
@@ -54,6 +56,7 @@ import {
 } from "./lib/paths";
 import { adjustEditorFontSize } from "./lib/editorZoom";
 import { planExternalReload } from "./lib/externalReload";
+import { useUpdater } from "./lib/updater";
 import type { FileTreeSelectionItem } from "./lib/fileSelection";
 import {
   belongsToDirectory,
@@ -113,6 +116,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   sidebarCollapsed: false,
   showHiddenFiles: false,
   recentVault: "",
+  autoCheckUpdates: true,
+  skippedUpdateVersion: "",
+  lastUpdateCheckAt: 0,
 };
 
 function entryName(relativePath: string) {
@@ -267,6 +273,12 @@ export default function App() {
     },
     [showToast],
   );
+
+  const updater = useUpdater({
+    settings,
+    onSettingsChange: updateSettings,
+    enabled: booted,
+  });
 
   const applySettings = useCallback((next: AppSettings) => {
     const resolvedTheme =
@@ -1950,6 +1962,7 @@ export default function App() {
               <SettingsPanel
                 settings={settings}
                 onChange={updateSettings}
+                updater={updater}
               />
             )}
 
@@ -2235,6 +2248,49 @@ export default function App() {
       </footer>
 
       {toast ? <div className="toast">{toast}</div> : null}
+
+      {updater.state.phase === "available" &&
+      !updater.dialogOpen &&
+      !updater.toastDismissed &&
+      !updater.skipped ? (
+        <div className="update-prompt" role="status">
+          <span className="update-prompt-icon" aria-hidden="true">
+            <ArrowDownToLine size={15} />
+          </span>
+          <span className="update-prompt-body">
+            <strong>新版本 {updater.state.info?.version} 可用</strong>
+            <span>
+              当前 {updater.state.currentVersion} · 只提示，不打断
+            </span>
+            <span className="update-prompt-actions">
+              <button
+                type="button"
+                className="update-primary small"
+                onClick={() => updater.openDialog()}
+              >
+                查看
+              </button>
+              <button
+                type="button"
+                className="update-ghost small"
+                onClick={() => updater.dismissToast()}
+              >
+                稍后
+              </button>
+            </span>
+          </span>
+          <button
+            type="button"
+            className="update-prompt-close"
+            aria-label="关闭"
+            onClick={() => updater.dismissToast()}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+
+      <UpdateDialog updater={updater} />
 
       {contextMenu ? (
         <ContextMenu

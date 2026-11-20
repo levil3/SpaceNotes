@@ -9,6 +9,7 @@ const {
   createSidecarServer,
 } = require("./server.cjs");
 const { SettingsStore, VaultService } = require("../../electron/vault.cjs");
+const { UpdateService } = require("../../electron/update.cjs");
 
 function requiredEnvironment(name) {
   const value = process.env[name];
@@ -127,16 +128,31 @@ async function main() {
   const unsupportedHostAction = async () => {
     throw new Error("该动作由 macOS 原生宿主处理。");
   };
+  const appVersion = String(process.env.SPACENOTES_APP_VERSION || "0.0.0");
+  // 打开安装包/链接需要原生宿主（NSWorkspace），sidecar 只负责下载与状态。
+  const updateService = new UpdateService({
+    currentVersion: appVersion,
+    platform: "mac",
+    arch: process.arch === "arm64" ? "arm64" : "x64",
+    cacheDir: path.join(path.dirname(settingsPath), "updates"),
+    // 与 Electron 一致：允许指向自建更新镜像，默认走 GitHub 公共接口。
+    apiBase: process.env.SPACENOTES_UPDATE_API_BASE || undefined,
+    onChange: (state) => broadcaster.broadcastUpdate?.(state),
+  });
+  await updateService.restoreDownloaded();
+
   const sharedApi = createLevilNotesApi({
     vaultService,
     gitService,
     settingsStore,
+    updateService,
     hostActions: {
       chooseVaultFolder: unsupportedHostAction,
       showInFolder: unsupportedHostAction,
       minimizeWindow: unsupportedHostAction,
       toggleMaximizeWindow: unsupportedHostAction,
       closeWindow: unsupportedHostAction,
+      // 故意不提供 openPath：安装包由渲染层经宿主桥交给 NSWorkspace 打开。
     },
   });
   const api = sharedApi;

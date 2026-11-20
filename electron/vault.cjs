@@ -18,6 +18,9 @@ const DEFAULT_SETTINGS = {
   sidebarCollapsed: false,
   showHiddenFiles: false,
   recentVault: "",
+  autoCheckUpdates: true,
+  skippedUpdateVersion: "",
+  lastUpdateCheckAt: 0,
 };
 
 const ALWAYS_SKIPPED_DIRECTORIES = new Set([".git"]);

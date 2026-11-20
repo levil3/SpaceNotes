@@ -53,6 +53,10 @@ final class SidecarManager {
             configuration.allowedOrigins.joined(separator: ",")
         environment["SPACENOTES_PARENT_PID"] =
             String(configuration.parentPID)
+        // 更新检查需要真实的应用版本号，sidecar 自己拿不到 bundle 版本。
+        environment["SPACENOTES_APP_VERSION"] = Bundle.main
+            .object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String ?? ""
         let existingPath = environment["PATH"] ?? ""
         environment["PATH"] = [
             "/opt/homebrew/bin",

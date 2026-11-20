@@ -28,16 +28,24 @@ const CONTENT_TYPES = new Map([
 function createEventBroadcaster() {
   const subscribers = new Set();
 
+  const send = (event, payload) => {
+    const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const response of subscribers) {
+      response.write(message);
+    }
+  };
+
   return {
     subscribe(response) {
       subscribers.add(response);
       return () => subscribers.delete(response);
     },
     broadcast(payload) {
-      const message = `event: vault-changed\ndata: ${JSON.stringify(payload)}\n\n`;
-      for (const response of subscribers) {
-        response.write(message);
-      }
+      send("vault-changed", payload);
+    },
+    // 更新状态变化（进度 / 就绪 / 失败）复用同一条 SSE 通道。
+    broadcastUpdate(payload) {
+      send("update-changed", payload);
     },
     close() {
       for (const response of subscribers) {

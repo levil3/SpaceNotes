@@ -6,6 +6,7 @@
     const baseUrl = config.baseUrl.replace(/\/+$/, "");
     const pendingHostRequests = new Map();
     const subscribers = new Set();
+    const updateSubscribers = new Set();
     const openFileSubscribers = new Set();
     const pendingOpenFiles = [];
     let nextHostRequestId = 1;
@@ -72,7 +73,7 @@
     }
 
     function openEventSource() {
-      if (eventSource || subscribers.size === 0) {
+      if (eventSource || (subscribers.size === 0 && updateSubscribers.size === 0)) {
         return;
       }
       eventSource = new EventSourceImpl(
@@ -93,10 +94,25 @@
           }
         }
       });
+      eventSource.addEventListener("update-changed", (event) => {
+        let state;
+        try {
+          state = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        for (const subscriber of [...updateSubscribers]) {
+          try {
+            subscriber(state);
+          } catch {
+            // One subscriber must not prevent delivery to the others.
+          }
+        }
+      });
     }
 
     function closeEventSourceIfIdle() {
-      if (subscribers.size === 0 && eventSource) {
+      if (subscribers.size === 0 && updateSubscribers.size === 0 && eventSource) {
         eventSource.close();
         eventSource = null;
       }
@@ -162,10 +178,34 @@
         requestHost("writeClipboardText", [text]),
       showInFolder: (relativePath) =>
         requestHost("showInFolder", [relativePath]),
+      openPath: (target) => requestHost("openPath", [target]),
       minimizeWindow: () => requestHost("minimizeWindow"),
       toggleMaximizeWindow: () =>
         requestHost("toggleMaximizeWindow"),
       closeWindow: () => requestHost("closeWindow"),
+
+      getUpdateState: () => invoke("getUpdateState"),
+      checkForUpdate: (options) => invoke("checkForUpdate", [options]),
+      downloadUpdate: () => invoke("downloadUpdate"),
+      cancelUpdate: () => invoke("cancelUpdate"),
+      installUpdate: () => invoke("installUpdate"),
+      openUpdateReleasePage: () => invoke("openUpdateReleasePage"),
+      onUpdateChanged: (callback) => {
+        if (typeof callback !== "function") {
+          throw new TypeError("update callback must be a function");
+        }
+        updateSubscribers.add(callback);
+        openEventSource();
+        let active = true;
+        return () => {
+          if (!active) {
+            return;
+          }
+          active = false;
+          updateSubscribers.delete(callback);
+          closeEventSourceIfIdle();
+        };
+      },
       onVaultChanged: (callback) => {
         if (typeof callback !== "function") {
           throw new TypeError("vault change callback must be a function");

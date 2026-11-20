@@ -286,7 +286,7 @@ cp -R "$ROOT/dist/." "$APP_PATH/Contents/Resources/web/"
 cp "$MACOS_ROOT/bridge/levilNotesBridge.js" \
   "$APP_PATH/Contents/Resources/levilNotesBridge.js"
 cp "$ROOT/electron/api.cjs" "$ROOT/electron/git.cjs" \
-  "$ROOT/electron/vault.cjs" \
+  "$ROOT/electron/vault.cjs" "$ROOT/electron/update.cjs" \
   "$APP_PATH/Contents/Resources/sidecar/electron/"
 cp "$MACOS_ROOT/sidecar/sidecar-entry.cjs" \
   "$MACOS_ROOT/sidecar/server.cjs" \
